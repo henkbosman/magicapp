@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.2 - 2026-09-10
+
+### Opgelost
+
+- Het plus-icoon van de knop **Kaart toevoegen** rechtsboven staat op mobiele schermen exact gecentreerd. De verborgen tekst neemt geen ruimte meer in.
+- Op de mobiele kaartdetailpagina worden **Kaartgegevens** en **Keywords** onder elkaar weergegeven in plaats van naast elkaar.
+
 ## 2.0.1 - 2026-09-10
 
 ### Gewijzigd

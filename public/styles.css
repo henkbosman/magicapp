@@ -407,9 +407,15 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
   .mobile-brand { display: block; }
   .mobile-brand .brand-mark { width: 38px; height: 38px; }
   .topbar { padding: 10px 14px; gap: 10px; }
-  .top-add span:last-child, .top-add { font-size: 0; }
-  .top-add span:first-child { font-size: 1.1rem; }
-  .top-add { width: 42px; padding: 0; }
+  .button.top-add {
+    width: 42px; height: 42px; min-height: 42px; padding: 0; gap: 0;
+    display: inline-grid; place-items: center; font-size: 0;
+  }
+  .button.top-add span:last-child { display: none; }
+  .button.top-add span:first-child {
+    width: 100%; height: 100%; display: grid; place-items: center;
+    font-size: 1.1rem; line-height: 1;
+  }
   #app { padding: 24px 16px 102px; }
   .mobile-nav {
     position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
@@ -429,6 +435,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
   .mobile-nav a small { color: inherit; font-size: .69rem; line-height: 1; white-space: nowrap; }
   .mobile-nav a.active { background: var(--primary-soft); color: var(--primary-dark); }
   .dashboard-grid, .add-layout, .card-detail-grid { grid-template-columns: 1fr; }
+  .card-detail-grid .grid-2 { grid-template-columns: 1fr; }
   .selected-printing, .card-detail-image-stack { position: static; }
   .card-detail-image-stack { max-width: 330px; margin: 0 auto; }
   .filters, .filters.compact-filters { grid-template-columns: repeat(2, minmax(0,1fr)); }
