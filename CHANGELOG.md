@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.1 - 2026-09-10
+
+### Gewijzigd
+
+- Collectie-, Wanted- en deckfilters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Actieve filters blijven werken en worden als aantal op de toggle getoond.
+- Bij het toevoegen van een kaart aan Wanted wordt na de kaartnaam slechts één representatieve printing getoond; de definitieve printing wordt later vanuit Wanted gekozen.
+- De toelichting dat de gewenste printing later gekozen kan worden is uit het Wanted-toevoegvenster verwijderd.
+- De knop **Printing** op Wanted blijft bruikbaar wanneer de schrijf-API geblokkeerd is. Printings en prijzen kunnen dan worden bekeken, maar de keuze kan niet worden gewijzigd.
+- Afbeeldingen in de Wanted-printingkiezer zijn aanklikbaar en openen een grote, mobielvriendelijke preview.
+- Scryfall-printingresultaten bewaren naast de thumbnail ook de normale afbeeldings-URL. De printingcacheversie is verhoogd zodat bestaande cachegegevens automatisch worden vernieuwd.
+- De zichtbare melding/status voor een niet-beschikbare schrijf-API is verwijderd. Schrijfknoppen blijven wel automatisch grijs en uitgeschakeld.
+- De mobiele ondernavigatie bevat voortaan vier duidelijke vaste knoppen: Home, Collectie, Decks en Wanted. De aparte Toevoegen-knop in deze balk is verwijderd.
+- De mobiele navigatie heeft een constante inhoudshoogte en duidelijkere SVG-iconen met een zichtbare actieve status.
+- De decktegels schakelen op smalle schermen naar één kolom en lange namen/teksten kunnen niet meer buiten het witte vlak lopen.
+
 ## 2.0.0 - 2026-09-10
 
 Eerste productiebaseline.

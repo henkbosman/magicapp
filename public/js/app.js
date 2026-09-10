@@ -1,6 +1,6 @@
 import { api, queryString } from './api.js';
 import { cardSearchResult } from './components.js';
-import { debounce, escapeHtml, loadingBlock, toast } from './utils.js';
+import { debounce, escapeHtml, loadingBlock } from './utils.js';
 import { consumePendingScroll, prepareCardDetailNavigation } from './navigation-state.js';
 import { applyWriteAvailability, initializeWriteAccess } from './write-access.js';
 import { renderAddCard } from './views/add-card.js';
@@ -149,9 +149,6 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-window.addEventListener('app:write-blocked', (event) => {
-  toast(event.detail?.checked ? 'Deze verbinding heeft alleen leestoegang.' : 'Schrijftoegang wordt nog gecontroleerd.', 'warning');
-});
 
 initializeWriteAccess();
 

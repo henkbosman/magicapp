@@ -14,7 +14,7 @@ function localSuggestionHtml(card, index) {
   </button>`;
 }
 
-export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCollection = false } = {}) {
+export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCollection = false, singlePrinting = false } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let selectedName = '';
@@ -76,7 +76,8 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
       results.innerHTML = '';
       try {
         const response = await api(`/cards/printings${queryString({ name })}`);
-        loadedPrintings = response.data || response;
+        const allPrintings = response.data || response;
+        loadedPrintings = singlePrinting ? allPrintings.slice(0, 1) : allPrintings;
         status.hidden = true;
         if (!loadedPrintings.length) {
           status.hidden = false;

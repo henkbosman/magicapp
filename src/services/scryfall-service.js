@@ -106,10 +106,10 @@ class ScryfallService {
 
   async printings(name, { force = false } = {}) {
     const normalizedName = normalizeSearchText(name);
-    // v2 bevat uitsluitend fysieke paper-printings. Door de cacheversie in de
+    // v3 bevat fysieke paper-printings plus een normale afbeeldings-URL voor previews. Door de cacheversie in de
     // sleutel op te nemen worden oudere resultaten met digitale varianten niet
     // opnieuw gebruikt na een upgrade.
-    const cacheKey = `printings:v2:${normalizedName}`;
+    const cacheKey = `printings:v3:${normalizedName}`;
     return this.cached(cacheKey, config.scryfallPrintingsCacheTtlMs, async () => {
       const escapedName = String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const params = new URLSearchParams({

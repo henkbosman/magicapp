@@ -135,7 +135,8 @@ function mergePrintings(localPrintings, remotePrintings) {
           ...remotePrinting,
           cardId: localPrinting.cardId,
           cached: true,
-          image: localPrinting.image || remotePrinting.image
+          image: localPrinting.image || remotePrinting.image,
+          imageNormal: localPrinting.imageNormal || remotePrinting.imageNormal || localPrinting.image || remotePrinting.image
         }
       : localPrinting);
   }

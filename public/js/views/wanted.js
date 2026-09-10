@@ -3,6 +3,7 @@ import { addCardToCollection, addCardToWanted } from '../card-actions.js';
 import { pickCard } from '../card-picker.js';
 import { cachedCardImageUrl, cardImage, pageHeader, usageBadges } from '../components.js';
 import { bindLiveFilters } from '../live-filters.js';
+import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import {
   confirmDialog,
   emptyState,
@@ -87,6 +88,17 @@ function samePrinting(card, printing) {
     && String(card.collectorNumber || '') === String(printing.collectorNumber || ''));
 }
 
+function openPrintingPreview(printing) {
+  const source = printing.imageNormal || printing.image;
+  if (!source) return null;
+  return openDialog({
+    title: `${printing.name} · ${printing.setName}`,
+    cancelLabel: 'Sluiten',
+    wide: true,
+    content: `<div class="printing-image-preview"><img src="${escapeHtml(cachedCardImageUrl(source))}" alt="${escapeHtml(`${printing.name} uit ${printing.setName}`)}"></div>`
+  });
+}
+
 async function choosePrinting(item, onDone) {
   const dialog = openDialog({
     title: `Printing kiezen voor ${item.card.name}`,
@@ -120,7 +132,7 @@ async function choosePrinting(item, onDone) {
         const current = samePrinting(item.printing, printing);
         return `<article class="wanted-printing-card ${current ? 'selected' : ''}">
           ${printing.image
-            ? `<img src="${escapeHtml(cachedCardImageUrl(printing.image))}" alt="${escapeHtml(`${printing.name} uit ${printing.setName}`)}" loading="lazy">`
+            ? `<button type="button" class="wanted-printing-image-button" data-preview-index="${index}" aria-label="Vergroot ${escapeHtml(printing.name)} uit ${escapeHtml(printing.setName)}"><img src="${escapeHtml(cachedCardImageUrl(printing.image))}" alt="${escapeHtml(`${printing.name} uit ${printing.setName}`)}" loading="lazy"></button>`
             : `<span class="card-image-placeholder wanted-printing-image"><span>${escapeHtml(printing.name?.slice(0, 1) || '?')}</span></span>`}
           <div class="wanted-printing-copy">
             <div class="wanted-printing-heading"><strong>${escapeHtml(printing.setName)}</strong><span class="badge neutral">${escapeHtml(printing.setCode.toUpperCase())} #${escapeHtml(printing.collectorNumber)}</span></div>
@@ -130,6 +142,11 @@ async function choosePrinting(item, onDone) {
           <button type="button" class="button ${current ? 'primary' : 'secondary'} small choose-wanted-printing" data-index="${index}" data-write-action ${current ? 'disabled' : ''}>${current ? 'Gekozen' : 'Kiezen'}</button>
         </article>`;
       }).join('')}`;
+
+    results.querySelectorAll('[data-preview-index]').forEach((button) => button.addEventListener('click', () => {
+      const printing = printings[Number(button.dataset.previewIndex)];
+      if (printing) openPrintingPreview(printing);
+    }));
 
     results.querySelector('#clear-wanted-printing')?.addEventListener('click', async (event) => {
       const button = event.currentTarget;
@@ -201,7 +218,7 @@ function renderWantedRows(items, hasFilters = false) {
       </div>
       <div class="card-list-actions">
         <button class="button primary small acquire-wanted" data-id="${item.id}" data-write-action ${item.printing ? '' : 'disabled title="Kies eerst een printing"'}>Gekocht</button>
-        <button class="button secondary small choose-printing" data-id="${item.id}" data-write-action>Printing</button>
+        <button class="button secondary small choose-printing" data-id="${item.id}">Printing</button>
         <button class="button secondary small edit-wanted" data-id="${item.id}" data-write-action>Bewerken</button>
         <button class="button ghost small delete-wanted text-danger" data-id="${item.id}" data-name="${escapeHtml(item.card.name)}" data-write-action>Verwijderen</button>
       </div>
@@ -248,6 +265,9 @@ export async function renderWanted(context) {
     sort: context.query.get('sort') || 'priority'
   };
 
+  const filterPanelExpanded = filtersExpanded('wanted');
+  const activeFilterCount = Object.entries(filters).filter(([key, value]) => key !== 'sort' && String(value || '').length > 0).length;
+
   let options = await api('/wanted/options');
   let items = await api(`/wanted${queryString(filters)}`);
 
@@ -259,7 +279,8 @@ export async function renderWanted(context) {
         description: 'Filter per deck of doorzoek de series waarin je wanted-kaarten zijn verschenen.',
         actions: `<button id="add-wanted" class="button primary" data-write-action>＋ Kaart toevoegen</button><a class="button secondary" href="${apiPath('/wanted/export.csv')}">CSV exporteren</a>`
       })}
-      <form id="wanted-filters" class="filters compact-filters wanted-filters live-filters" autocomplete="off">
+      ${filterToggleHtml({ id: 'wanted-filter-toggle', panelId: 'wanted-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+      <form id="wanted-filters" class="filters compact-filters wanted-filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>
         <div class="field filter-search"><label>Naam</label><input name="q" type="search" value="${escapeHtml(filters.q)}" placeholder="Zoek wanted-kaart"></div>
         <div class="field"><label>Prioriteit</label><select name="priority"><option value="">Alle prioriteiten</option>${[1,2,3,4,5].map((value) => option(value, `Prioriteit ${value}`, filters.priority)).join('')}</select></div>
         <div class="field"><label>Deck</label><select id="wanted-deck-filter" name="deckId">${deckOptionsHtml(options, filters.deckId)}</select></div>
@@ -279,6 +300,12 @@ export async function renderWanted(context) {
       const resultsElement = document.getElementById('wanted-results');
       const countElement = document.getElementById('wanted-result-count');
       let liveFilters;
+      const filterToggle = bindFilterToggle({
+        button: document.getElementById('wanted-filter-toggle'),
+        panel: filterForm,
+        key: 'wanted',
+        getActiveCount: () => [...new FormData(filterForm).entries()].filter(([key, value]) => key !== 'sort' && String(value || '').length > 0).length
+      });
 
       const updateResults = (nextItems, hasFilters) => {
         items = nextItems;
@@ -289,6 +316,7 @@ export async function renderWanted(context) {
         const nextItems = await api(`/wanted${params.toString() ? `?${params}` : ''}`, { signal });
         updateResults(nextItems, params.toString().length > 0);
         countElement.textContent = resultCountText(nextItems);
+        filterToggle.updateActiveCount();
       };
 
       const reloadOptionsAndResults = async () => {
@@ -320,7 +348,7 @@ export async function renderWanted(context) {
       });
 
       const addWanted = async () => {
-        const card = await pickCard({ title: 'Kaart aan wanted-list toevoegen' });
+        const card = await pickCard({ title: 'Kaart aan wanted-list toevoegen', singlePrinting: true });
         if (card) addCardToWanted(card, { onDone: reloadOptionsAndResults });
       };
 

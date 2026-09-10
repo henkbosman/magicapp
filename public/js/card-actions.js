@@ -117,7 +117,6 @@ export function addCardToWanted(card, { onDone = refreshView, quantity = 1, note
       <div class="field"><label>Prioriteit</label><select name="priority"><option value="1">1 · Hoogst</option><option value="2">2 · Hoog</option><option value="3" selected>3 · Normaal</option><option value="4">4 · Laag</option><option value="5">5 · Laagst</option></select></div>
       <div class="field"><label>Maximumprijs (€)</label><input name="maximumPrice" type="number" min="0" step="0.01"></div>
       <div class="field full"><label>Opmerkingen</label><textarea name="notes">${escapeHtml(notes)}</textarea></div>
-      <p class="form-note full">De gewenste printing kun je later vanuit de wanted-list kiezen.</p>
     </div>`,
     onSubmit: async (data) => {
       const wantedItem = await api('/wanted', { method: 'POST', body: {

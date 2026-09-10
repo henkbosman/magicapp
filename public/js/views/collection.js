@@ -3,6 +3,7 @@ import { addCardToDeck } from '../card-actions.js';
 import { cardImage, cardInsightBadges, manaCost, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { bindLiveFilters } from '../live-filters.js';
+import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, toast } from '../utils.js';
 
 const CONDITION_LABELS = {
@@ -61,6 +62,8 @@ export async function renderCollection(context) {
     deckId: context.query.get('deckId') || '',
     availability: context.query.get('availability') || ''
   };
+  const filterPanelExpanded = filtersExpanded('collection');
+  const activeFilterCount = Object.values(filters).filter((value) => String(value || '').length > 0).length;
   const [result, options] = await Promise.all([
     api(`/collection${queryString(filters)}`),
     api('/collection/options')
@@ -74,7 +77,8 @@ export async function renderCollection(context) {
         description: `${items.length} collectieregels zichtbaar. Beschikbaarheid wordt over alle printings van dezelfde Oracle-kaart berekend.`,
         actions: `<a class="button primary" data-write-action href="#/add">＋ Kaart toevoegen</a><a class="button secondary" href="${apiPath('/collection/export.csv')}">CSV exporteren</a>`
       })}
-      <form id="collection-filters" class="filters live-filters" autocomplete="off">
+      ${filterToggleHtml({ id: 'collection-filter-toggle', panelId: 'collection-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+      <form id="collection-filters" class="filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>
         <div class="field filter-search"><label>Naam</label><input name="q" type="search" value="${escapeHtml(filters.q)}" placeholder="Zoek in lokale collectie"></div>
         <div class="field"><label>Kleuridentiteit</label><select name="color"><option value="">Alle kleuren</option>${[['W','Wit'],['U','Blauw'],['B','Zwart'],['R','Rood'],['G','Groen'],['M','Meerkleurig'],['C','Kleurloos']].map(([v,l]) => option(v, l, filters.color)).join('')}</select></div>
         <div class="field"><label>Kaarttype</label><select name="type"><option value="">Alle types</option>${['Creature','Land','Artifact','Enchantment','Instant','Sorcery','Planeswalker','Battle'].map((v) => option(v, v, filters.type)).join('')}</select></div>
@@ -94,6 +98,12 @@ export async function renderCollection(context) {
       const resultsElement = document.getElementById('collection-results');
       const countElement = document.getElementById('collection-result-count');
       let liveFilters;
+      const filterToggle = bindFilterToggle({
+        button: document.getElementById('collection-filter-toggle'),
+        panel: filterForm,
+        key: 'collection',
+        getActiveCount: () => [...new FormData(filterForm).values()].filter((value) => String(value || '').length > 0).length
+      });
 
       const updateResults = (nextItems, hasFilters) => {
         items = nextItems;
@@ -104,6 +114,7 @@ export async function renderCollection(context) {
       const loadCurrentResults = async (params = liveFilters?.getParams() || new URLSearchParams(), signal) => {
         const next = await api(`/collection${params.toString() ? `?${params}` : ''}`, { signal });
         updateResults(next.items, params.toString().length > 0);
+        filterToggle.updateActiveCount();
       };
 
       liveFilters = bindLiveFilters({

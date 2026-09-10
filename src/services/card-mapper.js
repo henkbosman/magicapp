@@ -197,6 +197,7 @@ export function scryfallSummary(card) {
     finishes: mapped.finishes,
     prices: mapped.prices,
     image: mapped.imageSmall || mapped.imageNormal,
+    imageNormal: mapped.imageNormal || mapped.imageSmall,
     typeLine: mapped.typeLine,
     manaCost: mapped.manaCost,
     layout: mapped.layout

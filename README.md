@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.0.0
+# Magic Collection Manager 2.0.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.0.1** verfijnt vooral de wanted-, filter- en mobiele gebruikersinterface. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -19,7 +19,7 @@ Versie **2.0.0** is de eerste productiebaseline. De experimentele Monte Carlo/de
 - Handmatig corrigeerbare kaartkenmerken voor mana-productie en library-searchfuncties.
 - CSV-import/-export voor de collectie en tekstimport/-export voor decks.
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
-- Automatische alleen-lezeninterface wanneer de schrijf-API niet bereikbaar is.
+- Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
 
 ## Vereisten
@@ -62,7 +62,7 @@ Versie 2.0.0 is bewust een **nieuwe productiebaseline**. De code bevat geen upgr
 Voor de schoonste productie-installatie:
 
 1. Bewaar eventuele 1.x-data als aparte back-up.
-2. Start 2.0.0 met een nieuwe lege `data/`-map.
+2. Start de 2.0-productiebasis met een nieuwe lege `data/`-map.
 3. Importeer collectiegegevens zo nodig via CSV en decks via de bestaande deckimport.
 
 Een oudere 1.x-database kan technisch tabellen bevatten die op delen van het 2.0-schema lijken, maar dit is geen ondersteund productie-upgradepad. Gebruik voor productie daarom een verse 2.0-database.
@@ -130,7 +130,7 @@ De collectie ondersteunt onder andere filters op:
 - deck;
 - beschikbaarheid.
 
-Filters reageren direct zonder aparte filterknop. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
+Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; de gekozen filters blijven actief. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 
@@ -138,7 +138,7 @@ Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaa
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven.
 
@@ -171,7 +171,7 @@ De simulator valideert bewust geen Magic-regels of betaalbaarheid. De tijdelijke
 
 Wanted-items kunnen zonder gekozen printing worden opgeslagen. De Printing-filter toont alle mogelijke printings waarin wanted-kaarten voorkomen, zodat je bijvoorbeeld in een winkel gericht per set kunt zoeken.
 
-De wanted-list ondersteunt filters op onder andere:
+De wanted-list gebruikt een standaard ingeklapte filtersectie en ondersteunt filters op onder andere:
 
 - kaartnaam;
 - prioriteit;
@@ -180,7 +180,7 @@ De wanted-list ondersteunt filters op onder andere:
 - rarity;
 - kleur.
 
-Heeft een kaart aantoonbaar precies één papieren printing, dan kan deze automatisch worden gekozen. Bij aankoop kan de werkelijk gekochte printing aan de betreffende deckregel worden gekoppeld.
+Heeft een kaart aantoonbaar precies één papieren printing, dan kan deze automatisch worden gekozen. Bij aankoop kan de werkelijk gekochte printing aan de betreffende deckregel worden gekoppeld. Bij het toevoegen van een nieuw wanted-item wordt na de kaartnaam slechts één representatieve printing getoond; de gewenste printing kies je pas later. De knop **Printing** blijft in alleen-lezenmodus beschikbaar om alle uitvoeringen en prijzen te bekijken, terwijl het wijzigen van de keuze uitgeschakeld blijft.
 
 ## Database
 

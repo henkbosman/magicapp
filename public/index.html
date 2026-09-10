@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#17231c">
   <meta name="description" content="Lokale Magic: The Gathering collectie-, wanted- en deckmanager">
   <title>Magic Collection Manager</title>
-  <link rel="stylesheet" href="/styles.css?v=2.0.0">
+  <link rel="stylesheet" href="/styles.css?v=2.0.1">
 </head>
 <body>
   <div class="app-shell">
@@ -23,10 +23,6 @@
         <a href="#/wanted" data-nav="wanted"><span aria-hidden="true">☆</span> Wanted</a>
         <a href="#/settings" data-nav="settings"><span aria-hidden="true">⚙</span> Onderhoud</a>
       </nav>
-      <div class="sidebar-note write-access-status checking" id="write-access-status">
-        <span class="status-dot"></span>
-        <span class="write-status-copy"><strong>Schrijftoegang</strong><small>Toegang controleren…</small></span>
-      </div>
     </aside>
 
     <div class="workspace">
@@ -42,10 +38,6 @@
         <a class="button primary compact top-add" data-write-action href="#/add"><span aria-hidden="true">＋</span><span>Toevoegen</span></a>
       </header>
 
-      <div id="read-only-banner" class="read-only-banner" role="status" hidden>
-        <strong>Alleen-lezen</strong>
-        <span data-read-only-message>De schrijf-API is vanaf dit netwerk niet bereikbaar.</span>
-      </div>
       <main id="app" tabindex="-1">
         <div class="page-loading"><span class="spinner"></span><p>Applicatie laden…</p></div>
       </main>
@@ -53,14 +45,13 @@
   </div>
 
   <nav class="mobile-nav" aria-label="Mobiele navigatie">
-    <a href="#/dashboard" data-nav="dashboard"><span>⌂</span><small>Home</small></a>
-    <a href="#/collection" data-nav="collection"><span>▦</span><small>Collectie</small></a>
-    <a class="mobile-add" href="#/add" data-nav="add" data-write-action><span>＋</span><small>Toevoegen</small></a>
-    <a href="#/decks" data-nav="decks"><span>▤</span><small>Decks</small></a>
-    <a href="#/wanted" data-nav="wanted"><span>☆</span><small>Wanted</small></a>
+    <a href="#/dashboard" data-nav="dashboard"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 10.5 12 3l8.5 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg></span><small>Home</small></a>
+    <a href="#/collection" data-nav="collection"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span><small>Collectie</small></a>
+    <a href="#/decks" data-nav="decks"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="13" height="17" rx="2"/><path d="M8 7h7M8 11h7M8 15h4"/></svg></span><small>Decks</small></a>
+    <a href="#/wanted" data-nav="wanted"><span class="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg></span><small>Wanted</small></a>
   </nav>
 
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
-  <script type="module" src="/js/app.js?v=2.0.0"></script>
+  <script type="module" src="/js/app.js?v=2.0.1"></script>
 </body>
 </html>

@@ -154,3 +154,8 @@ POST /api/write/maintenance/backup
 ## Reverse proxy
 
 Een voorbeeld voor Nginx staat in `deploy/nginx-read-write.conf.example`. Het uitgangspunt is dat `/api/write` alleen bereikbaar is vanuit vertrouwde LAN-adressen, terwijl `/api/read` en de statische frontend desgewenst breder beschikbaar zijn.
+
+
+## Printing-afbeeldingen
+
+`GET /api/read/cards/printings?name=...` levert per printing naast `image` (thumbnail) ook `imageNormal` voor een grotere preview wanneer Scryfall die beschikbaar stelt.

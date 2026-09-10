@@ -16,6 +16,7 @@ export function summarizeLocalPrinting(card) {
     finishes: card.finishes,
     prices: card.prices,
     image: card.images.small || card.images.normal,
+    imageNormal: card.images.normal || card.images.small,
     typeLine: card.typeLine,
     manaCost: card.manaCost,
     layout: card.layout,
@@ -80,6 +81,7 @@ export function groupPrintings(printings) {
         cardId: variant.cardId || null,
         finishes: variant.finishes || [],
         image: variant.image || null,
+        imageNormal: variant.imageNormal || variant.image || null,
         cached: Boolean(variant.cached)
       }));
     return {
@@ -100,6 +102,7 @@ export function groupPrintings(printings) {
       variants,
       prices: representative.prices,
       image: representative.image,
+      imageNormal: representative.imageNormal || representative.image,
       typeLine: representative.typeLine,
       manaCost: representative.manaCost,
       layout: representative.layout,

@@ -5,6 +5,7 @@ import { cardImage, cardInsightBadges, manaCost, pageHeader, tagPills } from '..
 import { openCardInsightsEditor } from '../card-insights.js';
 import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, parseTags, refreshView, toast } from '../utils.js';
 import { prepareDeckSimulatorNavigation, prepareDeckStatsNavigation, preserveCurrentScrollForNextRender } from '../navigation-state.js';
+import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 
 const ROLE_LABELS = {
   commander: 'Commander', partner: 'Tweede commander', companion: 'Companion',
@@ -322,6 +323,9 @@ export async function renderDeckDetail(context) {
   cards.flatMap((item) => item.relations || []).forEach((group) => groupsById.set(group.id, group));
   const deckCardTypes = sortCardTypes(new Set(cards.flatMap((item) => item.card.cardTypes || [])));
   const selectedType = deckCardTypes.includes(initialType) ? initialType : '';
+  const filterPanelKey = `deck-${deck.id}`;
+  const filterPanelExpanded = filtersExpanded(filterPanelKey);
+  const activeFilterCount = Number(Boolean(initialSearch)) + Number(initialRole !== 'all') + Number(Boolean(selectedType));
 
   const cardList = cards.length
     ? `<div id="deck-card-list" class="card-list">${cards.map(deckCardHtml).join('')}</div>`
@@ -346,14 +350,19 @@ export async function renderDeckDetail(context) {
       <section class="panel">
         <header class="panel-header"><h2>Decklijst</h2><div><a class="button secondary small" href="${apiPath(`/decks/${deck.id}/export.txt`)}">Exporteren</a> <a class="button secondary small" href="${apiPath(`/decks/${deck.id}/export.txt?missing=true`)}">Tekort exporteren</a></div></header>
         <div class="panel-body">
-          <div class="deck-list-toolbar">
-            <div class="deck-list-filter-fields">
-              <div class="field deck-list-search"><label for="deck-card-search">Zoek in dit deck</label><input id="deck-card-search" type="search" autocomplete="off" value="${escapeHtml(initialSearch)}" placeholder="Filter op kaartnaam, type, set, tag, combo of synergie…"></div>
-              <div class="field deck-list-type"><label for="deck-card-type">Kaarttype</label><select id="deck-card-type">${cardTypeOptions(deckCardTypes, selectedType)}</select></div>
-            </div>
+          <div class="deck-filter-heading">
+            ${filterToggleHtml({ id: 'deck-filter-toggle', panelId: 'deck-filters-panel', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
             <span id="deck-filter-summary" class="muted">${cards.length} kaartregels zichtbaar</span>
           </div>
-          <div class="section-tabs" id="deck-tabs"><button class="${initialRole === 'all' ? 'active' : ''}" data-filter="all">Alles (${cards.length})</button>${Object.entries(ROLE_LABELS).map(([role,label]) => `<button class="${initialRole === role ? 'active' : ''}" data-filter="${role}">${escapeHtml(label)} (${cards.filter((item) => item.role === role).length})</button>`).join('')}</div>
+          <div id="deck-filters-panel" class="deck-filters-panel collapsible-filters" ${filterPanelExpanded ? '' : 'hidden'}>
+            <div class="deck-list-toolbar">
+              <div class="deck-list-filter-fields">
+                <div class="field deck-list-search"><label for="deck-card-search">Zoek in dit deck</label><input id="deck-card-search" type="search" autocomplete="off" value="${escapeHtml(initialSearch)}" placeholder="Filter op kaartnaam, type, set, tag, combo of synergie…"></div>
+                <div class="field deck-list-type"><label for="deck-card-type">Kaarttype</label><select id="deck-card-type">${cardTypeOptions(deckCardTypes, selectedType)}</select></div>
+              </div>
+            </div>
+            <div class="section-tabs" id="deck-tabs"><button class="${initialRole === 'all' ? 'active' : ''}" data-filter="all">Alles (${cards.length})</button>${Object.entries(ROLE_LABELS).map(([role,label]) => `<button class="${initialRole === role ? 'active' : ''}" data-filter="${role}">${escapeHtml(label)} (${cards.filter((item) => item.role === role).length})</button>`).join('')}</div>
+          </div>
           ${cardList}
           <div id="deck-filter-empty" class="filter-empty" hidden>Geen kaarten voldoen aan deze zoekopdracht en selectie.</div>
         </div>
@@ -444,6 +453,14 @@ export async function renderDeckDetail(context) {
       let activeDeckFilter = initialRole;
       const deckSearch = document.getElementById('deck-card-search');
       const deckType = document.getElementById('deck-card-type');
+      const deckFilterToggle = bindFilterToggle({
+        button: document.getElementById('deck-filter-toggle'),
+        panel: document.getElementById('deck-filters-panel'),
+        key: filterPanelKey,
+        getActiveCount: () => Number(Boolean(String(deckSearch?.value || '').trim()))
+          + Number(activeDeckFilter !== 'all')
+          + Number(Boolean(String(deckType?.value || '')))
+      });
       const replaceDeckFilterQuery = () => {
         const params = new URLSearchParams();
         const search = String(deckSearch?.value || '').trim();
@@ -475,6 +492,7 @@ export async function renderDeckDetail(context) {
       const applyAndRememberDeckFilters = () => {
         applyDeckListFilters();
         replaceDeckFilterQuery();
+        deckFilterToggle.updateActiveCount();
       };
       deckSearch?.addEventListener('input', applyAndRememberDeckFilters);
       deckType?.addEventListener('change', applyAndRememberDeckFilters);
