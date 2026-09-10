@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17231c">
+  <meta name="description" content="Lokale Magic: The Gathering collectie-, wanted- en deckmanager">
+  <title>Magic Collection Manager</title>
+  <link rel="stylesheet" href="/styles.css?v=2.0.0">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Hoofdnavigatie">
+      <a class="brand" href="#/dashboard" aria-label="Magic Collection Manager">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span><strong>Magic</strong><small>Collection Manager</small></span>
+      </a>
+      <nav class="main-nav">
+        <a href="#/dashboard" data-nav="dashboard"><span aria-hidden="true">⌂</span> Dashboard</a>
+        <a href="#/collection" data-nav="collection"><span aria-hidden="true">▦</span> Collectie</a>
+        <a href="#/add" data-nav="add" data-write-action><span aria-hidden="true">＋</span> Kaart toevoegen</a>
+        <a href="#/decks" data-nav="decks"><span aria-hidden="true">▤</span> Decks</a>
+        <a href="#/wanted" data-nav="wanted"><span aria-hidden="true">☆</span> Wanted</a>
+        <a href="#/settings" data-nav="settings"><span aria-hidden="true">⚙</span> Onderhoud</a>
+      </nav>
+      <div class="sidebar-note write-access-status checking" id="write-access-status">
+        <span class="status-dot"></span>
+        <span class="write-status-copy"><strong>Schrijftoegang</strong><small>Toegang controleren…</small></span>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <a class="mobile-brand" href="#/dashboard" aria-label="Dashboard"><span class="brand-mark">M</span></a>
+        <div class="global-search-wrap">
+          <label class="sr-only" for="global-search">Zoek een kaart</label>
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="global-search" type="search" autocomplete="off" placeholder="Controleer direct of je een kaart hebt…">
+          <kbd>/</kbd>
+          <div id="global-search-results" class="search-popover" hidden></div>
+        </div>
+        <a class="button primary compact top-add" data-write-action href="#/add"><span aria-hidden="true">＋</span><span>Toevoegen</span></a>
+      </header>
+
+      <div id="read-only-banner" class="read-only-banner" role="status" hidden>
+        <strong>Alleen-lezen</strong>
+        <span data-read-only-message>De schrijf-API is vanaf dit netwerk niet bereikbaar.</span>
+      </div>
+      <main id="app" tabindex="-1">
+        <div class="page-loading"><span class="spinner"></span><p>Applicatie laden…</p></div>
+      </main>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobiele navigatie">
+    <a href="#/dashboard" data-nav="dashboard"><span>⌂</span><small>Home</small></a>
+    <a href="#/collection" data-nav="collection"><span>▦</span><small>Collectie</small></a>
+    <a class="mobile-add" href="#/add" data-nav="add" data-write-action><span>＋</span><small>Toevoegen</small></a>
+    <a href="#/decks" data-nav="decks"><span>▤</span><small>Decks</small></a>
+    <a href="#/wanted" data-nav="wanted"><span>☆</span><small>Wanted</small></a>
+  </nav>
+
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script type="module" src="/js/app.js?v=2.0.0"></script>
+</body>
+</html>

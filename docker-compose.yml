@@ -1,0 +1,26 @@
+services:
+  magic-collection-manager:
+    build:
+      context: .
+    container_name: magic-collection-manager
+    init: true
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATA_DIR: /app/data
+      DATABASE_FILE: magic-collection.sqlite
+      SCRYFALL_USER_AGENT: "MagicCollectionManager/2.0.0 (local personal app)"
+      SCRYFALL_TIMEOUT_MS: 15000
+      SCRYFALL_REQUEST_DELAY_MS: 550
+      SCRYFALL_AUTOCOMPLETE_CACHE_TTL_HOURS: 168
+      SCRYFALL_PRINTINGS_CACHE_TTL_HOURS: 12
+      SCRYFALL_PRINTING_CATALOG_TTL_HOURS: 168
+      SCRYFALL_CARD_CACHE_TTL_HOURS: 168
+      CACHE_IMAGES: "true"
+      LOG_LEVEL: info
+    volumes:
+      - ./data:/app/data
