@@ -68,19 +68,25 @@ function ownedImageViewer(variants) {
 }
 
 export async function renderCardDetail(context) {
-  const cardId = Number(context.params.id);
+  const previewScryfallId = context.params.scryfallId || '';
+  const previewMode = Boolean(previewScryfallId);
+  const cardId = previewMode ? null : Number(context.params.id);
   const returnToken = context.query.get('return') || '';
   const returnLabel = getCardReturnLabel(returnToken);
-  const card = await api(`/cards/${cardId}`);
+  const card = previewMode
+    ? await api(`/cards/preview/${encodeURIComponent(previewScryfallId)}`)
+    : await api(`/cards/${cardId}`);
   const [collectionResult, wantedResult] = await Promise.all([
-    api(`/collection/card/${cardId}`),
+    api(`/collection${queryString({ cardKey: card.cardKey, limit: 1000 })}`),
     api(`/wanted${queryString({ q: card.name })}`)
   ]);
   const collectionItems = collectionResult.items;
   const wantedItems = wantedResult.filter((item) => item.card.cardKey === card.cardKey);
   const euro = card.prices?.eur;
   const euroFoil = card.prices?.eur_foil;
-  const imageVariants = ownedImageVariants(collectionItems, card);
+  const imageVariants = previewMode
+    ? [{ card, quantity: 0, finishes: [], languages: [] }]
+    : ownedImageVariants(collectionItems, card);
 
   const collectionHtml = collectionItems.length ? `<div class="card-list">${collectionItems.map((item) => `<div class="collection-detail-row"><strong>${item.quantity}× ${escapeHtml(item.card.setName)} (${escapeHtml(item.card.setCode.toUpperCase())}) #${escapeHtml(item.card.collectorNumber)}</strong><span>${escapeHtml(item.finish)} · ${escapeHtml(item.language)} · ${escapeHtml(item.condition)}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div>`).join('')}</div>` : '<p class="muted">Deze Oracle-kaart is nog niet in je collectie aanwezig.</p>';
   const deckHtml = card.usage.decks.length ? `<div class="deck-link-list">${card.usage.decks.map((deck) => `<a href="#/decks/${deck.id}"><span>${escapeHtml(deck.name)}</span><strong>${deck.quantity}×</strong></a>`).join('')}</div>` : '<p class="muted">Deze kaart wordt nog niet in een deck gebruikt.</p>';
@@ -91,12 +97,12 @@ export async function renderCardDetail(context) {
         eyebrow: `${card.setName} · ${card.setCode.toUpperCase()} #${card.collectorNumber}`,
         title: card.name,
         description: card.printedName && card.printedName !== card.name ? card.printedName : card.typeLine,
-        actions: `<button id="card-detail-back" class="button secondary" type="button">← ${escapeHtml(returnLabel)}</button><button id="card-add-collection" class="button primary" data-write-action>＋ Collectie</button><button id="card-add-deck" class="button secondary" data-write-action>▤ Deck</button>${isBasicLand(card) ? '' : '<button id="card-add-wanted" class="button secondary" data-write-action>☆ Wanted</button>'}`
+        actions: `<button id="card-detail-back" class="button secondary" type="button">← ${escapeHtml(returnLabel)}</button>${previewMode ? '' : `<button id="card-add-collection" class="button primary" data-write-action>＋ Collectie</button><button id="card-add-deck" class="button secondary" data-write-action>▤ Deck</button>${isBasicLand(card) ? '' : '<button id="card-add-wanted" class="button secondary" data-write-action>☆ Wanted</button>'}`}`
       })}
       <section class="card-detail-grid">
         <div class="card-detail-image-stack">
           ${ownedImageViewer(imageVariants)}
-          <button id="refresh-card" class="button secondary" data-write-action>Kaartgegevens vernieuwen</button>
+          ${previewMode ? '' : '<button id="refresh-card" class="button secondary" data-write-action>Kaartgegevens vernieuwen</button>'}
         </div>
         <div>
           <section class="panel"><div class="panel-body">
@@ -120,7 +126,7 @@ export async function renderCardDetail(context) {
             <section class="panel"><header class="panel-header"><h2>Keywords</h2></header><div class="panel-body">${card.keywords.length ? `<div class="tag-list">${card.keywords.map((keyword) => `<span class="tag">${escapeHtml(keyword)}</span>`).join('')}</div>` : '<p class="muted">Geen Scryfall-keywords.</p>'}</div></section>
           </section>
           <section class="panel card-insights-panel">
-            <header class="panel-header"><h2>Mana en deckzoekfuncties</h2><button id="edit-card-insights" class="button secondary small" data-write-action>Kenmerken bewerken</button></header>
+            <header class="panel-header"><h2>Mana en deckzoekfuncties</h2>${previewMode ? '' : '<button id="edit-card-insights" class="button secondary small" data-write-action>Kenmerken bewerken</button>'}</header>
             <div class="panel-body insight-detail-grid">
               <div class="insight-detail-card"><span>Produceert mana</span><strong>${manaProductionHtml(card.insights?.manaProduction?.entries || [])}</strong><small>${escapeHtml(cardInsightSourceLabel(card.insights?.manaProduction?.source))}${card.insights?.manaProduction?.note ? ` · ${escapeHtml(card.insights.manaProduction.note)}` : ''}</small></div>
               <div class="insight-detail-card"><span>Kan opzoeken in library</span><strong>${librarySearchHtml(card.insights?.librarySearch?.targets || [])}</strong><small>${escapeHtml(cardInsightSourceLabel(card.insights?.librarySearch?.source))}${card.insights?.librarySearch?.note ? ` · ${escapeHtml(card.insights.librarySearch.note)}` : ''}</small></div>

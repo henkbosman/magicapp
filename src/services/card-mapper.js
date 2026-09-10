@@ -125,6 +125,59 @@ export function mapScryfallCard(card) {
   };
 }
 
+export function scryfallCardToApi(card) {
+  const mapped = mapScryfallCard(card);
+  return {
+    id: null,
+    scryfallId: mapped.scryfallId,
+    oracleId: mapped.oracleId,
+    cardKey: mapped.oracleId || mapped.scryfallId,
+    name: mapped.name,
+    printedName: mapped.printedName,
+    manaCost: mapped.manaCost,
+    manaValue: mapped.manaValue,
+    colors: mapped.colors,
+    colorIdentity: mapped.colorIdentity,
+    producedMana: mapped.producedMana,
+    typeLine: mapped.typeLine,
+    cardTypes: mapped.cardTypes,
+    supertypes: mapped.supertypes,
+    subtypes: mapped.subtypes,
+    oracleText: mapped.oracleText,
+    printedText: mapped.printedText,
+    power: mapped.power,
+    toughness: mapped.toughness,
+    loyalty: mapped.loyalty,
+    defense: mapped.defense,
+    keywords: mapped.keywords,
+    setName: mapped.setName,
+    setCode: mapped.setCode,
+    collectorNumber: mapped.collectorNumber,
+    rarity: mapped.rarity,
+    releasedAt: mapped.releasedAt,
+    artist: mapped.artist,
+    language: mapped.language,
+    layout: mapped.layout,
+    legalities: mapped.legalities,
+    images: {
+      small: mapped.imageSmall,
+      normal: mapped.imageNormal,
+      large: mapped.imageLarge,
+      png: mapped.imagePng,
+      backSmall: mapped.backImageSmall,
+      backNormal: mapped.backImageNormal,
+      backLarge: mapped.backImageLarge,
+      backPng: mapped.backImagePng
+    },
+    finishes: mapped.finishes,
+    prices: mapped.prices,
+    cardFaces: mapped.cardFaces,
+    scryfallUri: mapped.scryfallUri,
+    createdAt: null,
+    updatedAt: null
+  };
+}
+
 export function cardRowToApi(row) {
   if (!row) return null;
   const cardId = row.card_record_id !== undefined && row.card_record_id !== null

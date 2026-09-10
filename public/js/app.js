@@ -27,6 +27,7 @@ const routes = [
   { pattern: /^\/decks\/(?<id>\d+)\/stats$/, name: 'decks', render: renderDeckStatistics },
   { pattern: /^\/decks\/(?<id>\d+)\/simulate$/, name: 'decks', render: renderDeckSimulator },
   { pattern: /^\/wanted$/, name: 'wanted', render: renderWanted },
+  { pattern: /^\/cards\/preview\/(?<scryfallId>[0-9a-fA-F-]+)$/, name: '', render: renderCardDetail },
   { pattern: /^\/cards\/(?<id>\d+)$/, name: '', render: renderCardDetail },
   { pattern: /^\/settings$/, name: 'settings', render: renderSettings }
 ];
@@ -63,7 +64,9 @@ async function renderRoute() {
     });
     if (sequence !== renderSequence) return;
     root.innerHTML = view.html;
-    view.mount?.();
+    applyWriteAvailability(root);
+    await view.mount?.();
+    if (sequence !== renderSequence) return;
     applyWriteAvailability(root);
     root.focus({ preventScroll: true });
     const restoredScroll = consumePendingScroll(window.location.hash);
@@ -97,10 +100,10 @@ const performGlobalSearch = debounce(async () => {
   try {
     const cards = await api(`/cards/search${queryString({ q: query, limit: 12 })}`);
     if (!cards.length) {
-      globalResults.innerHTML = `<div class="picker-status"><strong>Nog niet lokaal bekend</strong><p>Zoek deze kaart via Scryfall en kies een printing.</p><a class="button primary compact" data-write-action href="#/add?q=${encodeURIComponent(query)}">Kaart opzoeken</a></div>`;
+      globalResults.innerHTML = `<div class="picker-status"><strong>Nog niet lokaal bekend</strong><p>Zoek deze kaart via Scryfall en kies een printing.</p><a class="button primary compact" href="#/add?q=${encodeURIComponent(query)}">Kaart opzoeken</a></div>`;
       return;
     }
-    globalResults.innerHTML = `${cards.map(cardSearchResult).join('')}<div class="search-popover-footer"><a class="button ghost compact" data-write-action href="#/add?q=${encodeURIComponent(query)}">Andere printing of nieuwe kaart zoeken →</a></div>`;
+    globalResults.innerHTML = `${cards.map(cardSearchResult).join('')}<div class="search-popover-footer"><a class="button ghost compact" href="#/add?q=${encodeURIComponent(query)}">Andere printing of nieuwe kaart zoeken →</a></div>`;
     globalResults.querySelectorAll('[data-card-id]').forEach((button) => button.addEventListener('click', () => {
       window.location.hash = prepareCardDetailNavigation(`#/cards/${button.dataset.cardId}`);
       globalSearch.value = '';

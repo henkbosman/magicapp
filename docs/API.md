@@ -1,4 +1,4 @@
-# REST API - Magic Collection Manager 2.0.0
+# REST API - Magic Collection Manager 2.0.3
 
 De API gebruikt twee strikt gescheiden zones:
 
@@ -30,6 +30,7 @@ GET /api/read/dashboard
 GET   /api/read/cards/search?q=eternal
 GET   /api/read/cards/autocomplete?q=eternal
 GET   /api/read/cards/printings?name=Eternal%20Witness
+GET   /api/read/cards/preview/:scryfallId
 GET   /api/read/cards/image-cache?url=<scryfall-image-url>
 GET   /api/read/cards/:id/image
 GET   /api/read/cards/:id
@@ -37,6 +38,8 @@ POST  /api/write/cards/cache
 PATCH /api/write/cards/:id/metadata
 POST  /api/write/cards/:id/refresh
 ```
+
+`GET /cards/preview/:scryfallId` levert detailgegevens voor een exacte Scryfall-printing via de lees-API zonder de printing in de lokale `cards`-tabel op te slaan. Hierdoor kunnen printings ook in alleen-lezenmodus volledig worden bekeken.
 
 `PATCH /cards/:id/metadata` beheert handmatige Oracle-brede correcties voor mana-productie en library-searchfuncties.
 

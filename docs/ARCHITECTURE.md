@@ -117,3 +117,8 @@ De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regele
 - De afbeeldingsproxy accepteert alleen gevalideerde Scryfall HTTPS-hosts.
 - SQLite foreign keys bewaken relaties en cascades.
 - Reverse-proxyfiltering kan de schrijfzone tot het LAN beperken.
+
+
+## Read-only printingpreview
+
+Het scherm **Kaart toevoegen** gebruikt `/api/read/cards/printings` voor de printinglijst. Een aangeklikte printing wordt via `/api/read/cards/preview/:scryfallId` als transient kaartdetail geladen. Deze leesroute gebruikt de bestaande Scryfall-responsecache maar maakt geen record in `cards` aan. Bezitsvelden en schrijfacties op het toevoegscherm staan in een `data-write-only`-container en worden door `write-access.js` volledig verborgen wanneer de schrijf-API niet bereikbaar is.

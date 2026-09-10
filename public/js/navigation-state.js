@@ -47,6 +47,7 @@ function token() {
 
 function sourceLabel(hash = '') {
   if (hash.startsWith('#/collection')) return 'Terug naar collectie';
+  if (hash.startsWith('#/add')) return 'Terug naar kaart toevoegen';
   if (hash.startsWith('#/wanted')) return 'Terug naar Wanted';
   if (/^#\/decks\/\d+\/stats/.test(hash)) return 'Terug naar deckstatistieken';
   if (/^#\/decks\/\d+\/simulate/.test(hash)) return 'Terug naar simulator';
@@ -92,7 +93,7 @@ function returnToSource(prefix, returnToken, fallbackHash) {
   if (state && window.history.length > 1) {
     window.history.back();
     window.setTimeout(() => {
-      const stillOnDetail = /^#\/cards\/\d+/.test(window.location.hash)
+      const stillOnDetail = /^#\/cards\/(?:\d+|preview\/[^?]+)/.test(window.location.hash)
         || /^#\/decks\/\d+\/(?:stats|simulate)/.test(window.location.hash);
       if (stillOnDetail) window.location.hash = destination;
     }, 250);

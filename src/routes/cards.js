@@ -4,15 +4,19 @@ import { assert } from '../lib/http-error.js';
 import { normalizeSearchText } from '../lib/text.js';
 import { positiveInteger, requiredString } from '../lib/validation.js';
 import {
+  addUsage,
+  getCardByScryfallId,
   getCardWithUsage,
   searchCards,
-  upsertScryfallCard
+  upsertScryfallCard,
+  usageMapsForKeys
 } from '../services/card-repository.js';
 import { ensureCard } from '../services/card-cache-service.js';
 import { scryfallService } from '../services/scryfall-service.js';
 import { loadGroupedPrintingsByName } from '../services/printing-catalog-service.js';
 import { serveScryfallImage } from '../services/image-cache-service.js';
-import { updateCardUserMetadata } from '../services/card-insight-service.js';
+import { enrichCardWithInsights, updateCardUserMetadata } from '../services/card-insight-service.js';
+import { scryfallCardToApi } from '../services/card-mapper.js';
 
 export const cardsReadRouter = express.Router();
 export const cardsWriteRouter = express.Router();
@@ -47,6 +51,17 @@ cardsReadRouter.get('/printings', async (req, res) => {
   const name = requiredString(req.query.name, 'Kaartnaam', 300);
   const result = await loadGroupedPrintingsByName(name);
   res.json(result);
+});
+
+cardsReadRouter.get('/preview/:scryfallId', async (req, res) => {
+  const scryfallId = requiredString(req.params.scryfallId, 'Scryfall-ID', 100);
+  const local = getCardByScryfallId(scryfallId);
+  if (local) {
+    return res.json({ data: getCardWithUsage(local.id) });
+  }
+
+  const preview = enrichCardWithInsights(scryfallCardToApi(await scryfallService.getById(scryfallId)));
+  res.json({ data: addUsage(preview, usageMapsForKeys([preview.cardKey])) });
 });
 
 cardsReadRouter.get('/image-cache', async (req, res) => {
