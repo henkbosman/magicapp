@@ -27,7 +27,6 @@ const routes = [
   { pattern: /^\/decks\/(?<id>\d+)\/stats$/, name: 'decks', render: renderDeckStatistics },
   { pattern: /^\/decks\/(?<id>\d+)\/simulate$/, name: 'decks', render: renderDeckSimulator },
   { pattern: /^\/wanted$/, name: 'wanted', render: renderWanted },
-  { pattern: /^\/cards\/preview\/(?<scryfallId>[0-9a-fA-F-]+)$/, name: '', render: renderCardDetail },
   { pattern: /^\/cards\/(?<id>\d+)$/, name: '', render: renderCardDetail },
   { pattern: /^\/settings$/, name: 'settings', render: renderSettings }
 ];
@@ -64,7 +63,6 @@ async function renderRoute() {
     });
     if (sequence !== renderSequence) return;
     root.innerHTML = view.html;
-    applyWriteAvailability(root);
     await view.mount?.();
     if (sequence !== renderSequence) return;
     applyWriteAvailability(root);

@@ -1308,3 +1308,10 @@ body.simulator-touch-dragging { overflow: hidden; user-select: none; }
   .printing-image-preview { min-height: 0; }
   .printing-image-preview img { width: 100%; max-height: 72vh; }
 }
+
+
+/* Read-only browsing: mutation controls disappear, navigation and printing discovery stay usable. */
+html.write-unavailable [data-write-only] { display: none !important; }
+.selected-printing-detail-link { display: inline-block; border-radius: 10px; }
+.selected-printing-detail-link:focus-visible { outline: 3px solid var(--focus, #4f7f5a); outline-offset: 3px; }
+.selected-printing-detail-link .card-image { cursor: zoom-in; }

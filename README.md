@@ -2,7 +2,7 @@
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.0.3** bevat de verbeteringen uit 2.0.1 en 2.0.2 plus verbeterde read-only navigatie voor kaartzoeken, printingselectie en printingdetails. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.0.3** bevat de verbeteringen uit 2.0.1 plus enkele mobiele layoutcorrecties. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -20,7 +20,6 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.0.3** bevat de verbe
 - CSV-import/-export voor de collectie en tekstimport/-export voor decks.
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
-- In alleen-lezenmodus blijven kaartzoeken en printingselectie volledig beschikbaar; een printing kan als detailpagina worden bekeken zonder de kaart lokaal te hoeven registreren.
 - Databaseback-up en onderhoudsfuncties.
 
 ## Vereisten
@@ -222,3 +221,8 @@ npm run check
 ```
 
 De applicatie bevat bewust geen automatische unit-, integratie- of end-to-endtests, conform de projectspecificatie.
+
+
+## Read-only kaart toevoegen
+
+Ook wanneer `/api/write` door de reverse proxy is geblokkeerd, blijven de globale zoekactie en de printinglijst onder **Kaart toevoegen** bruikbaar. Een printing kan worden bekeken en de kaartdetailpagina kan worden geopend. De invoervelden en knoppen waarmee collectie-, deck- of wantedgegevens worden gewijzigd, worden in read-only mode verborgen.

@@ -9,17 +9,14 @@ function isFormControl(element) {
     || element instanceof HTMLTextAreaElement;
 }
 
+function applyWriteModeClass() {
+  const unavailable = state.available !== true;
+  document.documentElement.classList.toggle('write-unavailable', unavailable);
+}
+
 export function applyWriteAvailability(root = document) {
   const unavailable = state.available !== true;
-
-  const writeOnly = [];
-  if (root instanceof Element && root.matches('[data-write-only]')) writeOnly.push(root);
-  if (root.querySelectorAll) writeOnly.push(...root.querySelectorAll('[data-write-only]'));
-  for (const element of writeOnly) {
-    element.hidden = unavailable;
-    element.setAttribute('aria-hidden', unavailable ? 'true' : 'false');
-  }
-
+  applyWriteModeClass();
   const elements = [];
   if (root instanceof Element && root.matches('[data-write-action]')) elements.push(root);
   if (root.querySelectorAll) elements.push(...root.querySelectorAll('[data-write-action]'));

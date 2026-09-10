@@ -4,19 +4,16 @@ import { assert } from '../lib/http-error.js';
 import { normalizeSearchText } from '../lib/text.js';
 import { positiveInteger, requiredString } from '../lib/validation.js';
 import {
-  addUsage,
   getCardByScryfallId,
   getCardWithUsage,
   searchCards,
-  upsertScryfallCard,
-  usageMapsForKeys
+  upsertScryfallCard
 } from '../services/card-repository.js';
 import { ensureCard } from '../services/card-cache-service.js';
 import { scryfallService } from '../services/scryfall-service.js';
 import { loadGroupedPrintingsByName } from '../services/printing-catalog-service.js';
 import { serveScryfallImage } from '../services/image-cache-service.js';
-import { enrichCardWithInsights, updateCardUserMetadata } from '../services/card-insight-service.js';
-import { scryfallCardToApi } from '../services/card-mapper.js';
+import { updateCardUserMetadata } from '../services/card-insight-service.js';
 
 export const cardsReadRouter = express.Router();
 export const cardsWriteRouter = express.Router();
@@ -53,21 +50,20 @@ cardsReadRouter.get('/printings', async (req, res) => {
   res.json(result);
 });
 
-cardsReadRouter.get('/preview/:scryfallId', async (req, res) => {
-  const scryfallId = requiredString(req.params.scryfallId, 'Scryfall-ID', 100);
-  const local = getCardByScryfallId(scryfallId);
-  if (local) {
-    return res.json({ data: getCardWithUsage(local.id) });
-  }
-
-  const preview = enrichCardWithInsights(scryfallCardToApi(await scryfallService.getById(scryfallId)));
-  res.json({ data: addUsage(preview, usageMapsForKeys([preview.cardKey])) });
-});
-
 cardsReadRouter.get('/image-cache', async (req, res) => {
   const url = requiredString(req.query.url, 'Afbeeldings-URL', 2000);
   await serveScryfallImage(res, url);
 });
+
+cardsReadRouter.get('/preview/:scryfallId', async (req, res) => {
+  const scryfallId = requiredString(req.params.scryfallId, 'Scryfall-ID', 100);
+  let card = getCardByScryfallId(scryfallId);
+  if (!card) {
+    card = upsertScryfallCard(await scryfallService.getById(scryfallId));
+  }
+  res.json({ data: getCardWithUsage(card.id) });
+});
+
 
 cardsReadRouter.get('/:id/image', async (req, res) => {
   const card = getCardWithUsage(positiveInteger(req.params.id, 'Kaart-ID'));

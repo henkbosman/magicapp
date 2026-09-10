@@ -2,14 +2,14 @@
 
 ## 2.0.3 - 2026-09-10
 
-### Gewijzigd
+### Verbeterd
 
-- De globale actie **Andere printing of nieuwe kaart zoeken** blijft altijd beschikbaar, ook wanneer `/api/write` door de reverse proxy is geblokkeerd.
-- Het scherm **Kaart toevoegen** blijft in alleen-lezenmodus bruikbaar voor zoeken en het bekijken van alle beschikbare printings.
-- Het aanklikken van een printing opent nu de detailpagina van die exacte Scryfall-printing via de lees-API.
-- De terugknop van de printingdetailpagina keert terug naar **Kaart toevoegen** met dezelfde kaart, gekozen printing en scrollpositie.
-- Wanneer een gekozen printing na terugkeer wordt getoond in alleen-lezenmodus, blijven alleen de kaart- en printinggegevens zichtbaar; invoervelden en schrijfacties worden volledig verborgen.
-- Niet-lokaal opgeslagen printings kunnen via een nieuw read-only previewendpoint worden bekeken zonder een record in `cards` aan te maken.
+- De globale zoekacties **Kaart opzoeken** en **Andere printing of nieuwe kaart zoeken** blijven beschikbaar in alleen-lezenmodus.
+- Printings op **Kaart toevoegen** blijven selecteerbaar wanneer de schrijf-API niet beschikbaar is.
+- Een nieuw read-endpoint laadt de details van een geselecteerde Scryfall-printing zonder toegang tot `/api/write`; technische kaartcache mag daarbij lokaal worden bijgewerkt, gebruikersdata niet.
+- In alleen-lezenmodus worden de invoervelden en muterende knoppen van de geselecteerde printing volledig verborgen; kaart- en printinginformatie blijft zichtbaar.
+- De afbeelding en naam van de geselecteerde printing openen de kaartdetailpagina. De terugknop herstelt daarna de kaart-toevoegenpagina, gekozen printing en scrollpositie.
+- De kaartnaam en geselecteerde printing worden in de hashroute bewaard zodat de kaart-toevoegenpagina na terugnavigatie exact kan worden opgebouwd.
 
 ## 2.0.2 - 2026-09-10
 

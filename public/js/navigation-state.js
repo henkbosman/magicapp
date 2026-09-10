@@ -93,7 +93,7 @@ function returnToSource(prefix, returnToken, fallbackHash) {
   if (state && window.history.length > 1) {
     window.history.back();
     window.setTimeout(() => {
-      const stillOnDetail = /^#\/cards\/(?:\d+|preview\/[^?]+)/.test(window.location.hash)
+      const stillOnDetail = /^#\/cards\/\d+/.test(window.location.hash)
         || /^#\/decks\/\d+\/(?:stats|simulate)/.test(window.location.hash);
       if (stillOnDetail) window.location.hash = destination;
     }, 250);
