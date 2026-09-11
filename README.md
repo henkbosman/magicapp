@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.2.0
+# Magic Collection Manager 2.2.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.0** verbetert de snelle kaartinvoer, voegt een gecombineerde collectie-en-deckactie toe, toont marktprijzen in de collectie en maakt de kleuridentiteitsfilter geschikt voor meerdere toegestane kleuren. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.1** corrigeert de kleuridentiteitsfilter, maakt de kleurkeuze compacter, beperkt de snelle kaartinvoer tot EUR-prijzen en herstelt de gecombineerde collectie-en-deckactie. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -128,7 +128,7 @@ Via **Instellingen en onderhoud** kan de externe responsecache worden geleegd of
 
 ## Kaart toevoegen
 
-Na het kiezen van een kaartnaam worden alle papieren printings getoond. Een keuzelijst met collectornummers kan de lijst beperken tot één kaartnummer. Na selectie springt de pagina naar de invoer en toont zij de beschikbare EUR-, USD- en MTGO-prijzen van die printing.
+Na het kiezen van een kaartnaam worden alle papieren printings getoond. Een keuzelijst met collectornummers kan de lijst beperken tot één kaartnummer. Na selectie springt de pagina naar de invoer en toont zij uitsluitend de beschikbare EUR-prijzen van die printing.
 
 Het opmerkingenveld is uit deze snelle invoer verwijderd. Aantal, taal, afwerking, conditie, locatie, aankoopprijs en de wanted-afstemming blijven staan nadat een actie is uitgevoerd en worden pas opnieuw geïnitialiseerd wanneer een andere printing wordt gekozen.
 
@@ -136,7 +136,7 @@ De drie acties staan naast elkaar:
 
 - **Collectie**: voegt de fysieke printing aan de collectie toe;
 - **Wanted**: voegt het Oracle-kaartconcept aan Wanted toe zonder de huidige printing vast te leggen;
-- **Collectie + Deck**: voegt de fysieke printing binnen één transactie aan de collectie en aan het gekozen deck toe.
+- **Collectie + Deck**: voegt de fysieke printing binnen één transactie aan de collectie en aan het gekozen deck toe. De frontend gebruikt hiervoor het bestaande collectie-endpoint met deckvelden; `/collection/with-deck` blijft als compatibiliteitsalias beschikbaar.
 
 Succesmeldingen van dit scherm verschijnen bovenaan. De afbeelding en kaartnaam openen de exact geselecteerde printing op de kaartdetailpagina.
 
@@ -156,7 +156,7 @@ De collectie ondersteunt onder andere filters op:
 - deck;
 - beschikbaarheid.
 
-Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt meerdere selectievakjes. Geselecteerde gekleurde symbolen vormen samen de toegestane kleuridentiteit: bij alleen groen verschijnen uitsluitend monogroene kaarten; bij groen en wit verschijnen mono-groen, mono-wit en groen-witte kaarten. Kleurloze kaarten verschijnen wanneer **Kleurloos** is geselecteerd. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
+Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt compacte, aanklikbare manasymbolen. Een geselecteerd symbool krijgt een dikke rand. Bij alleen groen verschijnen uitsluitend kaarten met exact een groene kleuridentiteit; kaarten met aanvullende kleuren worden uitgesloten. Bij meerdere gekozen kleuren mag de volledige kaartidentiteit uitsluitend uit die geselecteerde kleuren bestaan. Kleurloze kaarten verschijnen alleen wanneer **Kleurloos** is geselecteerd. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 

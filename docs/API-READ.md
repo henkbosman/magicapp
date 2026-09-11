@@ -1,4 +1,4 @@
-# Magic Collection Manager Read API 2.2.0
+# Magic Collection Manager Read API 2.2.1
 
 Base URL: `https://<host>`  
 Alle routes gebruiken `GET` en hebben geen JSON-body. Querywaarden staan in de URL.  
@@ -17,7 +17,7 @@ Controleert of de read-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","version":"2.2.0"}
+{"status":"ok","version":"2.2.1"}
 ```
 
 ## `GET /api/read/dashboard`
@@ -286,7 +286,7 @@ Niet van toepassing. Responsebody is `text/csv` met kolommen `name,set_code,set_
 
 ## `GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={W|U|B|R|G|C}&color={...}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}`
 
-Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. Herhaal `color` voor meerdere toegestane kleuren, bijvoorbeeld `?color=G&color=W`. De volledige kaartidentiteit moet binnen W/U/B/R/G vallen; kleurloze kaarten vereisen `color=C`.
+Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. Eén `color` vereist exact die monokleur; herhaal `color` voor een toegestane kleurenverzameling, bijvoorbeeld `?color=G&color=W`. Aanvullende kleuren worden uitgesloten en kleurloze kaarten vereisen `color=C`.
 
 ### Input JSON
 
@@ -652,7 +652,7 @@ Geeft technische status van database, caches en lokale installatie.
 ```json
 {
   "data": {
-    "applicationVersion": "2.2.0",
+    "applicationVersion": "2.2.1",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

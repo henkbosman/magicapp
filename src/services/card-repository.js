@@ -304,16 +304,25 @@ export function listCollection(filters = {}) {
       const colorClauses = [];
 
       if (includeColorless) colorClauses.push("json_array_length(c.color_identity_json) = 0");
-      if (selectedColors.length) {
+      if (selectedColors.length === 1) {
+        colorClauses.push(`(
+          json_array_length(c.color_identity_json) = 1
+          AND EXISTS (
+            SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
+            WHERE UPPER(CAST(identity_color.value AS TEXT)) = ?
+          )
+        )`);
+        params.push(selectedColors[0]);
+      } else if (selectedColors.length > 1) {
         const placeholders = selectedColors.map(() => '?').join(', ');
         colorClauses.push(`(
-          json_array_length(c.color_identity_json) > 0
+          json_array_length(c.color_identity_json) BETWEEN 1 AND ?
           AND NOT EXISTS (
             SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
             WHERE UPPER(CAST(identity_color.value AS TEXT)) NOT IN (${placeholders})
           )
         )`);
-        params.push(...selectedColors);
+        params.push(selectedColors.length, ...selectedColors);
       }
       if (colorClauses.length) conditions.push(`(${colorClauses.join(' OR ')})`);
     }

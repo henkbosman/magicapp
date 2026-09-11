@@ -1,6 +1,6 @@
 import { api, apiPath, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
-import { cardImage, cardInsightBadges, manaCost, manaLabel, pageHeader, rarityBadge, usageBadges } from '../components.js';
+import { cardImage, cardInsightBadges, manaCost, manaSymbol, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
@@ -31,7 +31,10 @@ function collectionPrice(item) {
 function colorIdentityOptions(selectedColors = []) {
   const selected = new Set(selectedColors.map((color) => String(color).toUpperCase()));
   return [['W', 'Wit'], ['U', 'Blauw'], ['B', 'Zwart'], ['R', 'Rood'], ['G', 'Groen'], ['C', 'Kleurloos']]
-    .map(([value, label]) => `<label class="color-identity-option"><input type="checkbox" name="color" value="${value}" ${selected.has(value) ? 'checked' : ''}><span>${manaLabel(value, label)}</span></label>`)
+    .map(([value, label]) => `<label class="color-identity-option" title="${escapeHtml(label)}">
+      <input class="sr-only" type="checkbox" name="color" value="${value}" aria-label="${escapeHtml(label)}" ${selected.has(value) ? 'checked' : ''}>
+      <span class="color-identity-icon" aria-hidden="true">${manaSymbol(value, { label })}</span>
+    </label>`)
     .join('');
 }
 

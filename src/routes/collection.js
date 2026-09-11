@@ -64,18 +64,8 @@ collectionReadRouter.get('/', (req, res) => {
   res.json({ data: listCollection(req.query) });
 });
 
-collectionWriteRouter.post('/', async (req, res) => {
-  const card = await ensureCard(req.body || {});
-  const item = addCollectionItem({ cardId: card.id, ...collectionInput(req.body || {}) });
-  res.status(201).json({ data: item });
-});
-
-collectionWriteRouter.post('/with-deck', async (req, res) => {
-  const body = req.body || {};
-  const card = await ensureCard(body);
-  const collection = collectionInput(body);
-  const deck = collectionDeckInput(body);
-  const result = transaction(() => {
+function addCollectionAndDeck(card, collection, deck) {
+  return transaction(() => {
     const collectionItem = addCollectionItem({ cardId: card.id, ...collection });
     const deckCard = addDeckCard(deck.deckId, {
       cardId: card.id,
@@ -89,8 +79,28 @@ collectionWriteRouter.post('/with-deck', async (req, res) => {
       deckCard
     };
   });
-  res.status(201).json({ data: result });
-});
+}
+
+async function createCollection(req, res, { requireDeck = false } = {}) {
+  const body = req.body || {};
+  const card = await ensureCard(body);
+  const collection = collectionInput(body);
+  const hasDeck = body.deckId !== undefined && body.deckId !== null && String(body.deckId).trim() !== '';
+
+  if (requireDeck || hasDeck) {
+    const deck = collectionDeckInput(body);
+    return res.status(201).json({ data: addCollectionAndDeck(card, collection, deck) });
+  }
+
+  const item = addCollectionItem({ cardId: card.id, ...collection });
+  return res.status(201).json({ data: item });
+}
+
+collectionWriteRouter.post('/', (req, res) => createCollection(req, res));
+
+// Backwards-compatible alias. The application itself uses POST /collection
+// with deckId so proxies that only allow the established collection route work too.
+collectionWriteRouter.post('/with-deck', (req, res) => createCollection(req, res, { requireDeck: true }));
 
 collectionReadRouter.get('/card/:cardId', (req, res) => {
   const card = getCardWithUsage(positiveInteger(req.params.cardId, 'Kaart-ID'));

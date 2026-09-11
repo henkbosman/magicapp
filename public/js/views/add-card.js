@@ -20,22 +20,17 @@ const ROLE_OPTIONS = [
 ];
 
 const PRICE_ROWS = [
-  ['eur', 'Non-foil', 'EUR'],
-  ['eur_foil', 'Foil', 'EUR'],
-  ['eur_etched', 'Etched', 'EUR'],
-  ['usd', 'Non-foil', 'USD'],
-  ['usd_foil', 'Foil', 'USD'],
-  ['usd_etched', 'Etched', 'USD'],
-  ['tix', 'MTGO', 'TIX']
+  ['eur', 'Non-foil'],
+  ['eur_foil', 'Foil'],
+  ['eur_etched', 'Etched']
 ];
 
-function formatPrice(value, currency) {
+function formatPrice(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '—';
-  if (currency === 'TIX') return `${new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 2 }).format(number)} tix`;
   return new Intl.NumberFormat('nl-NL', {
     style: 'currency',
-    currency,
+    currency: 'EUR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(number);
@@ -44,10 +39,10 @@ function formatPrice(value, currency) {
 function pricesHtml(prices = {}) {
   const rows = PRICE_ROWS
     .filter(([key]) => prices?.[key] !== null && prices?.[key] !== undefined && prices?.[key] !== '')
-    .map(([key, label, currency]) => `<div class="printing-price-item"><span>${escapeHtml(label)} · ${escapeHtml(currency)}</span><strong>${escapeHtml(formatPrice(prices[key], currency))}</strong></div>`);
+    .map(([key, label]) => `<div class="printing-price-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatPrice(prices[key]))}</strong></div>`);
   return rows.length
     ? `<div class="printing-price-grid">${rows.join('')}</div>`
-    : '<p class="muted printing-price-empty">Voor deze printing is geen prijsinformatie beschikbaar.</p>';
+    : '<p class="muted printing-price-empty">Voor deze printing is geen EUR-prijs beschikbaar.</p>';
 }
 
 function printingHtml(printing, index) {
@@ -220,7 +215,7 @@ export async function renderAddCard(context) {
           </div>`,
           onSubmit: async (data) => {
             const deckId = Number(formValue(data, 'deckId'));
-            const result = await api('/collection/with-deck', {
+            const result = await api('/collection', {
               method: 'POST',
               body: {
                 ...collectionPayload,

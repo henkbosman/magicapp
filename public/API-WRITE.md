@@ -1,4 +1,4 @@
-# Magic Collection Manager Write API 2.2.0
+# Magic Collection Manager Write API 2.2.1
 
 Base URL: `https://<host>`  
 Gebruik `Content-Type: application/json`. De reverse proxy kan `/api/write/*` buiten het LAN blokkeren.  
@@ -35,7 +35,7 @@ Controleert of de write-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","writeAvailable":true,"version":"2.2.0"}
+{"status":"ok","writeAvailable":true,"version":"2.2.1"}
 ```
 
 ## `POST /api/write/cards/cache`
@@ -140,7 +140,7 @@ Importeert fysieke collectie-items uit een CSV-string.
 
 ## `POST /api/write/collection`
 
-Voegt een fysieke kaart toe of verhoogt een identieke collectieregel. Voeg één kaartidentificatie toe.
+Voegt een fysieke kaart toe. Met `deckId` wordt dezelfde printing atomair ook aan dat deck toegevoegd. Voeg één kaartidentificatie toe.
 
 ### Input JSON
 
@@ -155,11 +155,18 @@ Voegt een fysieke kaart toe of verhoogt een identieke collectieregel. Voeg één
   "notes": "",
   "purchasePrice": 0.5,
   "reconcileWanted": true,
-  "sourceWantedId": 31
+  "sourceWantedId": 31,
+  "deckId": 4,
+  "deckQuantity": 1,
+  "role": "main",
+  "tags": ["Ramp"],
+  "note": "Decknotitie"
 }
 ```
 
 ### Output JSON
+
+Zonder `deckId`:
 
 ```json
 {
@@ -177,9 +184,20 @@ Voegt een fysieke kaart toe of verhoogt een identieke collectieregel. Voeg één
 }
 ```
 
+Met `deckId`:
+
+```json
+{
+  "data": {
+    "collectionItem": {"id":55,"quantity":1,"card":{"id":123,"name":"Eternal Witness"}},
+    "deckCard": {"id":81,"quantity":1,"role":"main","tags":["Ramp"],"card":{"id":123,"name":"Eternal Witness"}}
+  }
+}
+```
+
 ## `POST /api/write/collection/with-deck`
 
-Voegt één concrete printing binnen dezelfde transactie toe aan de fysieke collectie en een deck. Bij een fout wordt geen van beide toevoegingen bewaard. Voeg één kaartidentificatie toe.
+Compatibiliteitsalias voor `POST /api/write/collection` met `deckId`. Voegt één concrete printing binnen dezelfde transactie toe aan de fysieke collectie en een deck.
 
 ### Input JSON
 

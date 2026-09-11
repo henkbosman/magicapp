@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.2.0
+# Architectuur - Magic Collection Manager 2.2.1
 
 ## Overzicht
 
@@ -51,7 +51,7 @@ Joined queries aliasen de database-ID van `cards` expliciet als `card_record_id`
 
 ## Routes en services
 
-`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`. De gecombineerde route `POST /api/write/collection/with-deck` gebruikt een buitenste SQLite-transactie; de bestaande collectie- en deckservices nemen via savepoints veilig aan die transactie deel.
+`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`. `POST /api/write/collection` voert bij aanwezigheid van `deckId` een gecombineerde collectie- en decktoevoeging uit binnen één buitenste SQLite-transactie; `POST /api/write/collection/with-deck` blijft dezelfde bewerking als compatibiliteitsalias aanbieden. De bestaande collectie- en deckservices nemen via savepoints veilig aan die transactie deel.
 
 Belangrijke services:
 
@@ -101,7 +101,7 @@ Kaartafbeeldingen worden standaard onder `data/images/` gecachet. Cachebestanden
 
 ## Collectiefiltering
 
-De kleuridentiteitsfilter verzendt één of meer herhaalde `color`-queryparameters. De backend behandelt W/U/B/R/G als een toegestane verzameling: iedere kleur in de kaartidentiteit moet daarin voorkomen. Kleurloze kaarten worden alleen toegevoegd wanneer `C` is geselecteerd. Filtering vindt vóór paginering in SQLite plaats.
+De kleuridentiteitsfilter verzendt één of meer herhaalde `color`-queryparameters. Bij één gekozen kleur vereist de backend exact één kleur in de kaartidentiteit. Bij meerdere gekozen kleuren moet iedere kleur in de kaartidentiteit binnen de geselecteerde verzameling vallen; aanvullende kleuren worden uitgesloten. Kleurloze kaarten worden alleen toegevoegd wanneer `C` is geselecteerd. Filtering vindt vóór paginering in SQLite plaats.
 
 ## Deckstatistieken
 

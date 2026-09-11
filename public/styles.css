@@ -1381,7 +1381,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 }
 
 
-/* Release 2.2.0: kaartinvoer, multi-kleurfilter en prijsweergave */
+/* Release 2.2.x: kaartinvoer, multi-kleurfilter en prijsweergave */
 .toast-region-top {
   top: calc(var(--topbar) + 12px);
   bottom: auto;
@@ -1449,27 +1449,38 @@ html.write-unavailable [data-write-only] { display: none !important; }
   font-size: .76rem;
   font-weight: 700;
 }
-.color-identity-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.color-identity-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .color-identity-option {
-  min-height: 39px;
-  padding: 6px 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 5px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid var(--line-strong);
+  border-radius: 11px;
   background: #fff;
   cursor: pointer;
   user-select: none;
+  transition: border-color .14s, background .14s, box-shadow .14s, transform .14s;
+}
+.color-identity-option:hover {
+  border-color: #8aa792;
+  background: var(--surface-soft);
+  transform: translateY(-1px);
 }
 .color-identity-option:has(input:checked) {
-  border-color: #78a084;
+  padding: 4px;
+  border: 3px solid var(--primary-dark);
   background: var(--primary-soft);
-  box-shadow: 0 0 0 2px rgba(40,99,62,.06);
+  box-shadow: 0 0 0 2px rgba(40,99,62,.12);
 }
-.color-identity-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
-.color-identity-option .mana-label { gap: 5px; font-size: .76rem; font-weight: 700; }
-.color-identity-option .mana-symbol { width: 23px; height: 23px; flex-basis: 23px; }
+.color-identity-option:has(input:focus-visible) {
+  outline: 3px solid rgba(40,99,62,.24);
+  outline-offset: 2px;
+}
+.color-identity-option .color-identity-icon { display: grid; place-items: center; }
+.color-identity-option .mana-symbol { width: 27px; height: 27px; flex-basis: 27px; }
 
 .collection-market-price {
   min-width: 67px;

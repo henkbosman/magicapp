@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.2.1 - 2026-09-11
+
+### Verbeterd
+
+- De kleuridentiteitsfilter toont alleen de zes manasymbolen; tekstlabels en losse checkbox-vakjes zijn visueel verwijderd.
+- Geselecteerde kleuridentiteiten krijgen een duidelijke, dikkere groene rand en blijven volledig toetsenbordtoegankelijk.
+- **Kaart toevoegen** toont uitsluitend beschikbare EUR-prijzen voor non-foil, foil en etched.
+
+### Opgelost
+
+- De monokleurfilter gebruikt nu een expliciete exacte controle: bij alleen groen worden kaarten met bijvoorbeeld groen-zwart of groen-wit uitgesloten.
+- **Collectie + Deck** gebruikt het bestaande `POST /api/write/collection` met deckvelden, zodat de actie niet meer op een ontbrekend subendpoint kan stranden. De atomaire transactie blijft behouden.
+- `POST /api/write/collection/with-deck` blijft als compatibiliteitsalias beschikbaar.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x- en 2.2.0-data blijft rechtstreeks bruikbaar.
+
 ## 2.2.0 - 2026-09-11
 
 ### Verbeterd
