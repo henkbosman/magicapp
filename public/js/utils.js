@@ -60,7 +60,7 @@ export function parseTags(value) {
 }
 
 
-export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabel = 'Annuleren', destructive = false, wide = false, onSubmit }) {
+export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabel = 'Annuleren', destructive = false, wide = false, writeAction = true, onSubmit }) {
   const dialog = document.createElement('dialog');
   dialog.className = `modal ${wide ? 'modal-wide' : ''}`;
   dialog.innerHTML = `
@@ -69,7 +69,7 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
       <div class="modal-body">${content}</div>
       <footer>
         <button type="button" class="button secondary close-dialog">${escapeHtml(cancelLabel)}</button>
-        ${onSubmit ? `<button type="submit" data-write-action class="button ${destructive ? 'danger' : 'primary'}">${escapeHtml(submitLabel)}</button>` : ''}
+        ${onSubmit ? `<button type="submit" ${writeAction ? 'data-write-action' : ''} class="button ${destructive ? 'danger' : 'primary'}">${escapeHtml(submitLabel)}</button>` : ''}
       </footer>
     </form>`;
   document.body.append(dialog);
@@ -105,13 +105,14 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
   return dialog;
 }
 
-export function confirmDialog({ title, message, confirmLabel = 'Verwijderen', destructive = true }) {
+export function confirmDialog({ title, message, confirmLabel = 'Verwijderen', destructive = true, writeAction = true }) {
   return new Promise((resolve) => {
     const dialog = openDialog({
       title,
       content: `<p class="dialog-message">${escapeHtml(message)}</p>`,
       submitLabel: confirmLabel,
       destructive,
+      writeAction,
       onSubmit: async () => {
         resolve(true);
         return true;

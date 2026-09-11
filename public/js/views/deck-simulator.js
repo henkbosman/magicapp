@@ -12,32 +12,11 @@ import {
 } from '../navigation-state.js';
 import { confirmDialog, escapeHtml, openDialog, toast } from '../utils.js';
 
-const STORAGE_PREFIX = 'magic-collection:deck-simulator:';
 const SIMULATED_ROLES = new Set(['main']);
 const COMMAND_ROLES = new Set(['commander', 'partner', 'companion']);
 const ZONE_LABELS = {
   library: 'Library', hand: 'Hand', battlefield: 'Tafel', graveyard: 'Graveyard', command: 'Command zone'
 };
-
-function storageKey(deckId) {
-  return `${STORAGE_PREFIX}${deckId}`;
-}
-
-function safeReadState(deckId) {
-  try {
-    return JSON.parse(window.sessionStorage.getItem(storageKey(deckId)) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function saveState(deckId, state) {
-  try {
-    window.sessionStorage.setItem(storageKey(deckId), JSON.stringify(state));
-  } catch {
-    // The simulator remains usable when sessionStorage is unavailable.
-  }
-}
 
 function shuffle(values) {
   const items = [...values];
@@ -46,14 +25,6 @@ function shuffle(values) {
     [items[index], items[swap]] = [items[swap], items[index]];
   }
   return items;
-}
-
-function deckFingerprint(cards) {
-  return cards
-    .filter((item) => SIMULATED_ROLES.has(item.role) || COMMAND_ROLES.has(item.role))
-    .map((item) => `${item.id}:${item.quantity}:${item.role}:${item.card.id}`)
-    .sort()
-    .join('|');
 }
 
 function makeInstances(cards) {
@@ -75,14 +46,11 @@ function makeInstances(cards) {
   return { library: shuffle(library), command };
 }
 
-function createInitialState(deckId, cards) {
+function createInitialState(cards) {
   const zones = makeInstances(cards);
   const hand = [];
   for (let index = 0; index < 7 && zones.library.length; index += 1) hand.push(zones.library.pop());
   return {
-    version: 2,
-    deckId,
-    fingerprint: deckFingerprint(cards),
     turn: 1,
     zones: {
       library: zones.library,
@@ -95,13 +63,6 @@ function createInitialState(deckId, cards) {
     history: [],
     updatedAt: Date.now()
   };
-}
-
-function validState(state, deckId, cards) {
-  if (!state || state.version !== 2 || Number(state.deckId) !== Number(deckId)) return false;
-  if (state.fingerprint !== deckFingerprint(cards)) return false;
-  const zones = state.zones || {};
-  return ['library', 'hand', 'battlefield', 'graveyard', 'command'].every((zone) => Array.isArray(zones[zone]));
 }
 
 function itemMap(cards) {
@@ -545,9 +506,7 @@ export async function renderDeckSimulator(context) {
     api(`/decks/${deckId}/links`)
   ]);
   const byDeckCardId = itemMap(cards);
-  let state = safeReadState(deckId);
-  if (!validState(state, deckId, cards)) state = createInitialState(deckId, cards);
-  saveState(deckId, state);
+  let state = createInitialState(cards);
 
   return {
     html: `${pageHeader({
@@ -569,7 +528,6 @@ export async function renderDeckSimulator(context) {
       let cardClickTimer = null;
       let suppressCardZoomUntil = 0;
       const render = () => {
-        saveState(deckId, state);
         if (root) root.innerHTML = tableHtml(state, groups, byDeckCardId);
         const metrics = document.querySelector('.simulator-metrics');
         if (metrics) metrics.innerHTML = [
@@ -609,10 +567,11 @@ export async function renderDeckSimulator(context) {
         const confirmed = await confirmDialog({
           title: 'Simulatie resetten',
           message: 'Alle zones en beurtinformatie worden gewist. Het deck wordt opnieuw geschud en je krijgt zeven kaarten.',
-          confirmLabel: 'Resetten'
+          confirmLabel: 'Resetten',
+          writeAction: false
         });
         if (!confirmed) return;
-        state = createInitialState(deckId, cards);
+        state = createInitialState(cards);
         render();
         toast('De speeltest is opnieuw begonnen.');
       });

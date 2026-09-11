@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.1 - 2026-09-11
+
+### Verbeterd
+
+- De API-documentatie is opgesplitst in `API-READ.md` en `API-WRITE.md`.
+- Ieder endpoint staat compact in de volgorde URL, korte uitleg, input-JSON en output-JSON.
+- De onderhoudspagina bevat afzonderlijke links naar beide Markdowndocumenten.
+- De decksimulator bewaart geen speltoestand meer in `sessionStorage`; iedere opening of herlaadactie start een nieuwe simulatie.
+- De lokale resetbevestiging is losgekoppeld van de write-API, zodat resetten ook in alleen-lezenmodus werkt.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x- en 2.1.0-data blijft rechtstreeks bruikbaar.
+
 ## 2.1.0 - 2026-09-10
 
 ### Verbeterd

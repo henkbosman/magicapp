@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.1.0
+# Architectuur - Magic Collection Manager 2.1.1
 
 ## Overzicht
 
@@ -107,14 +107,14 @@ Er is geen Monte Carlo- of regelsimulatieanalyse in 2.0.
 
 ## Simulator
 
-De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regelengine. De status staat in `sessionStorage`; kaartverplaatsingen veranderen geen databasegegevens.
+De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regelengine. De toestand bestaat uitsluitend in het geheugen van de actieve view. Herladen of opnieuw openen start een nieuwe simulatie; kaartverplaatsingen veranderen geen browseropslag of databasegegevens. De resetbevestiging is een lokale actie en is niet gekoppeld aan de write-API.
 
 
 ## Statische API-documentatie
 
-De volledige machineleesbare endpointbeschrijving staat als pure Markdown in `public/API.md`. Express serveert dit bestand rechtstreeks op `/API.md` met content type `text/markdown; charset=utf-8`. `docs/API.md` bevat dezelfde inhoud voor gebruik vanuit de broncode en releasebundel. De onderhoudspagina linkt naar de publieke variant.
+De machineleesbare endpointbeschrijving is opgesplitst in `public/API-READ.md` en `public/API-WRITE.md`. Express serveert deze als `/API-READ.md` en `/API-WRITE.md` met content type `text/markdown; charset=utf-8`. `docs/API-READ.md` en `docs/API-WRITE.md` zijn identieke bronkopieën. De onderhoudspagina linkt naar beide publieke documenten.
 
-De documentatie benoemt voor elk endpoint de HTTP-methode, route, pad- en queryparameters, JSON-body en responsevorm. Hierdoor hoeft een LLM-integratie de frontendcode niet te analyseren om de API te gebruiken.
+Ieder endpoint gebruikt dezelfde compacte volgorde: URL, korte uitleg, input-JSON en output-JSON. Niet-JSON-responses zoals afbeeldingen, CSV, tekstexport en databaseback-ups worden expliciet als zodanig gemarkeerd.
 
 ## Foutafhandeling en veiligheid
 

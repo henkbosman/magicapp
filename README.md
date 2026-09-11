@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.1.0
+# Magic Collection Manager 2.1.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.1.0** verfijnt de dagelijkse bediening, filters, kaarttoevoeging en de documentatie voor externe API-clients. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.1.1** splitst de compacte API-documentatie in een read- en write-document en maakt de decksimulator volledig tijdelijk en onafhankelijk van schrijftoegang. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -13,7 +13,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.1.0** verfijnt de da
 - Decks bouwen met kaarten die wel of niet in de collectie aanwezig zijn.
 - Benoemde combo- en synergiegroepen met twee of meer kaarten, toelichting en een instelbare volgorde.
 - Deckstatistieken voor mana curve, kleuren, kaarttypes, lands, creatures, handmatige tags, mana-productie, library-searchfuncties en Commander-controles.
-- Een vrije drag-and-drop-decksimulator met library, hand, battlefield, graveyard en command zone.
+- Een vrije, niet-persistente drag-and-drop-decksimulator met library, hand, battlefield, graveyard en command zone.
 - Wanted-list met prioriteit, rarity, mogelijke printings, gekozen printing, prijsinformatie en deckfilter.
 - Basic lands worden niet als ontbrekend beschouwd en komen niet op Wanted.
 - Handmatig corrigeerbare kaartkenmerken voor mana-productie en library-searchfuncties.
@@ -21,7 +21,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.1.0** verfijnt de da
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
-- Volledige statische API-documentatie in Markdown via `/API.md`, bedoeld voor scripts en LLM-integraties.
+- Compacte statische API-documentatie in Markdown via `/API-READ.md` en `/API-WRITE.md`, bedoeld voor scripts en LLM-integraties.
 
 ## Vereisten
 
@@ -105,14 +105,16 @@ Een Nginx-voorbeeld staat in:
 deploy/nginx-read-write.conf.example
 ```
 
-De volledige endpointbeschrijving met input- en outputformaten staat als pure Markdown in:
+De endpointbeschrijvingen staan als compacte pure Markdown in:
 
 ```text
-public/API.md
-docs/API.md
+public/API-READ.md
+public/API-WRITE.md
+docs/API-READ.md
+docs/API-WRITE.md
 ```
 
-Tijdens het draaien is deze pagina rechtstreeks beschikbaar via `/API.md`. De onderhoudspagina bevat hiervoor een link.
+Tijdens het draaien zijn de documenten bereikbaar via `/API-READ.md` en `/API-WRITE.md`. De onderhoudspagina bevat beide links. Ieder endpoint staat in de volgorde URL, korte uitleg, input-JSON en output-JSON.
 
 Let op: de lees-API bevat persoonlijke collectie-, deck- en wantedgegevens. Als je de applicatie buiten het LAN publiceert, beveilig de toegang daarom zelf met bijvoorbeeld VPN, reverse-proxyauthenticatie en HTTPS.
 
@@ -175,7 +177,7 @@ Deterministische statistieken worden zonder AI berekend.
 
 De simulator is een vrije speeltafel om gevoel te krijgen voor het deck. Kaarten worden als afbeeldingen getoond en kunnen met drag-and-drop tussen library, hand, battlefield, graveyard en command zone worden verplaatst.
 
-De simulator valideert bewust geen Magic-regels of betaalbaarheid. De tijdelijke status blijft alleen in de browsersessie en verandert de database niet.
+De simulator valideert bewust geen Magic-regels of betaalbaarheid. De toestand bestaat alleen in het geheugen van de geopende pagina, wordt niet in browseropslag of de database bewaard en begint opnieuw na herladen of opnieuw openen. Alle simulatoracties, inclusief resetten, blijven daardoor beschikbaar in alleen-lezenmodus.
 
 ## Wanted-list
 
