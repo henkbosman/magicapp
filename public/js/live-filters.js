@@ -8,6 +8,19 @@ export function formFilters(form, defaults = {}) {
   return params;
 }
 
+
+export function resetFilterForm(form, defaults = {}) {
+  for (const control of form?.elements || []) {
+    if (!control.name) continue;
+    const value = Object.hasOwn(defaults, control.name) ? defaults[control.name] : '';
+    if (control.type === 'checkbox' || control.type === 'radio') {
+      control.checked = Boolean(value);
+    } else {
+      control.value = String(value ?? '');
+    }
+  }
+}
+
 export function replaceRouteQuery(routePath, params) {
   const query = params.toString();
   const hash = `#${routePath}${query ? `?${query}` : ''}`;

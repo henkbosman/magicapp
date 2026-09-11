@@ -12,7 +12,7 @@ export function filtersExpanded(key) {
   }
 }
 
-export function filterToggleHtml({ id, panelId, expanded = false, activeCount = 0 }) {
+export function filterToggleHtml({ id, panelId, expanded = false, activeCount = 0, resetId = '' }) {
   const active = Number(activeCount || 0);
   const label = expanded ? 'Filters verbergen' : 'Filters tonen';
   return `<div class="filter-toggle-row">
@@ -21,6 +21,7 @@ export function filterToggleHtml({ id, panelId, expanded = false, activeCount = 
       <span data-filter-toggle-label>${label}</span>
       ${active > 0 ? `<span class="filter-active-count" data-filter-active-count>${active} actief</span>` : '<span class="filter-active-count" data-filter-active-count hidden></span>'}
     </button>
+    ${resetId ? `<button id="${escapeHtml(resetId)}" class="button ghost filter-reset" type="button">↺ Filters resetten</button>` : ''}
   </div>`;
 }
 

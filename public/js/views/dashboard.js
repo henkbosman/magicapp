@@ -24,8 +24,7 @@ export async function renderDashboard() {
     html: `
       ${pageHeader({
         eyebrow: 'Overzicht',
-        title: 'Jouw Magic-verzameling',
-        description: 'Controleer je collectie, decktekorten en wanted-list vanuit één lokaal overzicht.',
+        title: 'Mijn Magic-verzameling',
         actions: '<a class="button primary" data-write-action href="#/add">＋ Kaart toevoegen</a><a class="button secondary" href="#/decks">Deck bouwen</a>'
       })}
       <section class="metrics-grid">

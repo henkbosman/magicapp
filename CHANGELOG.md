@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.1.0 - 2026-09-10
+
+### Verbeterd
+
+- Het venster voor **Kaart toevoegen** binnen een deck is aanzienlijk breder en hoger gemaakt. De zoekresultaten en printingkaarten gebruiken de beschikbare ruimte responsief.
+- De kleuridentiteitsfilter in Collectie behandelt `W`, `U`, `B`, `R` en `G` voortaan als monokleurfilter inclusief kleurloze kaarten. Een groen-zwarte kaart verschijnt dus niet meer bij groen, terwijl een kleurloze kaart wel bruikbaar blijft.
+- Collectie en Wanted hebben naast de inklapknop een directe knop **Filters resetten**. De resultaten worden zonder paginaverspringing opnieuw geladen.
+- Het opmerkingenveld op **Kaart toevoegen** is compacter gemaakt.
+- **Aan collectie toevoegen** staat als primaire actie boven **Naar Wanted** en **Naar deck**.
+- De kaartdetailpagina heeft meer verticale ruimte tussen **Beschikbaarheid** en de daaropvolgende informatiepanelen.
+- Het dashboard gebruikt nu **Mijn Magic-verzameling** en de algemene introductiezin is verwijderd.
+- Er is een volledige statische API-handleiding toegevoegd als `public/API.md`. De pagina bevat alle read- en write-endpoints met invoer- en uitvoerformaten en is rechtstreeks bereikbaar via `/API.md`.
+- De onderhoudspagina bevat een link naar de Markdown-API-handleiding.
+- Markdownbestanden worden expliciet als `text/markdown; charset=utf-8` en zonder verouderde browsercache geserveerd.
+- De voorbeeldconfiguraties gebruiken de 2.1.0-versie in de Scryfall User-Agent.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.0.3 - 2026-09-10
 
 ### Verbeterd

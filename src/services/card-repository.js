@@ -295,8 +295,17 @@ export function listCollection(filters = {}) {
     if (color === 'C') conditions.push("c.color_identity_json = '[]'");
     else if (color === 'M') conditions.push('json_array_length(c.color_identity_json) > 1');
     else {
-      conditions.push('c.color_identity_json LIKE ?');
-      params.push(`%"${color}"%`);
+      conditions.push(`(
+        c.color_identity_json = '[]'
+        OR (
+          json_array_length(c.color_identity_json) = 1
+          AND EXISTS (
+            SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
+            WHERE UPPER(CAST(identity_color.value AS TEXT)) = ?
+          )
+        )
+      )`);
+      params.push(color);
     }
   }
   if (filters.subtype) {

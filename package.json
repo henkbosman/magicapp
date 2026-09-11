@@ -1,6 +1,6 @@
 {
   "name": "magic-collection-manager",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "private": true,
   "description": "Lokale Magic: The Gathering collectie-, wanted- en deckmanager",
   "type": "module",

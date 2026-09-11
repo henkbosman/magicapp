@@ -105,7 +105,7 @@ export async function renderCardDetail(context) {
             <h3>${escapeHtml(card.typeLine)}</h3>
             ${faceText(card)}
           </div></section>
-          <section class="panel"><header class="panel-header"><h2>Beschikbaarheid</h2></header><div class="panel-body">${usageBadges(card.usage)}${card.usage.decks.length ? `<p class="help-text">Verschillende fysieke printings tellen samen op basis van Oracle-identiteit.</p>` : ''}</div></section>
+          <section class="panel card-availability-panel"><header class="panel-header"><h2>Beschikbaarheid</h2></header><div class="panel-body">${usageBadges(card.usage)}${card.usage.decks.length ? `<p class="help-text">Verschillende fysieke printings tellen samen op basis van Oracle-identiteit.</p>` : ''}</div></section>
           <section class="grid-2">
             <section class="panel"><header class="panel-header"><h2>Kaartgegevens</h2></header><div class="panel-body"><div class="card-facts">
               <div class="fact"><span>Set</span><strong>${escapeHtml(card.setName)}</strong></div>

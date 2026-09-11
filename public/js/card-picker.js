@@ -35,6 +35,7 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
           : 'Typ minimaal twee letters om Scryfall en de lokale database te doorzoeken.'}</div>
         <div id="picker-results" class="printing-grid"></div>`
     });
+    if (preferCollection) dialog.classList.add('modal-card-picker');
     const search = dialog.querySelector('#picker-search');
     const suggestions = dialog.querySelector('#picker-suggestions');
     const status = dialog.querySelector('#picker-status');

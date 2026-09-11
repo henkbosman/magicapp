@@ -48,10 +48,13 @@ function selectedPanel(card, printing) {
           <div class="field"><label>Conditie</label><select name="condition"><option value="near_mint">Near mint</option><option value="mint">Mint</option><option value="excellent">Excellent</option><option value="good">Good</option><option value="light_played">Light played</option><option value="played">Played</option><option value="poor">Poor</option></select></div>
           <div class="field"><label>Locatie</label><input name="location" placeholder="Map, doos of lade"></div>
           <div class="field"><label>Aankoopprijs (€)</label><input name="purchasePrice" type="number" min="0" step="0.01"></div>
-          <div class="field full"><label>Opmerkingen</label><textarea name="notes"></textarea></div>
+          <div class="field full"><label>Opmerkingen</label><textarea class="add-card-notes" name="notes" rows="2"></textarea></div>
           <label class="checkbox-field full"><input name="reconcileWanted" type="checkbox" checked> Wanted-aantal automatisch verminderen</label>
         </div>
-        <div class="form-actions">${isBasicLand(card) ? '' : '<button type="button" id="selected-to-wanted" class="button secondary" data-write-action>☆ Naar Wanted</button>'}<button type="button" id="selected-to-deck" class="button secondary" data-write-action>▤ Naar deck</button><button class="button primary" type="submit" data-write-action>＋ Aan collectie toevoegen</button></div>
+        <div class="add-card-actions">
+          <button class="button primary add-card-primary-action" type="submit" data-write-action>＋ Aan collectie toevoegen</button>
+          <div class="add-card-secondary-actions">${isBasicLand(card) ? '' : '<button type="button" id="selected-to-wanted" class="button secondary" data-write-action>☆ Naar Wanted</button>'}<button type="button" id="selected-to-deck" class="button secondary" data-write-action>▤ Naar deck</button></div>
+        </div>
       </form>
       </div>
     </div>

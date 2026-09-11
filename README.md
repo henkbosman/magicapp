@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.0.3
+# Magic Collection Manager 2.1.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.0.3** bevat de verbeteringen uit 2.0.1 plus enkele mobiele layoutcorrecties. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.1.0** verfijnt de dagelijkse bediening, filters, kaarttoevoeging en de documentatie voor externe API-clients. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -21,6 +21,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.0.3** bevat de verbe
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
+- Volledige statische API-documentatie in Markdown via `/API.md`, bedoeld voor scripts en LLM-integraties.
 
 ## Vereisten
 
@@ -104,6 +105,15 @@ Een Nginx-voorbeeld staat in:
 deploy/nginx-read-write.conf.example
 ```
 
+De volledige endpointbeschrijving met input- en outputformaten staat als pure Markdown in:
+
+```text
+public/API.md
+docs/API.md
+```
+
+Tijdens het draaien is deze pagina rechtstreeks beschikbaar via `/API.md`. De onderhoudspagina bevat hiervoor een link.
+
 Let op: de lees-API bevat persoonlijke collectie-, deck- en wantedgegevens. Als je de applicatie buiten het LAN publiceert, beveilig de toegang daarom zelf met bijvoorbeeld VPN, reverse-proxyauthenticatie en HTTPS.
 
 ## Kaartgegevens en caching
@@ -130,7 +140,7 @@ De collectie ondersteunt onder andere filters op:
 - deck;
 - beschikbaarheid.
 
-Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; de gekozen filters blijven actief. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
+Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Bij een afzonderlijke kleuridentiteit worden kaarten met exact die ene kleuridentiteit en kleurloze kaarten getoond, maar niet de meerkleurige kaarten waarin die kleur voorkomt. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 
@@ -138,7 +148,7 @@ Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaa
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven.
 
@@ -171,7 +181,7 @@ De simulator valideert bewust geen Magic-regels of betaalbaarheid. De tijdelijke
 
 Wanted-items kunnen zonder gekozen printing worden opgeslagen. De Printing-filter toont alle mogelijke printings waarin wanted-kaarten voorkomen, zodat je bijvoorbeeld in een winkel gericht per set kunt zoeken.
 
-De wanted-list gebruikt een standaard ingeklapte filtersectie en ondersteunt filters op onder andere:
+De wanted-list gebruikt een standaard ingeklapte filtersectie, heeft een knop **Filters resetten** en ondersteunt filters op onder andere:
 
 - kaartnaam;
 - prioriteit;

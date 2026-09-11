@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.0.0
+# Architectuur - Magic Collection Manager 2.1.0
 
 ## Overzicht
 
@@ -108,6 +108,13 @@ Er is geen Monte Carlo- of regelsimulatieanalyse in 2.0.
 ## Simulator
 
 De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regelengine. De status staat in `sessionStorage`; kaartverplaatsingen veranderen geen databasegegevens.
+
+
+## Statische API-documentatie
+
+De volledige machineleesbare endpointbeschrijving staat als pure Markdown in `public/API.md`. Express serveert dit bestand rechtstreeks op `/API.md` met content type `text/markdown; charset=utf-8`. `docs/API.md` bevat dezelfde inhoud voor gebruik vanuit de broncode en releasebundel. De onderhoudspagina linkt naar de publieke variant.
+
+De documentatie benoemt voor elk endpoint de HTTP-methode, route, pad- en queryparameters, JSON-body en responsevorm. Hierdoor hoeft een LLM-integratie de frontendcode niet te analyseren om de API te gebruiken.
 
 ## Foutafhandeling en veiligheid
 

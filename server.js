@@ -58,8 +58,11 @@ app.use(express.static(config.publicDir, {
   etag: true,
   maxAge: 0,
   setHeaders(res, filePath) {
-    if (/\.(?:css|js|html)$/i.test(filePath)) {
+    if (/\.(?:css|js|html|md)$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+    if (/\.md$/i.test(filePath)) {
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
     }
   }
 }));

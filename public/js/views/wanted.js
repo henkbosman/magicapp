@@ -2,7 +2,7 @@ import { api, apiPath, queryString } from '../api.js';
 import { addCardToCollection, addCardToWanted } from '../card-actions.js';
 import { pickCard } from '../card-picker.js';
 import { cachedCardImageUrl, cardImage, pageHeader, usageBadges } from '../components.js';
-import { bindLiveFilters } from '../live-filters.js';
+import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import {
   confirmDialog,
@@ -279,7 +279,7 @@ export async function renderWanted(context) {
         description: 'Filter per deck of doorzoek de series waarin je wanted-kaarten zijn verschenen.',
         actions: `<button id="add-wanted" class="button primary" data-write-action>＋ Kaart toevoegen</button><a class="button secondary" href="${apiPath('/wanted/export.csv')}">CSV exporteren</a>`
       })}
-      ${filterToggleHtml({ id: 'wanted-filter-toggle', panelId: 'wanted-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+      ${filterToggleHtml({ id: 'wanted-filter-toggle', panelId: 'wanted-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount, resetId: 'wanted-filter-reset' })}
       <form id="wanted-filters" class="filters compact-filters wanted-filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>
         <div class="field filter-search"><label>Naam</label><input name="q" type="search" value="${escapeHtml(filters.q)}" placeholder="Zoek wanted-kaart"></div>
         <div class="field"><label>Prioriteit</label><select name="priority"><option value="">Alle prioriteiten</option>${[1,2,3,4,5].map((value) => option(value, `Prioriteit ${value}`, filters.priority)).join('')}</select></div>
@@ -345,6 +345,11 @@ export async function renderWanted(context) {
         defaults: { sort: 'priority' },
         onApply: loadCurrentResults,
         onError: (error) => toast(error.message || 'Filteren is mislukt.', 'error')
+      });
+
+      document.getElementById('wanted-filter-reset')?.addEventListener('click', () => {
+        resetFilterForm(filterForm, { sort: 'priority' });
+        liveFilters.apply();
       });
 
       const addWanted = async () => {

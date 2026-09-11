@@ -2,7 +2,7 @@ import { api, apiPath, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
 import { cardImage, cardInsightBadges, manaCost, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
-import { bindLiveFilters } from '../live-filters.js';
+import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, toast } from '../utils.js';
 
@@ -77,7 +77,7 @@ export async function renderCollection(context) {
         description: `${items.length} collectieregels zichtbaar. Beschikbaarheid wordt over alle printings van dezelfde Oracle-kaart berekend.`,
         actions: `<a class="button primary" data-write-action href="#/add">＋ Kaart toevoegen</a><a class="button secondary" href="${apiPath('/collection/export.csv')}">CSV exporteren</a>`
       })}
-      ${filterToggleHtml({ id: 'collection-filter-toggle', panelId: 'collection-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+      ${filterToggleHtml({ id: 'collection-filter-toggle', panelId: 'collection-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount, resetId: 'collection-filter-reset' })}
       <form id="collection-filters" class="filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>
         <div class="field filter-search"><label>Naam</label><input name="q" type="search" value="${escapeHtml(filters.q)}" placeholder="Zoek in lokale collectie"></div>
         <div class="field"><label>Kleuridentiteit</label><select name="color"><option value="">Alle kleuren</option>${[['W','Wit'],['U','Blauw'],['B','Zwart'],['R','Rood'],['G','Groen'],['M','Meerkleurig'],['C','Kleurloos']].map(([v,l]) => option(v, l, filters.color)).join('')}</select></div>
@@ -122,6 +122,11 @@ export async function renderCollection(context) {
         routePath: '/collection',
         onApply: loadCurrentResults,
         onError: (error) => toast(error.message || 'Filteren is mislukt.', 'error')
+      });
+
+      document.getElementById('collection-filter-reset')?.addEventListener('click', () => {
+        resetFilterForm(filterForm);
+        liveFilters.apply();
       });
 
       resultsElement.addEventListener('click', async (event) => {

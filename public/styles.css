@@ -1315,3 +1315,83 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .selected-printing-detail-link { display: inline-block; border-radius: 10px; }
 .selected-printing-detail-link:focus-visible { outline: 3px solid var(--focus, #4f7f5a); outline-offset: 3px; }
 .selected-printing-detail-link .card-image { cursor: zoom-in; }
+
+/* Release 2.1.0: grotere deckkaartkiezer, filterreset en verfijnde detailopmaak */
+.modal-card-picker {
+  width: min(1180px, calc(100vw - 32px));
+}
+.modal-card-picker .modal-card {
+  height: min(820px, calc(100vh - 32px));
+}
+.modal-card-picker .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.modal-card-picker .picker-suggestion-list {
+  max-height: min(62vh, 580px);
+}
+.modal-card-picker .printing-grid {
+  max-height: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filter-toggle-row {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-reset {
+  min-height: 38px;
+}
+
+.add-card-notes {
+  min-height: 64px;
+  height: 64px;
+}
+.add-card-actions {
+  margin-top: 16px;
+  display: grid;
+  gap: 9px;
+}
+.add-card-primary-action {
+  width: 100%;
+}
+.add-card-secondary-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.card-availability-panel {
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .modal-card-picker .printing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-card-picker {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .modal-card-picker .modal-card {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .modal-card-picker .printing-grid {
+    grid-template-columns: 1fr;
+  }
+  .filter-toggle-row .filter-reset {
+    width: 100%;
+  }
+  .add-card-secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .add-card-secondary-actions .button {
+    width: 100%;
+  }
+}
