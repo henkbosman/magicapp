@@ -291,21 +291,31 @@ export function listCollection(filters = {}) {
     params.push(`%"${filters.type}"%`);
   }
   if (filters.color) {
-    const color = String(filters.color).toUpperCase();
-    if (color === 'C') conditions.push("c.color_identity_json = '[]'");
-    else if (color === 'M') conditions.push('json_array_length(c.color_identity_json) > 1');
-    else {
-      conditions.push(`(
-        c.color_identity_json = '[]'
-        OR (
-          json_array_length(c.color_identity_json) = 1
-          AND EXISTS (
+    const rawColors = Array.isArray(filters.color) ? filters.color : String(filters.color).split(',');
+    const colors = [...new Set(rawColors.map((value) => String(value).trim().toUpperCase()).filter(Boolean))];
+
+    // De historische API-waarde M blijft ondersteund. De nieuwe interface
+    // gebruikt herhaalbare W/U/B/R/G/C-parameters als toegestane identiteit.
+    if (colors.length === 1 && colors[0] === 'M') {
+      conditions.push('json_array_length(c.color_identity_json) > 1');
+    } else {
+      const selectedColors = colors.filter((color) => ['W', 'U', 'B', 'R', 'G'].includes(color));
+      const includeColorless = colors.includes('C');
+      const colorClauses = [];
+
+      if (includeColorless) colorClauses.push("json_array_length(c.color_identity_json) = 0");
+      if (selectedColors.length) {
+        const placeholders = selectedColors.map(() => '?').join(', ');
+        colorClauses.push(`(
+          json_array_length(c.color_identity_json) > 0
+          AND NOT EXISTS (
             SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
-            WHERE UPPER(CAST(identity_color.value AS TEXT)) = ?
+            WHERE UPPER(CAST(identity_color.value AS TEXT)) NOT IN (${placeholders})
           )
-        )
-      )`);
-      params.push(color);
+        )`);
+        params.push(...selectedColors);
+      }
+      if (colorClauses.length) conditions.push(`(${colorClauses.join(' OR ')})`);
     }
   }
   if (filters.subtype) {

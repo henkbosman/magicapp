@@ -23,28 +23,43 @@ function legalityGrid(card) {
 
 function ownedImageVariants(collectionItems, fallbackCard) {
   const variants = new Map();
-  for (const item of collectionItems) {
-    const key = String(item.card.id);
+  const addVariant = (card, { quantity = 0, finish = '', language = '', selected = false } = {}) => {
+    const key = String(card.id);
     const current = variants.get(key) || {
-      card: item.card,
+      card,
       quantity: 0,
       finishes: new Set(),
-      languages: new Set()
+      languages: new Set(),
+      selected: false
     };
-    current.quantity += Number(item.quantity || 0);
-    if (item.finish) current.finishes.add(item.finish);
-    if (item.language) current.languages.add(item.language);
+    current.quantity += Number(quantity || 0);
+    if (finish) current.finishes.add(finish);
+    if (language) current.languages.add(language);
+    current.selected = current.selected || selected;
     variants.set(key, current);
+  };
+
+  // De kaart-ID in de URL hoort bij de gekozen printing. Neem deze altijd op,
+  // ook wanneer andere printings van hetzelfde Oracle-concept al in bezit zijn.
+  addVariant(fallbackCard, { selected: true });
+  for (const item of collectionItems) {
+    addVariant(item.card, {
+      quantity: item.quantity,
+      finish: item.finish,
+      language: item.language,
+      selected: item.card.id === fallbackCard.id
+    });
   }
+
   const rows = [...variants.values()].map((entry) => ({
     ...entry,
     finishes: [...entry.finishes],
     languages: [...entry.languages]
   }));
-  rows.sort((left, right) => Number(right.card.id === fallbackCard.id) - Number(left.card.id === fallbackCard.id)
+  rows.sort((left, right) => Number(right.selected) - Number(left.selected)
     || String(left.card.releasedAt || '').localeCompare(String(right.card.releasedAt || ''))
     || String(left.card.setName || '').localeCompare(String(right.card.setName || ''), 'nl'));
-  return rows.length ? rows : [{ card: fallbackCard, quantity: 0, finishes: [], languages: [] }];
+  return rows;
 }
 
 function ownedImageViewer(variants) {
@@ -60,7 +75,7 @@ function ownedImageViewer(variants) {
       <div class="owned-image-choice-list">
         ${variants.map((variant, index) => `<button type="button" class="owned-image-choice ${index === 0 ? 'active' : ''}" data-owned-image-index="${index}" aria-pressed="${index === 0 ? 'true' : 'false'}">
           <span>${escapeHtml(variant.card.setCode.toUpperCase())} #${escapeHtml(variant.card.collectorNumber)}</span>
-          <small>${variant.quantity}× in bezit${variant.finishes.length ? ` · ${escapeHtml(variant.finishes.join(', '))}` : ''}</small>
+          <small>${variant.quantity > 0 ? `${variant.quantity}× in bezit${variant.finishes.length ? ` · ${escapeHtml(variant.finishes.join(', '))}` : ''}` : 'Geselecteerde printing · niet in bezit'}</small>
         </button>`).join('')}
       </div>
     </div>` : ''}

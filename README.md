@@ -1,16 +1,16 @@
-# Magic Collection Manager 2.1.1
+# Magic Collection Manager 2.2.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.1.1** splitst de compacte API-documentatie in een read- en write-document en maakt de decksimulator volledig tijdelijk en onafhankelijk van schrijftoegang. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies is volledig verwijderd. Ook de historische 1.x-databasemigratieketen maakt geen deel meer uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.0** verbetert de snelle kaartinvoer, voegt een gecombineerde collectie-en-deckactie toe, toont marktprijzen in de collectie en maakt de kleuridentiteitsfilter geschikt voor meerdere toegestane kleuren. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
 - Snel lokaal zoeken en direct zien of een kaart in bezit is, hoeveel exemplaren beschikbaar zijn, in welke decks deze voorkomt en of de kaart op Wanted staat.
-- Verschillende fysieke printings, talen, condities, locaties en non-foil/foil/etched exemplaren registreren.
+- Verschillende fysieke printings, talen, condities, locaties en non-foil/foil/etched exemplaren registreren, met zichtbare Scryfall-prijzen per printing en afwerking.
 - Scryfall-autocomplete, printingselectie en lokaal opgeslagen kaartmetadata.
 - Persistente SQLite-cache voor externe Scryfall-resultaten en een lokale schijfcache voor kaartafbeeldingen.
-- Decks bouwen met kaarten die wel of niet in de collectie aanwezig zijn.
+- Decks bouwen met kaarten die wel of niet in de collectie aanwezig zijn, inclusief een atomaire actie die één printing tegelijk aan de collectie en een deck toevoegt.
 - Benoemde combo- en synergiegroepen met twee of meer kaarten, toelichting en een instelbare volgorde.
 - Deckstatistieken voor mana curve, kleuren, kaarttypes, lands, creatures, handmatige tags, mana-productie, library-searchfuncties en Commander-controles.
 - Een vrije, niet-persistente drag-and-drop-decksimulator met library, hand, battlefield, graveyard en command zone.
@@ -126,6 +126,20 @@ Externe resultaten worden tijdelijk in SQLite gecachet. Kaartafbeeldingen worden
 
 Via **Instellingen en onderhoud** kan de externe responsecache worden geleegd of lokaal opgeslagen kaartmetadata opnieuw met Scryfall worden gesynchroniseerd. Gebruikersgegevens zoals aantallen, decks, wanted-status, notities en aankoopprijzen worden daarbij niet overschreven.
 
+## Kaart toevoegen
+
+Na het kiezen van een kaartnaam worden alle papieren printings getoond. Een keuzelijst met collectornummers kan de lijst beperken tot één kaartnummer. Na selectie springt de pagina naar de invoer en toont zij de beschikbare EUR-, USD- en MTGO-prijzen van die printing.
+
+Het opmerkingenveld is uit deze snelle invoer verwijderd. Aantal, taal, afwerking, conditie, locatie, aankoopprijs en de wanted-afstemming blijven staan nadat een actie is uitgevoerd en worden pas opnieuw geïnitialiseerd wanneer een andere printing wordt gekozen.
+
+De drie acties staan naast elkaar:
+
+- **Collectie**: voegt de fysieke printing aan de collectie toe;
+- **Wanted**: voegt het Oracle-kaartconcept aan Wanted toe zonder de huidige printing vast te leggen;
+- **Collectie + Deck**: voegt de fysieke printing binnen één transactie aan de collectie en aan het gekozen deck toe.
+
+Succesmeldingen van dit scherm verschijnen bovenaan. De afbeelding en kaartnaam openen de exact geselecteerde printing op de kaartdetailpagina.
+
 ## Collectie
 
 De collectie ondersteunt onder andere filters op:
@@ -142,7 +156,7 @@ De collectie ondersteunt onder andere filters op:
 - deck;
 - beschikbaarheid.
 
-Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Bij een afzonderlijke kleuridentiteit worden kaarten met exact die ene kleuridentiteit en kleurloze kaarten getoond, maar niet de meerkleurige kaarten waarin die kleur voorkomt. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
+Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt meerdere selectievakjes. Geselecteerde gekleurde symbolen vormen samen de toegestane kleuridentiteit: bij alleen groen verschijnen uitsluitend monogroene kaarten; bij groen en wit verschijnen mono-groen, mono-wit en groen-witte kaarten. Kleurloze kaarten verschijnen wanneer **Kleurloos** is geselecteerd. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 

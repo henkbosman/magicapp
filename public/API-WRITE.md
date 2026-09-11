@@ -1,4 +1,4 @@
-# Magic Collection Manager Write API 2.1.1
+# Magic Collection Manager Write API 2.2.0
 
 Base URL: `https://<host>`  
 Gebruik `Content-Type: application/json`. De reverse proxy kan `/api/write/*` buiten het LAN blokkeren.  
@@ -35,7 +35,7 @@ Controleert of de write-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","writeAvailable":true,"version":"2.1.1"}
+{"status":"ok","writeAvailable":true,"version":"2.2.0"}
 ```
 
 ## `POST /api/write/cards/cache`
@@ -173,6 +173,58 @@ Voegt een fysieke kaart toe of verhoogt een identieke collectieregel. Voeg één
     "purchasePrice": 0.5,
     "card": {"id":123,"name":"Eternal Witness"},
     "deckPrintingAlignment": {"updatedDeckCards":1,"deckIds":[4],"decks":[{"id":4,"name":"Yedora"}]}
+  }
+}
+```
+
+## `POST /api/write/collection/with-deck`
+
+Voegt één concrete printing binnen dezelfde transactie toe aan de fysieke collectie en een deck. Bij een fout wordt geen van beide toevoegingen bewaard. Voeg één kaartidentificatie toe.
+
+### Input JSON
+
+```json
+{
+  "scryfallId": "uuid",
+  "quantity": 1,
+  "finish": "nonfoil",
+  "language": "en",
+  "condition": "near_mint",
+  "location": "Map 1",
+  "notes": "",
+  "purchasePrice": 0.5,
+  "reconcileWanted": true,
+  "deckId": 4,
+  "deckQuantity": 1,
+  "role": "main",
+  "tags": ["Ramp"],
+  "note": "Decknotitie"
+}
+```
+
+### Output JSON
+
+```json
+{
+  "data": {
+    "collectionItem": {
+      "id": 55,
+      "quantity": 1,
+      "finish": "nonfoil",
+      "language": "en",
+      "condition": "near_mint",
+      "location": "Map 1",
+      "purchasePrice": 0.5,
+      "card": {"id":123,"name":"Eternal Witness"}
+    },
+    "deckCard": {
+      "id": 81,
+      "quantity": 1,
+      "role": "main",
+      "note": "Decknotitie",
+      "tags": ["Ramp"],
+      "card": {"id":123,"name":"Eternal Witness"}
+    }
   }
 }
 ```

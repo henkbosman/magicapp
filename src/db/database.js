@@ -33,14 +33,30 @@ function initializeSchema() {
 
 initializeSchema();
 
+let transactionDepth = 0;
+let savepointSequence = 0;
+
 export function transaction(work) {
-  db.exec('BEGIN IMMEDIATE');
+  const outermost = transactionDepth === 0;
+  const savepoint = outermost ? '' : `app_savepoint_${++savepointSequence}`;
+  if (outermost) db.exec('BEGIN IMMEDIATE');
+  else db.exec(`SAVEPOINT ${savepoint}`);
+  transactionDepth += 1;
+
   try {
     const result = work();
-    db.exec('COMMIT');
+    transactionDepth -= 1;
+    if (outermost) db.exec('COMMIT');
+    else db.exec(`RELEASE SAVEPOINT ${savepoint}`);
     return result;
   } catch (error) {
-    db.exec('ROLLBACK');
+    transactionDepth -= 1;
+    if (outermost) {
+      db.exec('ROLLBACK');
+    } else {
+      db.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      db.exec(`RELEASE SAVEPOINT ${savepoint}`);
+    }
     throw error;
   }
 }

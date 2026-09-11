@@ -80,6 +80,7 @@ export function groupPrintings(printings) {
         scryfallId: variant.scryfallId,
         cardId: variant.cardId || null,
         finishes: variant.finishes || [],
+        prices: variant.prices || {},
         image: variant.image || null,
         imageNormal: variant.imageNormal || variant.image || null,
         cached: Boolean(variant.cached)

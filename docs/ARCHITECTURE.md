@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.1.1
+# Architectuur - Magic Collection Manager 2.2.0
 
 ## Overzicht
 
@@ -51,7 +51,7 @@ Joined queries aliasen de database-ID van `cards` expliciet als `card_record_id`
 
 ## Routes en services
 
-`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`.
+`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`. De gecombineerde route `POST /api/write/collection/with-deck` gebruikt een buitenste SQLite-transactie; de bestaande collectie- en deckservices nemen via savepoints veilig aan die transactie deel.
 
 Belangrijke services:
 
@@ -83,7 +83,7 @@ Express mount twee API-zones:
 
 De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart toevoegen, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
 
-Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie.
+Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie.
 
 ## Caching
 
@@ -98,6 +98,10 @@ Mogelijke papieren printings worden afzonderlijk genormaliseerd opgeslagen zodat
 ### Afbeeldingen
 
 Kaartafbeeldingen worden standaard onder `data/images/` gecachet. Cachebestanden zijn gekoppeld aan de exacte externe afbeelding-URL om verwisselde afbeeldingen door naam/ID-botsingen te voorkomen.
+
+## Collectiefiltering
+
+De kleuridentiteitsfilter verzendt één of meer herhaalde `color`-queryparameters. De backend behandelt W/U/B/R/G als een toegestane verzameling: iedere kleur in de kaartidentiteit moet daarin voorkomen. Kleurloze kaarten worden alleen toegevoegd wanneer `C` is geselecteerd. Filtering vindt vóór paginering in SQLite plaats.
 
 ## Deckstatistieken
 

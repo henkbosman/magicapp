@@ -30,7 +30,9 @@ export function printingVariants(printing, card = null) {
     scryfallId: card.scryfallId,
     cardId: card.id || null,
     finishes: card.finishes?.length ? card.finishes : ['nonfoil'],
+    prices: card.prices || {},
     image: card.images?.small || card.images?.normal || null,
+    imageNormal: card.images?.normal || card.images?.small || null,
     cached: Boolean(card.id)
   }];
 }

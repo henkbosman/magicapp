@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.2.0 - 2026-09-11
+
+### Verbeterd
+
+- Na het kiezen van een printing op **Kaart toevoegen** scrolt de pagina zo nodig naar de drie actieknoppen.
+- Het opmerkingenveld is uit de snelle kaartinvoer verwijderd.
+- De geselecteerde printing toont beschikbare non-foil-, foil-, etched- en MTGO-prijzen in EUR, USD en TIX.
+- Ingevulde collectievelden blijven na **Collectie**, **Wanted** en **Collectie + Deck** behouden en worden pas bij een andere printing opnieuw ingesteld.
+- De acties heten nu **Collectie**, **Wanted** en **Collectie + Deck** en staan in die volgorde naast elkaar.
+- **Collectie + Deck** schrijft de fysieke printing en de deckkaart atomair weg; bij een fout wordt geen halve toevoeging bewaard.
+- Succes- en foutmeldingen van de snelle kaartinvoer verschijnen bovenaan het scherm.
+- Naast het kaartnaamveld staat een collectornummerfilter dat alle beschikbare nummers van de gevonden kaart bevat.
+- De kleuridentiteitsfilter in Collectie ondersteunt meerdere geselecteerde kleuren en toont alleen kaarten waarvan de volledige identiteit binnen die toegestane kleuren valt. **Meerkleurig** is vervallen; kleurloos is afzonderlijk selecteerbaar.
+- Collectieregels tonen de beschikbare Scryfall-prijs voor hun concrete printing en afwerking.
+
+### Opgelost
+
+- De kaartdetailpagina die vanuit een geselecteerde printing wordt geopend, zet die exacte printing vooraan en valt niet meer terug op een andere printing die al in bezit is.
+- Opnieuw klikken op dezelfde printing wist de reeds ingevulde waarden niet meer.
+- Taalvarianten gebruiken waar mogelijk hun eigen exacte detailkoppeling en prijsinformatie.
+
+### API
+
+- Nieuw endpoint `POST /api/write/collection/with-deck` voor een atomaire collectie- en decktoevoeging.
+- `GET /api/read/collection` accepteert herhaalde `color`-parameters voor een toegestane kleuridentiteit.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x- en 2.1.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.1.1 - 2026-09-11
 
 ### Verbeterd

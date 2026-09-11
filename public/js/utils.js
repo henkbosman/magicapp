@@ -34,8 +34,10 @@ export function debounce(fn, delay = 250) {
   };
 }
 
-export function toast(message, type = 'success') {
-  const region = document.getElementById('toast-region');
+export function toast(message, type = 'success', { position = 'bottom' } = {}) {
+  const regionId = position === 'top' ? 'toast-region-top' : 'toast-region';
+  const region = document.getElementById(regionId) || document.getElementById('toast-region');
+  if (!region) return;
   const element = document.createElement('div');
   element.className = `toast ${type}`;
   element.innerHTML = `<span class="toast-icon">${type === 'error' ? '!' : type === 'warning' ? '△' : '✓'}</span><span>${escapeHtml(message)}</span>`;

@@ -1,4 +1,4 @@
-# Magic Collection Manager Read API 2.1.1
+# Magic Collection Manager Read API 2.2.0
 
 Base URL: `https://<host>`  
 Alle routes gebruiken `GET` en hebben geen JSON-body. Querywaarden staan in de URL.  
@@ -17,7 +17,7 @@ Controleert of de read-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","version":"2.1.1"}
+{"status":"ok","version":"2.2.0"}
 ```
 
 ## `GET /api/read/dashboard`
@@ -284,9 +284,9 @@ Exporteert alle fysieke collectieregels als CSV.
 
 Niet van toepassing. Responsebody is `text/csv` met kolommen `name,set_code,set_name,collector_number,quantity,finish,language,condition,location,notes,purchase_price,scryfall_id`.
 
-## `GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={W|U|B|R|G|M|C}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}`
+## `GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={W|U|B|R|G|C}&color={...}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}`
 
-Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel.
+Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. Herhaal `color` voor meerdere toegestane kleuren, bijvoorbeeld `?color=G&color=W`. De volledige kaartidentiteit moet binnen W/U/B/R/G vallen; kleurloze kaarten vereisen `color=C`.
 
 ### Input JSON
 
@@ -311,7 +311,7 @@ Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn option
         "purchasePrice": 0.5,
         "createdAt": "2026-09-10 12:00:00",
         "updatedAt": "2026-09-10 12:00:00",
-        "card": {"id":123,"name":"Eternal Witness","setCode":"m3c","collectorNumber":"226","usage":{},"insights":{}}
+        "card": {"id":123,"name":"Eternal Witness","setCode":"m3c","collectorNumber":"226","prices":{"eur":"0.45","eur_foil":"1.10","usd":"0.52"},"usage":{},"insights":{}}
       }
     ],
     "total": 1,
@@ -652,7 +652,7 @@ Geeft technische status van database, caches en lokale installatie.
 ```json
 {
   "data": {
-    "applicationVersion": "2.1.1",
+    "applicationVersion": "2.2.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

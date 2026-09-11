@@ -10,6 +10,8 @@ import {
 } from '../services/card-repository.js';
 import { ensureCard } from '../services/card-cache-service.js';
 import { booleanValue, oneOf, optionalNumber, optionalString, positiveInteger } from '../lib/validation.js';
+import { transaction } from '../db/database.js';
+import { addDeckCard } from '../services/deck-service.js';
 import { HttpError } from '../lib/http-error.js';
 import { exportCollectionCsv, importCollectionCsv } from '../services/import-export-service.js';
 
@@ -27,6 +29,20 @@ function collectionInput(body, { allowZero = false } = {}) {
     purchasePrice: optionalNumber(body.purchasePrice, 'Aankoopprijs'),
     reconcileWanted: booleanValue(body.reconcileWanted, true),
     sourceWantedId: body.sourceWantedId ? positiveInteger(body.sourceWantedId, 'Wanted-ID') : null
+  };
+}
+
+
+const DECK_ROLES = ['commander', 'partner', 'companion', 'main', 'sideboard', 'maybeboard'];
+
+function collectionDeckInput(body) {
+  const tags = body.tags ?? [];
+  return {
+    deckId: positiveInteger(body.deckId, 'Deck-ID'),
+    quantity: positiveInteger(body.deckQuantity ?? body.quantity ?? 1, 'Aantal in deck'),
+    role: oneOf(body.role, DECK_ROLES, 'Rol', 'main'),
+    note: optionalString(body.note, 5000),
+    tags: Array.isArray(tags) ? tags : String(tags).split(',').map((tag) => tag.trim())
   };
 }
 
@@ -52,6 +68,28 @@ collectionWriteRouter.post('/', async (req, res) => {
   const card = await ensureCard(req.body || {});
   const item = addCollectionItem({ cardId: card.id, ...collectionInput(req.body || {}) });
   res.status(201).json({ data: item });
+});
+
+collectionWriteRouter.post('/with-deck', async (req, res) => {
+  const body = req.body || {};
+  const card = await ensureCard(body);
+  const collection = collectionInput(body);
+  const deck = collectionDeckInput(body);
+  const result = transaction(() => {
+    const collectionItem = addCollectionItem({ cardId: card.id, ...collection });
+    const deckCard = addDeckCard(deck.deckId, {
+      cardId: card.id,
+      quantity: deck.quantity,
+      role: deck.role,
+      note: deck.note,
+      tags: deck.tags
+    });
+    return {
+      collectionItem: getCollectionItem(collectionItem.id),
+      deckCard
+    };
+  });
+  res.status(201).json({ data: result });
 });
 
 collectionReadRouter.get('/card/:cardId', (req, res) => {

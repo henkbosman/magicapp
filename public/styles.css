@@ -1343,24 +1343,13 @@ html.write-unavailable [data-write-only] { display: none !important; }
   min-height: 38px;
 }
 
-.add-card-notes {
-  min-height: 64px;
-  height: 64px;
-}
 .add-card-actions {
   margin-top: 16px;
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px;
 }
-.add-card-primary-action {
-  width: 100%;
-}
-.add-card-secondary-actions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 9px;
-}
+.add-card-actions .button { min-width: 0; width: 100%; }
 
 .card-availability-panel {
   margin-bottom: 20px;
@@ -1387,11 +1376,118 @@ html.write-unavailable [data-write-only] { display: none !important; }
   .filter-toggle-row .filter-reset {
     width: 100%;
   }
-  .add-card-secondary-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .add-card-secondary-actions .button {
-    width: 100%;
-  }
+  .add-card-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .add-card-actions .button { padding-inline: 6px; font-size: .78rem; }
+}
+
+
+/* Release 2.2.0: kaartinvoer, multi-kleurfilter en prijsweergave */
+.toast-region-top {
+  top: calc(var(--topbar) + 12px);
+  bottom: auto;
+}
+.toast-region-top .toast { transform: translateY(-10px); }
+.toast-region-top .toast.visible { transform: translateY(0); }
+
+.add-card-search-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 210px);
+  gap: 10px;
+  align-items: stretch;
+}
+.search-hero .add-card-number-field select {
+  height: 52px;
+  border: 0;
+}
+.search-hero .add-card-number-field select:disabled {
+  opacity: .72;
+  background: #eef1ee;
+}
+.selected-printing-prices {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.selected-printing-prices h3 { margin-bottom: 10px; }
+.printing-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.printing-price-item {
+  min-width: 0;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+.printing-price-item span {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: .7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.printing-price-item strong { white-space: nowrap; font-size: .78rem; }
+.printing-price-empty { margin: 0; }
+
+.color-identity-filter {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  grid-column: span 2;
+  border: 0;
+}
+.color-identity-filter legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--ink-soft);
+  font-size: .76rem;
+  font-weight: 700;
+}
+.color-identity-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.color-identity-option {
+  min-height: 39px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+}
+.color-identity-option:has(input:checked) {
+  border-color: #78a084;
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 2px rgba(40,99,62,.06);
+}
+.color-identity-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.color-identity-option .mana-label { gap: 5px; font-size: .76rem; font-weight: 700; }
+.color-identity-option .mana-symbol { width: 23px; height: 23px; flex-basis: 23px; }
+
+.collection-market-price {
+  min-width: 67px;
+  padding: 3px 7px;
+  display: inline-grid;
+  justify-items: end;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+.collection-market-price small,
+.collection-market-price strong { display: block; line-height: 1.15; white-space: nowrap; }
+.collection-market-price small { font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; }
+.collection-market-price strong { margin-top: 2px; font-size: .72rem; }
+
+@media (max-width: 640px) {
+  .toast-region-top { top: calc(var(--topbar) + 8px); }
+  .add-card-search-controls { grid-template-columns: 1fr; }
+  .printing-price-grid { grid-template-columns: 1fr; }
+  .color-identity-filter { grid-column: auto; }
+  .collection-market-price { justify-items: start; }
 }

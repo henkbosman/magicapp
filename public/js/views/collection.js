@@ -1,10 +1,10 @@
 import { api, apiPath, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
-import { cardImage, cardInsightBadges, manaCost, pageHeader, rarityBadge, usageBadges } from '../components.js';
+import { cardImage, cardInsightBadges, manaCost, manaLabel, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
-import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, toast } from '../utils.js';
+import { confirmDialog, emptyState, escapeHtml, formatEuro, formValue, openDialog, toast } from '../utils.js';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near mint', excellent: 'Excellent', good: 'Good',
@@ -13,6 +13,33 @@ const CONDITION_LABELS = {
 
 function option(value, label, current) {
   return `<option value="${escapeHtml(value)}" ${String(current || '') === String(value) ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+}
+
+function collectionPrice(item) {
+  const suffix = item.finish === 'foil' ? '_foil' : item.finish === 'etched' ? '_etched' : '';
+  const prices = item.card?.prices || {};
+  const euro = prices[`eur${suffix}`];
+  const usd = prices[`usd${suffix}`];
+  let value = '—';
+  if (euro !== null && euro !== undefined && euro !== '') value = formatEuro(euro);
+  else if (usd !== null && usd !== undefined && usd !== '') {
+    value = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'USD' }).format(Number(usd));
+  }
+  return `<span class="collection-market-price" title="Scryfall-prijs voor deze printing en afwerking"><small>Prijs</small><strong>${escapeHtml(value)}</strong></span>`;
+}
+
+function colorIdentityOptions(selectedColors = []) {
+  const selected = new Set(selectedColors.map((color) => String(color).toUpperCase()));
+  return [['W', 'Wit'], ['U', 'Blauw'], ['B', 'Zwart'], ['R', 'Rood'], ['G', 'Groen'], ['C', 'Kleurloos']]
+    .map(([value, label]) => `<label class="color-identity-option"><input type="checkbox" name="color" value="${value}" ${selected.has(value) ? 'checked' : ''}><span>${manaLabel(value, label)}</span></label>`)
+    .join('');
+}
+
+function activeCollectionFilterCount(filters) {
+  const scalarCount = Object.entries(filters)
+    .filter(([key, value]) => key !== 'color' && String(value || '').length > 0)
+    .length;
+  return scalarCount + (filters.color.length ? 1 : 0);
 }
 
 function renderCollectionRows(items, hasFilters = false) {
@@ -29,7 +56,7 @@ function renderCollectionRows(items, hasFilters = false) {
       <div class="card-list-content">
         <div class="card-title-row collection-card-title-row">
           <a data-card-detail-link href="#/cards/${item.card.id}"><strong>${escapeHtml(item.card.name)}</strong></a>
-          <span class="collection-title-meta">${manaCost(item.card.manaCost)}${rarityBadge(item.card.rarity)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></span>
+          <span class="collection-title-meta">${manaCost(item.card.manaCost)}${rarityBadge(item.card.rarity)}${collectionPrice(item)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></span>
         </div>
         <p class="card-meta">${escapeHtml(item.card.setName)} (${escapeHtml(item.card.setCode.toUpperCase())}) #${escapeHtml(item.card.collectorNumber)} · ${escapeHtml(item.language)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</p>
         ${usageBadges(item.card.usage, { compact: true })}
@@ -51,7 +78,10 @@ function resultCountText(items) {
 export async function renderCollection(context) {
   const filters = {
     q: context.query.get('q') || '',
-    color: context.query.get('color') || '',
+    color: context.query.getAll('color')
+      .flatMap((value) => String(value).split(','))
+      .map((value) => value.trim().toUpperCase())
+      .filter((value, index, values) => ['W', 'U', 'B', 'R', 'G', 'C'].includes(value) && values.indexOf(value) === index),
     type: context.query.get('type') || '',
     subtype: context.query.get('subtype') || '',
     manaValue: context.query.get('manaValue') || '',
@@ -63,7 +93,7 @@ export async function renderCollection(context) {
     availability: context.query.get('availability') || ''
   };
   const filterPanelExpanded = filtersExpanded('collection');
-  const activeFilterCount = Object.values(filters).filter((value) => String(value || '').length > 0).length;
+  const activeFilterCount = activeCollectionFilterCount(filters);
   const [result, options] = await Promise.all([
     api(`/collection${queryString(filters)}`),
     api('/collection/options')
@@ -80,7 +110,7 @@ export async function renderCollection(context) {
       ${filterToggleHtml({ id: 'collection-filter-toggle', panelId: 'collection-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount, resetId: 'collection-filter-reset' })}
       <form id="collection-filters" class="filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>
         <div class="field filter-search"><label>Naam</label><input name="q" type="search" value="${escapeHtml(filters.q)}" placeholder="Zoek in lokale collectie"></div>
-        <div class="field"><label>Kleuridentiteit</label><select name="color"><option value="">Alle kleuren</option>${[['W','Wit'],['U','Blauw'],['B','Zwart'],['R','Rood'],['G','Groen'],['M','Meerkleurig'],['C','Kleurloos']].map(([v,l]) => option(v, l, filters.color)).join('')}</select></div>
+        <fieldset class="field color-identity-filter"><legend>Kleuridentiteit</legend><div class="color-identity-options">${colorIdentityOptions(filters.color)}</div></fieldset>
         <div class="field"><label>Kaarttype</label><select name="type"><option value="">Alle types</option>${['Creature','Land','Artifact','Enchantment','Instant','Sorcery','Planeswalker','Battle'].map((v) => option(v, v, filters.type)).join('')}</select></div>
         <div class="field"><label>Subtype</label><input name="subtype" type="text" value="${escapeHtml(filters.subtype)}" placeholder="Bijv. Elf"></div>
         <div class="field"><label>Mana value</label><select name="manaValue"><option value="">Alle waardes</option>${['0','1','2','3','4','5','6','7+'].map((v) => option(v, v, filters.manaValue)).join('')}</select></div>
@@ -102,7 +132,9 @@ export async function renderCollection(context) {
         button: document.getElementById('collection-filter-toggle'),
         panel: filterForm,
         key: 'collection',
-        getActiveCount: () => [...new FormData(filterForm).values()].filter((value) => String(value || '').length > 0).length
+        getActiveCount: () => new Set([...new FormData(filterForm).entries()]
+          .filter(([, value]) => String(value || '').length > 0)
+          .map(([name]) => name)).size
       });
 
       const updateResults = (nextItems, hasFilters) => {

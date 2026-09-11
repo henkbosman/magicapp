@@ -103,7 +103,7 @@ export async function addCardToCollection(card, { onDone = refreshView, sourceWa
   return dialog;
 }
 
-export function addCardToWanted(card, { onDone = refreshView, quantity = 1, notes = '', deckId = null, deckIds = [] } = {}) {
+export function addCardToWanted(card, { onDone = refreshView, quantity = 1, notes = '', deckId = null, deckIds = [], toastOptions = {} } = {}) {
   if (isBasicLand(card)) {
     toast('Basic lands worden als standaard beschikbaar beschouwd en komen niet op de wanted-list.', 'warning');
     return null;
@@ -129,7 +129,7 @@ export function addCardToWanted(card, { onDone = refreshView, quantity = 1, note
       }});
       toast(wantedItem.printingSelected
         ? `${card.name} staat op je wanted-list; de enige beschikbare printing is automatisch gekozen.`
-        : `${card.name} staat op je wanted-list.`);
+        : `${card.name} staat op je wanted-list.`, 'success', toastOptions);
       await onDone?.();
       return true;
     }

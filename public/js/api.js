@@ -106,7 +106,10 @@ export async function downloadApi(path, options = {}) {
 export function queryString(values) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(values)) {
-    if (value !== undefined && value !== null && value !== '') params.set(key, value);
+    const entries = Array.isArray(value) ? value : [value];
+    for (const entry of entries) {
+      if (entry !== undefined && entry !== null && entry !== '') params.append(key, entry);
+    }
   }
   const text = params.toString();
   return text ? `?${text}` : '';
