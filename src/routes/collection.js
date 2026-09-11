@@ -83,13 +83,17 @@ function addCollectionAndDeck(card, collection, deck) {
 
 async function createCollection(req, res, { requireDeck = false } = {}) {
   const body = req.body || {};
-  const card = await ensureCard(body);
-  const collection = collectionInput(body);
   const hasDeck = body.deckId !== undefined && body.deckId !== null && String(body.deckId).trim() !== '';
+  const deck = requireDeck || hasDeck ? collectionDeckInput(body) : null;
+  const collection = collectionInput(body);
+  const card = await ensureCard(body);
 
-  if (requireDeck || hasDeck) {
-    const deck = collectionDeckInput(body);
-    return res.status(201).json({ data: addCollectionAndDeck(card, collection, deck) });
+  if (deck) {
+    const result = addCollectionAndDeck(card, collection, deck);
+    if (!result.collectionItem?.id || !result.deckCard?.id) {
+      throw new HttpError(500, 'De gecombineerde collectie- en decktoevoeging kon niet worden bevestigd.');
+    }
+    return res.status(201).json({ data: result });
   }
 
   const item = addCollectionItem({ cardId: card.id, ...collection });
@@ -98,8 +102,8 @@ async function createCollection(req, res, { requireDeck = false } = {}) {
 
 collectionWriteRouter.post('/', (req, res) => createCollection(req, res));
 
-// Backwards-compatible alias. The application itself uses POST /collection
-// with deckId so proxies that only allow the established collection route work too.
+// Dedicated endpoint used by the interface. Requiring deck fields prevents a
+// collection-only success when an outdated backend is still running.
 collectionWriteRouter.post('/with-deck', (req, res) => createCollection(req, res, { requireDeck: true }));
 
 collectionReadRouter.get('/card/:cardId', (req, res) => {

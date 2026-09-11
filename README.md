@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.2.1
+# Magic Collection Manager 2.2.2
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.1** corrigeert de kleuridentiteitsfilter, maakt de kleurkeuze compacter, beperkt de snelle kaartinvoer tot EUR-prijzen en herstelt de gecombineerde collectie-en-deckactie. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.2** maakt de gecombineerde collectie-en-deckactie strikt atomair via het daarvoor bedoelde endpoint en verstuurt meerdere kleuridentiteiten in één eenduidige querywaarde. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -55,6 +55,19 @@ npm start
 ```
 
 Open daarna `http://localhost:3000`.
+
+### Belangrijk bij handmatige upgrades
+
+Stop en start het Node.js-proces altijd opnieuw nadat applicatiebestanden zijn vervangen. Express laadt backendmodules alleen bij het starten van `node server.js`, terwijl bestanden uit `public/` tijdens een draaiend proces al wel vanaf schijf kunnen worden vernieuwd. Zonder herstart kan daardoor tijdelijk een nieuwe frontend met een oude backend draaien.
+
+Bij een handmatig gestart proces:
+
+```text
+Ctrl+C
+node server.js
+```
+
+Gebruik bij systemd of PM2 de bijbehorende restart-opdracht.
 
 ## Eerste productie-installatie
 
@@ -136,7 +149,7 @@ De drie acties staan naast elkaar:
 
 - **Collectie**: voegt de fysieke printing aan de collectie toe;
 - **Wanted**: voegt het Oracle-kaartconcept aan Wanted toe zonder de huidige printing vast te leggen;
-- **Collectie + Deck**: voegt de fysieke printing binnen één transactie aan de collectie en aan het gekozen deck toe. De frontend gebruikt hiervoor het bestaande collectie-endpoint met deckvelden; `/collection/with-deck` blijft als compatibiliteitsalias beschikbaar.
+- **Collectie + Deck**: voegt de fysieke printing binnen één transactie aan de collectie en aan het gekozen deck toe via `/collection/with-deck`. De actie wordt alleen als geslaagd getoond wanneer de server zowel de collectieregel als de deckregel bevestigt.
 
 Succesmeldingen van dit scherm verschijnen bovenaan. De afbeelding en kaartnaam openen de exact geselecteerde printing op de kaartdetailpagina.
 

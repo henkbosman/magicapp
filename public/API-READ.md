@@ -1,4 +1,4 @@
-# Magic Collection Manager Read API 2.2.1
+# Magic Collection Manager Read API 2.2.2
 
 Base URL: `https://<host>`  
 Alle routes gebruiken `GET` en hebben geen JSON-body. Querywaarden staan in de URL.  
@@ -17,7 +17,7 @@ Controleert of de read-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","version":"2.2.1"}
+{"status":"ok","version":"2.2.2"}
 ```
 
 ## `GET /api/read/dashboard`
@@ -284,9 +284,9 @@ Exporteert alle fysieke collectieregels als CSV.
 
 Niet van toepassing. Responsebody is `text/csv` met kolommen `name,set_code,set_name,collector_number,quantity,finish,language,condition,location,notes,purchase_price,scryfall_id`.
 
-## `GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={W|U|B|R|G|C}&color={...}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}`
+## `GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}`
 
-Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. Eén `color` vereist exact die monokleur; herhaal `color` voor een toegestane kleurenverzameling, bijvoorbeeld `?color=G&color=W`. Aanvullende kleuren worden uitgesloten en kleurloze kaarten vereisen `color=C`.
+Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. Eén kleur vereist exact die monokleur. Geef meerdere toegestane kleuren kommagescheiden op, bijvoorbeeld `?color=G,W`; herhaalde `color`-parameters worden ook geaccepteerd. Aanvullende kleuren worden uitgesloten en kleurloze kaarten vereisen `C`.
 
 ### Input JSON
 
@@ -652,7 +652,7 @@ Geeft technische status van database, caches en lokale installatie.
 ```json
 {
   "data": {
-    "applicationVersion": "2.2.1",
+    "applicationVersion": "2.2.2",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

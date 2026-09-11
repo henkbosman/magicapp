@@ -215,18 +215,29 @@ export async function renderAddCard(context) {
           </div>`,
           onSubmit: async (data) => {
             const deckId = Number(formValue(data, 'deckId'));
-            const result = await api('/collection', {
-              method: 'POST',
-              body: {
-                ...collectionPayload,
-                deckId,
-                deckQuantity: Number(formValue(data, 'deckQuantity', String(collectionPayload.quantity || 1))),
-                role: formValue(data, 'role', 'main'),
-                tags: parseTags(formValue(data, 'tags')),
-                note: formValue(data, 'note')
+            let result;
+            try {
+              result = await api('/collection/with-deck', {
+                method: 'POST',
+                body: {
+                  ...collectionPayload,
+                  deckId,
+                  deckQuantity: Number(formValue(data, 'deckQuantity', String(collectionPayload.quantity || 1))),
+                  role: formValue(data, 'role', 'main'),
+                  tags: parseTags(formValue(data, 'tags')),
+                  note: formValue(data, 'note')
+                }
+              });
+            } catch (error) {
+              if (error?.status === 404) {
+                throw new Error('De actieve backend kent de gecombineerde deckactie nog niet. Herstart de Node.js-server en probeer het opnieuw.');
               }
-            });
-            await refreshSelectedUsage(result.collectionItem?.card || null);
+              throw error;
+            }
+            if (!result?.collectionItem?.id || !result?.deckCard?.id) {
+              throw new Error('De server bevestigde de gecombineerde toevoeging niet. Herstart de Node.js-server en probeer het opnieuw.');
+            }
+            await refreshSelectedUsage(result.collectionItem.card || result.deckCard.card || null);
             const deckName = decks.find((deck) => deck.id === deckId)?.name || 'het deck';
             toast(`${selectedCard.name} is toegevoegd aan je collectie en aan ${deckName}.`, 'success', { position: 'top' });
             return true;

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.2 - 2026-09-11
+
+### Opgelost
+
+- **Collectie + Deck** gebruikt weer het expliciete endpoint `POST /api/write/collection/with-deck`. Dit endpoint vereist een deck en kan daardoor niet stilzwijgend alleen de collectie aanpassen.
+- De frontend accepteert een gecombineerde toevoeging pas als de response zowel een `collectionItem` als een `deckCard` bevat. Een 404 van een nog actieve oude backend wordt vertaald naar een duidelijke melding dat het Node.js-proces opnieuw moet worden gestart.
+- Deckvelden worden vóór het ophalen en opslaan van kaartmetadata gevalideerd; een ongeldige deckkeuze start geen collectieactie.
+- De kleuridentiteitsfilter verstuurt meerdere kleuren voortaan als één canonieke waarde, bijvoorbeeld `color=G,W`, zodat queryparsers of proxies geen tweede kleur kunnen verliezen.
+- De backend accepteert zowel kommagescheiden als herhaalde kleurparameters en behandelt ook geneste querywaarden robuust.
+- Eén geselecteerde kleur toont alleen exact die monokleur. Bij meerdere gekozen kleuren worden kaarten toegelaten waarvan de volledige kleuridentiteit een niet-lege subset van de selectie is; een groen-witte kaart verschijnt dus bij groen plus wit, maar niet bij alleen groen.
+
+### Deployment
+
+- De beschreven symptomen kunnen optreden wanneer nieuwe bestanden over een draaiende Node.js-installatie worden gekopieerd zonder het proces te herstarten: statische frontendbestanden worden dan vernieuwd, terwijl de backendcode in het oude proces blijft. Stop en start `node server.js` daarom altijd opnieuw na een upgrade.
+
 ## 2.2.1 - 2026-09-11
 
 ### Verbeterd

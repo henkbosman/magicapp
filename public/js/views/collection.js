@@ -45,6 +45,19 @@ function activeCollectionFilterCount(filters) {
   return scalarCount + (filters.color.length ? 1 : 0);
 }
 
+function normalizeCollectionQueryParams(values) {
+  const params = values instanceof URLSearchParams
+    ? new URLSearchParams(values)
+    : new URLSearchParams(queryString(values).replace(/^\?/, ''));
+  const colors = params.getAll('color')
+    .flatMap((value) => String(value).split(','))
+    .map((value) => value.trim().toUpperCase())
+    .filter((value, index, all) => ['W', 'U', 'B', 'R', 'G', 'C'].includes(value) && all.indexOf(value) === index);
+  params.delete('color');
+  if (colors.length) params.set('color', colors.join(','));
+  return params;
+}
+
 function renderCollectionRows(items, hasFilters = false) {
   if (!items.length) {
     return emptyState(
@@ -97,8 +110,9 @@ export async function renderCollection(context) {
   };
   const filterPanelExpanded = filtersExpanded('collection');
   const activeFilterCount = activeCollectionFilterCount(filters);
+  const initialParams = normalizeCollectionQueryParams(filters);
   const [result, options] = await Promise.all([
-    api(`/collection${queryString(filters)}`),
+    api(`/collection${initialParams.toString() ? `?${initialParams}` : ''}`),
     api('/collection/options')
   ]);
   let items = result.items;
@@ -147,8 +161,9 @@ export async function renderCollection(context) {
       };
 
       const loadCurrentResults = async (params = liveFilters?.getParams() || new URLSearchParams(), signal) => {
-        const next = await api(`/collection${params.toString() ? `?${params}` : ''}`, { signal });
-        updateResults(next.items, params.toString().length > 0);
+        const apiParams = normalizeCollectionQueryParams(params);
+        const next = await api(`/collection${apiParams.toString() ? `?${apiParams}` : ''}`, { signal });
+        updateResults(next.items, apiParams.toString().length > 0);
         filterToggle.updateActiveCount();
       };
 

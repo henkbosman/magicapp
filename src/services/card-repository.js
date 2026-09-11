@@ -274,6 +274,20 @@ export function searchCards(query, limit = 20) {
   return cards.map((card) => addUsage(card, maps));
 }
 
+const COLLECTION_COLOR_CODES = new Set(['W', 'U', 'B', 'R', 'G', 'C', 'M']);
+
+function flattenQueryValues(value) {
+  if (Array.isArray(value)) return value.flatMap(flattenQueryValues);
+  if (value && typeof value === 'object') return Object.values(value).flatMap(flattenQueryValues);
+  return String(value ?? '').split(',');
+}
+
+function normalizeCollectionColors(value) {
+  return [...new Set(flattenQueryValues(value)
+    .map((entry) => entry.trim().toUpperCase())
+    .filter((entry) => COLLECTION_COLOR_CODES.has(entry)))];
+}
+
 export function listCollection(filters = {}) {
   const conditions = [];
   const params = [];
@@ -291,11 +305,11 @@ export function listCollection(filters = {}) {
     params.push(`%"${filters.type}"%`);
   }
   if (filters.color) {
-    const rawColors = Array.isArray(filters.color) ? filters.color : String(filters.color).split(',');
-    const colors = [...new Set(rawColors.map((value) => String(value).trim().toUpperCase()).filter(Boolean))];
+    const colors = normalizeCollectionColors(filters.color);
 
-    // De historische API-waarde M blijft ondersteund. De nieuwe interface
-    // gebruikt herhaalbare W/U/B/R/G/C-parameters als toegestane identiteit.
+    // De historische API-waarde M blijft ondersteund. De interface gebruikt
+    // W/U/B/R/G/C als toegestane kleuridentiteit. Een enkele kleur is exact;
+    // bij meerdere kleuren mag de kaart uitsluitend een subset daarvan gebruiken.
     if (colors.length === 1 && colors[0] === 'M') {
       conditions.push('json_array_length(c.color_identity_json) > 1');
     } else {
@@ -304,16 +318,7 @@ export function listCollection(filters = {}) {
       const colorClauses = [];
 
       if (includeColorless) colorClauses.push("json_array_length(c.color_identity_json) = 0");
-      if (selectedColors.length === 1) {
-        colorClauses.push(`(
-          json_array_length(c.color_identity_json) = 1
-          AND EXISTS (
-            SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
-            WHERE UPPER(CAST(identity_color.value AS TEXT)) = ?
-          )
-        )`);
-        params.push(selectedColors[0]);
-      } else if (selectedColors.length > 1) {
+      if (selectedColors.length) {
         const placeholders = selectedColors.map(() => '?').join(', ');
         colorClauses.push(`(
           json_array_length(c.color_identity_json) BETWEEN 1 AND ?

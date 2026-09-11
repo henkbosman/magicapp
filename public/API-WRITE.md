@@ -1,4 +1,4 @@
-# Magic Collection Manager Write API 2.2.1
+# Magic Collection Manager Write API 2.2.2
 
 Base URL: `https://<host>`  
 Gebruik `Content-Type: application/json`. De reverse proxy kan `/api/write/*` buiten het LAN blokkeren.  
@@ -35,7 +35,7 @@ Controleert of de write-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","writeAvailable":true,"version":"2.2.1"}
+{"status":"ok","writeAvailable":true,"version":"2.2.2"}
 ```
 
 ## `POST /api/write/cards/cache`
@@ -140,7 +140,7 @@ Importeert fysieke collectie-items uit een CSV-string.
 
 ## `POST /api/write/collection`
 
-Voegt een fysieke kaart toe. Met `deckId` wordt dezelfde printing atomair ook aan dat deck toegevoegd. Voeg één kaartidentificatie toe.
+Voegt een fysieke kaart toe. Voor de interfaceactie Collectie + Deck is `/api/write/collection/with-deck` het voorkeursendpoint; `deckId` blijft hier ondersteund voor API-compatibiliteit. Voeg één kaartidentificatie toe.
 
 ### Input JSON
 
@@ -197,7 +197,7 @@ Met `deckId`:
 
 ## `POST /api/write/collection/with-deck`
 
-Compatibiliteitsalias voor `POST /api/write/collection` met `deckId`. Voegt één concrete printing binnen dezelfde transactie toe aan de fysieke collectie en een deck.
+Voegt één concrete printing binnen dezelfde transactie toe aan de fysieke collectie en een deck. `deckId` en de deckvelden zijn verplicht.
 
 ### Input JSON
 
