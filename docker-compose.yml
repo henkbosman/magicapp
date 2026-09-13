@@ -13,7 +13,7 @@ services:
       HOST: 0.0.0.0
       DATA_DIR: /app/data
       DATABASE_FILE: magic-collection.sqlite
-      SCRYFALL_USER_AGENT: "MagicCollectionManager/2.2.2 (local personal app)"
+      SCRYFALL_USER_AGENT: "MagicCollectionManager/2.3.0 (local personal app)"
       SCRYFALL_TIMEOUT_MS: 15000
       SCRYFALL_REQUEST_DELAY_MS: 550
       SCRYFALL_AUTOCOMPLETE_CACHE_TTL_HOURS: 168

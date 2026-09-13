@@ -1,4 +1,4 @@
-# Magic Collection Manager Read API 2.2.2
+# Magic Collection Manager Read API 2.3.0
 
 Base URL: `https://<host>`  
 Alle routes gebruiken `GET` en hebben geen JSON-body. Querywaarden staan in de URL.  
@@ -17,7 +17,7 @@ Controleert of de read-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","version":"2.2.2"}
+{"status":"ok","version":"2.3.0"}
 ```
 
 ## `GET /api/read/dashboard`
@@ -652,7 +652,7 @@ Geeft technische status van database, caches en lokale installatie.
 ```json
 {
   "data": {
-    "applicationVersion": "2.2.2",
+    "applicationVersion": "2.3.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

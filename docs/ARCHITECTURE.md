@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.2.2
+# Architectuur - Magic Collection Manager 2.3.0
 
 ## Overzicht
 
@@ -8,8 +8,9 @@ De applicatie is een single-process Node.js/Express-webapp met een statische HTM
 Browser
   │
   ├── /             statische responsive frontend
-  ├── /api/read/*   alleen leesacties
-  └── /api/write/*  mutaties
+  ├── /api/read/*   leesacties van de webinterface
+  ├── /api/write/*  mutaties
+  └── /api/ai/*     compacte read-only LLM-endpoints
          │
       Express
          │
@@ -55,6 +56,7 @@ Joined queries aliasen de database-ID van `cards` expliciet als `card_record_id`
 
 Belangrijke services:
 
+- `ai-service.js`: compacte, gepagineerde modellen voor externe LLM-tools;
 - `card-repository.js`: lokale kaarten, collectie, gebruikstellingen;
 - `card-cache-service.js`: lokale kaartcache en Scryfall-ophalen;
 - `scryfall-service.js`: externe verzoeken met rate limiting/cache;
@@ -68,16 +70,17 @@ Belangrijke services:
 - `card-insight-service.js`: afgeleide en handmatig corrigeerbare mana-/zoekkenmerken;
 - `import-export-service.js`: CSV- en deckimport/export.
 
-## Lees- en schrijfzone
+## API-zones
 
-Express mount twee API-zones:
+Express mount drie API-zones:
 
 ```text
 /api/read
 /api/write
+/api/ai
 ```
 
-`/api/read` accepteert alleen GET/HEAD. `/api/write` weigert GET/HEAD en bevat alle muterende endpoints. De frontend controleert `POST /api/write/health`; wanneer dit niet bereikbaar is, worden schrijfcontrols disabled en verschijnt de interface als alleen-lezen.
+`/api/read` accepteert alleen GET/HEAD. `/api/write` weigert GET/HEAD en bevat alle muterende endpoints. `/api/ai` accepteert alleen GET/HEAD en levert vier compacte modellen voor decks, deckkaarten, kaartdetails en een gefilterde collectie. De webinterface gebruikt `/api/ai` niet. De frontend controleert `POST /api/write/health`; wanneer dit niet bereikbaar is, worden schrijfcontrols disabled en verschijnt de interface als alleen-lezen.
 
 ## Frontend
 
@@ -116,7 +119,7 @@ De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regele
 
 ## Statische API-documentatie
 
-De machineleesbare endpointbeschrijving is opgesplitst in `public/API-READ.md` en `public/API-WRITE.md`. Express serveert deze als `/API-READ.md` en `/API-WRITE.md` met content type `text/markdown; charset=utf-8`. `docs/API-READ.md` en `docs/API-WRITE.md` zijn identieke bronkopieën. De onderhoudspagina linkt naar beide publieke documenten.
+De machineleesbare endpointbeschrijving is opgesplitst in `public/API-READ.md`, `public/API-WRITE.md` en `public/API-AI.md`. Express serveert deze als `/API-READ.md`, `/API-WRITE.md` en `/API-AI.md` met content type `text/markdown; charset=utf-8`. De gelijknamige bestanden onder `docs/` zijn bronkopieën. De onderhoudspagina linkt naar alle drie publieke documenten.
 
 Ieder endpoint gebruikt dezelfde compacte volgorde: URL, korte uitleg, input-JSON en output-JSON. Niet-JSON-responses zoals afbeeldingen, CSV, tekstexport en databaseback-ups worden expliciet als zodanig gemarkeerd.
 

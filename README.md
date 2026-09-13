@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.2.2
+# Magic Collection Manager 2.3.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.2** maakt de gecombineerde collectie-en-deckactie strikt atomair via het daarvoor bedoelde endpoint en verstuurt meerdere kleuridentiteiten in één eenduidige querywaarde. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.3.0** vereenvoudigt het toevoegen van kaarten aan Wanted en voegt een aparte, compacte read-only AI-API toe die niet door de webinterface zelf wordt gebruikt. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -21,7 +21,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.2.2** maakt de gecom
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
-- Compacte statische API-documentatie in Markdown via `/API-READ.md` en `/API-WRITE.md`, bedoeld voor scripts en LLM-integraties.
+- Compacte statische API-documentatie in Markdown via `/API-READ.md`, `/API-WRITE.md` en `/API-AI.md`.
 
 ## Vereisten
 
@@ -101,16 +101,17 @@ CACHE_IMAGES=true
 
 Ongeldige numerieke waarden voor poort, time-out of request delay vallen veilig terug op de standaardwaarde.
 
-## Lees- en schrijf-API
+## Lees-, schrijf- en AI-API
 
 De API is gescheiden in:
 
 ```text
 /api/read/*
 /api/write/*
+/api/ai/*
 ```
 
-Alle normale leesacties gebruiken `/api/read`. Mutaties gebruiken `/api/write`. Hierdoor kan een reverse proxy bijvoorbeeld de volledige webapp en lees-API extern beschikbaar maken, terwijl alleen lokale netwerkadressen mogen schrijven.
+Alle normale leesacties van de webinterface gebruiken `/api/read`. Mutaties gebruiken `/api/write`. De aparte `/api/ai`-zone bevat vier compacte read-only endpoints voor LLM-tools en wordt niet door de webinterface zelf gebruikt. Hierdoor kan een reverse proxy bijvoorbeeld de volledige webapp en beide leeszones extern beschikbaar maken, terwijl alleen lokale netwerkadressen mogen schrijven.
 
 Een Nginx-voorbeeld staat in:
 
@@ -123,11 +124,13 @@ De endpointbeschrijvingen staan als compacte pure Markdown in:
 ```text
 public/API-READ.md
 public/API-WRITE.md
+public/API-AI.md
 docs/API-READ.md
 docs/API-WRITE.md
+docs/API-AI.md
 ```
 
-Tijdens het draaien zijn de documenten bereikbaar via `/API-READ.md` en `/API-WRITE.md`. De onderhoudspagina bevat beide links. Ieder endpoint staat in de volgorde URL, korte uitleg, input-JSON en output-JSON.
+Tijdens het draaien zijn de documenten bereikbaar via `/API-READ.md`, `/API-WRITE.md` en `/API-AI.md`. De onderhoudspagina bevat alle drie links. Ieder endpoint staat in de volgorde URL, korte uitleg, input-JSON en output-JSON. De AI-API levert alleen compacte overzichten; volledige kaarttekst wordt pas via het afzonderlijke kaartdetailendpoint opgehaald.
 
 Let op: de lees-API bevat persoonlijke collectie-, deck- en wantedgegevens. Als je de applicatie buiten het LAN publiceert, beveilig de toegang daarom zelf met bijvoorbeeld VPN, reverse-proxyauthenticatie en HTTPS.
 
@@ -219,7 +222,7 @@ De wanted-list gebruikt een standaard ingeklapte filtersectie, heeft een knop **
 - rarity;
 - kleur.
 
-Heeft een kaart aantoonbaar precies één papieren printing, dan kan deze automatisch worden gekozen. Bij aankoop kan de werkelijk gekochte printing aan de betreffende deckregel worden gekoppeld. Bij het toevoegen van een nieuw wanted-item wordt na de kaartnaam slechts één representatieve printing getoond; de gewenste printing kies je pas later. De knop **Printing** blijft in alleen-lezenmodus beschikbaar om alle uitvoeringen en prijzen te bekijken, terwijl het wijzigen van de keuze uitgeschakeld blijft.
+Heeft een kaart aantoonbaar precies één papieren printing, dan kan deze automatisch worden gekozen. Bij aankoop kan de werkelijk gekochte printing aan de betreffende deckregel worden gekoppeld. Bij het toevoegen van een nieuw wanted-item opent na het aanklikken van de kaartnaam direct het formulier voor aantal, prioriteit, maximumprijs en opmerkingen; er is geen tussenstap meer waarin eerst één representatieve printing gekozen moet worden. De knop **Printing** blijft in alleen-lezenmodus beschikbaar om alle uitvoeringen en prijzen te bekijken, terwijl het wijzigen van de keuze uitgeschakeld blijft.
 
 ## Database
 

@@ -9,6 +9,7 @@ import { dashboardReadRouter } from './src/routes/dashboard.js';
 import { decksReadRouter, decksWriteRouter } from './src/routes/decks.js';
 import { maintenanceReadRouter, maintenanceWriteRouter } from './src/routes/maintenance.js';
 import { wantedReadRouter, wantedWriteRouter } from './src/routes/wanted.js';
+import { aiRouter } from './src/routes/ai.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -53,6 +54,7 @@ writeApi.use('/maintenance', maintenanceWriteRouter);
 
 app.use('/api/read', readApi);
 app.use('/api/write', writeApi);
+app.use('/api/ai', aiRouter);
 
 app.use(express.static(config.publicDir, {
   etag: true,

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.3.0 - 2026-09-13
+
+### Verbeterd
+
+- Bij **Wanted → Kaart toevoegen** opent na het aanklikken van een kaartnaam direct het formulier voor aantal, prioriteit, maximumprijs en opmerkingen. De tussenstap waarin eerst één representatieve printing gekozen moest worden is verwijderd.
+- De definitieve wanted-printing blijft, zoals voorheen, later via de knop **Printing** te kiezen.
+
+### AI API
+
+- Nieuwe afzonderlijke read-only API-zone onder `/api/ai/`; de webinterface gebruikt deze endpoints zelf niet.
+- `GET /api/ai/decks` geeft een compact overzicht van alle decks.
+- `GET /api/ai/decks/:id/cards` geeft alle kaartregels van één deck zonder volledige kaartteksten.
+- `GET /api/ai/cards/:id` geeft de relevante details van één kaart, inclusief kaarttekst, kenmerken, bezit en deckgebruik.
+- `GET /api/ai/collection` geeft een compacte, gepagineerde en filterbare lijst van unieke kaarten in bezit. De standaardlimiet is 25 en de maximumlimiet 100.
+- De onderhoudspagina bevat een link naar `/API-AI.md`, met korte input- en outputvoorbeelden voor alle AI-endpoints.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x- en 2.2.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.2.2 - 2026-09-11
 
 ### Opgelost

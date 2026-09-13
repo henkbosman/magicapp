@@ -14,7 +14,7 @@ function localSuggestionHtml(card, index) {
   </button>`;
 }
 
-export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCollection = false, singlePrinting = false } = {}) {
+export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCollection = false, resolveNameDirectly = false } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let selectedName = '';
@@ -50,6 +50,13 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
       if (!settled) resolve(null);
     }, { once: true });
 
+    const cachePrinting = async (printing) => {
+      const body = printing.cardId
+        ? { cardId: Number(printing.cardId) }
+        : { scryfallId: printing.scryfallId };
+      return api('/cards/cache', { method: 'POST', body });
+    };
+
     const choosePrinting = async (button) => {
       const printing = loadedPrintings[Number(button.dataset.printingIndex)];
       if (!printing) return;
@@ -57,11 +64,7 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
       buttons.forEach((item) => { item.disabled = true; });
       button.classList.add('selected');
       try {
-        const body = printing.cardId
-          ? { cardId: Number(printing.cardId) }
-          : { scryfallId: printing.scryfallId };
-        const card = await api('/cards/cache', { method: 'POST', body });
-        finish(card);
+        finish(await cachePrinting(printing));
       } catch (error) {
         toast(error.message, 'error');
         buttons.forEach((item) => { item.disabled = false; });
@@ -78,19 +81,38 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
       try {
         const response = await api(`/cards/printings${queryString({ name })}`);
         const allPrintings = response.data || response;
-        loadedPrintings = singlePrinting ? allPrintings.slice(0, 1) : allPrintings;
-        status.hidden = true;
+        loadedPrintings = allPrintings;
         if (!loadedPrintings.length) {
           status.hidden = false;
           status.textContent = 'Geen printings gevonden.';
           return;
         }
+        status.hidden = true;
         results.innerHTML = loadedPrintings.map((printing, index) => `
           <button type="button" class="printing-card" data-write-action data-printing-index="${index}">
             ${printing.image ? `<img src="${escapeHtml(cachedCardImageUrl(printing.image))}" alt="" loading="lazy">` : `<span class="card-image-placeholder"><span>${escapeHtml(printing.name.slice(0, 1))}</span></span>`}
             <span><strong>${escapeHtml(printing.setName)}</strong><small>${escapeHtml(printing.setCode.toUpperCase())} #${escapeHtml(printing.collectorNumber)} · ${escapeHtml(printing.rarity)}${printing.releasedAt ? ` · ${escapeHtml(printing.releasedAt)}` : ''}</small>${printing.cached ? '<small>Lokaal opgeslagen</small>' : ''}</span>
           </button>`).join('');
         results.querySelectorAll('.printing-card').forEach((button) => button.addEventListener('click', () => choosePrinting(button)));
+      } catch (error) {
+        status.hidden = false;
+        status.textContent = error.message;
+      }
+    };
+
+    const selectName = async (name) => {
+      if (!resolveNameDirectly) {
+        await loadPrintings(name);
+        return;
+      }
+      selectedName = name;
+      search.value = name;
+      suggestions.hidden = true;
+      results.innerHTML = '';
+      status.hidden = false;
+      status.innerHTML = '<span class="spinner"></span><p>Kaartgegevens laden…</p>';
+      try {
+        finish(await api('/cards/cache', { method: 'POST', body: { name } }));
       } catch (error) {
         status.hidden = false;
         status.textContent = error.message;
@@ -123,7 +145,7 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
       suggestions.innerHTML = parts.join('');
       suggestions.hidden = !parts.length;
       suggestions.querySelectorAll('[data-local-index]').forEach((button) => button.addEventListener('click', () => selectLocalCard(button)));
-      suggestions.querySelectorAll('[data-name]').forEach((button) => button.addEventListener('click', () => loadPrintings(button.dataset.name)));
+      suggestions.querySelectorAll('[data-name]').forEach((button) => button.addEventListener('click', () => selectName(button.dataset.name)));
     };
 
     const loadSuggestions = debounce(async () => {
@@ -139,7 +161,7 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
           loadedLocalCards = [];
           suggestions.innerHTML = names.map((name) => `<button type="button" data-name="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
           suggestions.hidden = !names.length;
-          suggestions.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => loadPrintings(button.dataset.name)));
+          suggestions.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => selectName(button.dataset.name)));
           return;
         }
 
@@ -170,7 +192,7 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
         event.preventDefault();
         const first = suggestions.querySelector('button');
         if (first) first.click();
-        else if (search.value.trim()) loadPrintings(search.value.trim());
+        else if (search.value.trim()) selectName(search.value.trim());
       }
     });
     if (initialQuery.trim().length >= 2) {

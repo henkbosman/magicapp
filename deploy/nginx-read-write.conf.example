@@ -1,4 +1,4 @@
-# Voorbeeld: publiceer de webapp en lees-API, maar sta schrijf-API alleen toe vanuit het LAN.
+# Voorbeeld: publiceer de webapp, read-API en AI-API, maar sta de write-API alleen toe vanuit het LAN.
 # Pas magic-collection:3000 en de LAN-subnetten aan jouw omgeving aan.
 
 upstream magic_collection_backend {
@@ -30,7 +30,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Statische webapp en /api/read zijn via deze algemene route bereikbaar.
+    # Statische webapp, /api/read en /api/ai zijn via deze algemene route bereikbaar.
     location / {
         proxy_pass http://magic_collection_backend;
         proxy_http_version 1.1;
