@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.3.4 - 2026-09-13
+
+### API-documentatie
+
+- De Read-, Write- en LLM-API-documentatie is omgezet van Markdown naar echte platte tekstbestanden.
+- De publieke documenten zijn bereikbaar via `/API-READ.txt`, `/API-WRITE.txt` en `/API-AI.txt` met content type `text/plain; charset=utf-8`.
+- Markdownkoppen, codeblokken, inline code en tabellen zijn vervangen door compacte tekstsecties, terwijl de volgorde URL, uitleg, input-JSON en output-JSON behouden blijft.
+- De onderhoudspagina linkt voortaan naar de drie tekstbestanden. Oude `.md`-URL’s sturen door naar de overeenkomstige `.txt`-URL.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x-, 2.2.x- en 2.3.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.3.3 - 2026-09-13
 
 ### AI API

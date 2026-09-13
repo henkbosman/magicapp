@@ -56,15 +56,24 @@ app.use('/api/read', readApi);
 app.use('/api/write', writeApi);
 app.use('/api/ai', aiRouter);
 
+const apiDocumentationRedirects = {
+  '/API-READ.md': '/API-READ.txt',
+  '/API-WRITE.md': '/API-WRITE.txt',
+  '/API-AI.md': '/API-AI.txt'
+};
+for (const [oldPath, newPath] of Object.entries(apiDocumentationRedirects)) {
+  app.get(oldPath, (req, res) => res.redirect(308, newPath));
+}
+
 app.use(express.static(config.publicDir, {
   etag: true,
   maxAge: 0,
   setHeaders(res, filePath) {
-    if (/\.(?:css|js|html|md)$/i.test(filePath)) {
+    if (/\.(?:css|js|html|txt)$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
-    if (/\.md$/i.test(filePath)) {
-      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    if (/\.txt$/i.test(filePath)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     }
   }
 }));
