@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.3.1
+# Architectuur - Magic Collection Manager 2.3.2
 
 ## Overzicht
 

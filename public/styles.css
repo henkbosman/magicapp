@@ -1515,3 +1515,24 @@ html.write-unavailable [data-write-only] { display: none !important; }
   .color-identity-filter { grid-column: auto; }
   .collection-market-price { justify-items: start; }
 }
+
+/* Release 2.3.2: uitlijning onderhoudsformulier */
+.maintenance-sync-form { align-items: start; }
+.maintenance-sync-field > label {
+  min-height: 2.1em;
+  display: flex;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+.maintenance-sync-field > small {
+  min-height: 1.15em;
+  display: block;
+  color: var(--ink-faint);
+  font-size: .72rem;
+  line-height: 1.15;
+}
+
+@media (max-width: 490px) {
+  .maintenance-sync-field > label { min-height: 0; }
+  .maintenance-sync-field > small { min-height: 0; }
+}

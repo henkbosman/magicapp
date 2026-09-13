@@ -245,16 +245,14 @@ export function listAiCollection(filters = {}) {
     .sort((left, right) => left.card.name.localeCompare(right.card.name, 'nl'));
 
   const total = cards.length;
-  const offset = filters.offset;
-  const limit = filters.limit;
+  const rawOffset = Number(filters.offset);
+  const rawLimit = Number(filters.limit);
+  const offset = Number.isInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
+  const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 25;
   const page = cards.slice(offset, offset + limit).map((entry) => ({
     id: entry.card.id,
     name: entry.card.name,
     owned: entry.card.usage.owned,
-    used: entry.card.usage.needed,
-    free: entry.card.usage.free,
-    shortage: entry.card.usage.shortage,
-    wanted: entry.card.usage.wanted,
     manaCost: entry.card.manaCost,
     manaValue: entry.card.manaValue,
     type: entry.card.typeLine

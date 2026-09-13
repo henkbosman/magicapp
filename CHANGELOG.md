@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.2 - 2026-09-13
+
+### AI API
+
+- `GET /api/ai/collection` retourneert per kaart geen `used`, `free`, `shortage` en `wanted` meer. De compacte kaartregel bevat alleen `id`, `name`, `owned`, `manaCost`, `manaValue` en `type`.
+- `limit` is standaard `25` wanneer de queryparameter ontbreekt of leeg is. De maximale waarde blijft `100`.
+- De LLM-documentatie licht iedere collectie-filter kort toe en vermeldt de geldige waarden.
+
+### Interface
+
+- De invoervelden bij **Scryfall synchroniseren** zijn op desktop en mobiel netjes uitgelijnd.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x-, 2.2.x- en 2.3.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.3.1 - 2026-09-13
 
 ### AI API

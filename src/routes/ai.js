@@ -27,8 +27,12 @@ aiRouter.get('/cards/:id', (req, res) => {
 });
 
 aiRouter.get('/collection', (req, res) => {
-  const limit = req.query.limit === undefined ? 25 : positiveInteger(req.query.limit, 'Limit');
-  const offset = req.query.offset === undefined ? 0 : positiveInteger(req.query.offset, 'Offset', { allowZero: true });
+  const limit = req.query.limit === undefined || req.query.limit === ''
+    ? 25
+    : positiveInteger(req.query.limit, 'Limit');
+  const offset = req.query.offset === undefined || req.query.offset === ''
+    ? 0
+    : positiveInteger(req.query.offset, 'Offset', { allowZero: true });
   const deckId = req.query.deckId === undefined || req.query.deckId === ''
     ? null
     : positiveInteger(req.query.deckId, 'Deck-ID');

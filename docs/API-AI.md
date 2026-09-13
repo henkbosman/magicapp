@@ -1,4 +1,4 @@
-# Magic Collection Manager AI API 2.3.1
+# Magic Collection Manager AI API 2.3.2
 
 Base: `https://<host>/api/ai`  
 Alle endpoints zijn `GET` en read-only.
@@ -90,9 +90,7 @@ Minimale functionele kaartinformatie.
 
 ## `GET /api/ai/collection?q=&type=&subtype=&colors=&keyword=&manaValue=&set=&rarity=&availability=&deckId=&limit=&offset=`
 
-Compacte, gepagineerde lijst van unieke kaarten in bezit. Standaard `limit=25`, maximaal `100`.
-
-Filters: `q`, `type`, `subtype`, `colors`, `keyword`, `manaValue`, `set`, `rarity`, `availability`, `deckId`, `limit`, `offset`.
+Compacte, gepagineerde lijst van unieke kaarten in bezit. Alle filters zijn optioneel.
 
 ### Input JSON
 
@@ -108,6 +106,23 @@ Filters: `q`, `type`, `subtype`, `colors`, `keyword`, `manaValue`, `set`, `rarit
 }
 ```
 
+### Filters
+
+| Filter | Betekenis | Geldige waarden |
+|---|---|---|
+| `q` | Deel van de kaartnaam | Vrije tekst, hoofdletterongevoelig |
+| `type` | Hoofdkaarttype | Bijvoorbeeld `Creature`, `Land`, `Artifact`, `Enchantment`, `Instant`, `Sorcery`, `Planeswalker`, `Battle` |
+| `subtype` | Exact subtype | Bijvoorbeeld `Elf`, `Druid`, `Forest`, `Equipment` |
+| `colors` | Toegestane kleuridentiteit | Kommagescheiden `W,U,B,R,G,C`; `C` is kleurloos. `G,W` staat mono-groen, mono-wit en groen-wit toe |
+| `keyword` | Exact Scryfall-keyword | Bijvoorbeeld `Flying`, `Trample`, `Morph`, `Ward` |
+| `manaValue` | Mana value | Niet-negatief getal of `7+` |
+| `set` | Setcode van een printing in bezit | Bijvoorbeeld `mh3`, `cmm`, `tmp` |
+| `rarity` | Rarity | `common`, `uncommon`, `rare`, `mythic`, `special`, `bonus` |
+| `availability` | Gebruikssituatie | `all`, `free`, `used`, `shortage`; standaard `all` |
+| `deckId` | Alleen kaarten die in dit deck voorkomen | Positief deck-ID |
+| `limit` | Maximum aantal resultaten | `1` t/m `100`; standaard `25` wanneer afwezig of leeg |
+| `offset` | Startpositie voor paginering | Geheel getal vanaf `0`; standaard `0` |
+
 ### Output JSON
 
 ```json
@@ -117,10 +132,6 @@ Filters: `q`, `type`, `subtype`, `colors`, `keyword`, `manaValue`, `set`, `rarit
       "id": 456,
       "name": "Llanowar Elves",
       "owned": 2,
-      "used": 1,
-      "free": 1,
-      "shortage": 0,
-      "wanted": 0,
       "manaCost": "{G}",
       "manaValue": 1,
       "type": "Creature — Elf Druid"

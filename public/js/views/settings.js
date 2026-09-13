@@ -45,9 +45,9 @@ export async function renderSettings() {
 
       <section class="grid-2 maintenance-grid">
         ${sectionCard('Scryfall synchroniseren', `<p>Vernieuw kaarttekst, legaliteit, prijzen en afbeeldings-URL’s. Deze onderhoudsactie omzeilt bewust de tijdelijke API-cache. Aantallen, decks, wanted-status en notities worden nooit overschreven.</p>
-          <form id="refresh-cards-form" class="form-grid">
-            <div class="field"><label>Alleen ouder dan (dagen)</label><input name="staleDays" type="number" min="0" value="7"><small>0 vernieuwt alle kaarten</small></div>
-            <div class="field"><label>Maximaal aantal</label><input name="limit" type="number" min="1" max="5000" value="500"></div>
+          <form id="refresh-cards-form" class="form-grid maintenance-sync-form">
+            <div class="field maintenance-sync-field"><label for="refresh-stale-days">Alleen ouder dan (dagen)</label><input id="refresh-stale-days" name="staleDays" type="number" min="0" value="7"><small>0 vernieuwt alle kaarten</small></div>
+            <div class="field maintenance-sync-field"><label for="refresh-limit">Maximaal aantal</label><input id="refresh-limit" name="limit" type="number" min="1" max="5000" value="500"><small aria-hidden="true">&nbsp;</small></div>
             <div class="form-actions full"><button class="button primary" type="submit" data-write-action>Kaartgegevens vernieuwen</button></div>
           </form><div id="refresh-result"></div>`)}
 
