@@ -307,29 +307,30 @@ export function listCollection(filters = {}) {
   if (filters.color) {
     const colors = normalizeCollectionColors(filters.color);
 
-    // De historische API-waarde M blijft ondersteund. De interface gebruikt
-    // W/U/B/R/G/C als toegestane kleuridentiteit. Een enkele kleur is exact;
-    // bij meerdere kleuren mag de kaart uitsluitend een subset daarvan gebruiken.
+    // De historische API-waarde M blijft ondersteund. De normale kleurknoppen
+    // gebruiken een exacte AND-selectie: alle gekozen kleuren moeten aanwezig
+    // zijn en aanvullende kleuren worden uitgesloten.
     if (colors.length === 1 && colors[0] === 'M') {
       conditions.push('json_array_length(c.color_identity_json) > 1');
     } else {
       const selectedColors = colors.filter((color) => ['W', 'U', 'B', 'R', 'G'].includes(color));
       const includeColorless = colors.includes('C');
-      const colorClauses = [];
 
-      if (includeColorless) colorClauses.push("json_array_length(c.color_identity_json) = 0");
-      if (selectedColors.length) {
-        const placeholders = selectedColors.map(() => '?').join(', ');
-        colorClauses.push(`(
-          json_array_length(c.color_identity_json) BETWEEN 1 AND ?
-          AND NOT EXISTS (
-            SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
-            WHERE UPPER(CAST(identity_color.value AS TEXT)) NOT IN (${placeholders})
-          )
+      if (includeColorless && selectedColors.length) {
+        conditions.push('0 = 1');
+      } else if (includeColorless) {
+        conditions.push('json_array_length(c.color_identity_json) = 0');
+      } else if (selectedColors.length) {
+        const requiredColors = selectedColors.map(() => `EXISTS (
+          SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
+          WHERE UPPER(CAST(identity_color.value AS TEXT)) = ?
+        )`);
+        conditions.push(`(
+          json_array_length(c.color_identity_json) = ?
+          AND ${requiredColors.join('\n          AND ')}
         )`);
         params.push(selectedColors.length, ...selectedColors);
       }
-      if (colorClauses.length) conditions.push(`(${colorClauses.join(' OR ')})`);
     }
   }
   if (filters.subtype) {

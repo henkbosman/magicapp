@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.3.2
+# Magic Collection Manager 2.3.3
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.3.2** verkleint de collectie-uitvoer van de read-only AI-API verder, documenteert alle AI-collectiefilters compact en lijnt de invoervelden voor Scryfall-synchronisatie uit. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.3.3** maakt de kleuridentiteitsfilters in de collectie en AI-API exact en conjunctief, en gebruikt in compacte collectie-uitvoer consequent het veld `cardId`. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -172,7 +172,7 @@ De collectie ondersteunt onder andere filters op:
 - deck;
 - beschikbaarheid.
 
-Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt compacte, aanklikbare manasymbolen. Een geselecteerd symbool krijgt een dikke rand. Bij alleen groen verschijnen uitsluitend kaarten met exact een groene kleuridentiteit; kaarten met aanvullende kleuren worden uitgesloten. Bij meerdere gekozen kleuren mag de volledige kaartidentiteit uitsluitend uit die geselecteerde kleuren bestaan. Kleurloze kaarten verschijnen alleen wanneer **Kleurloos** is geselecteerd. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
+Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt compacte, aanklikbare manasymbolen. Een geselecteerd symbool krijgt een dikke rand. De gekozen kleuren werken als een exacte AND-filter: iedere gekozen kleur moet aanwezig zijn en niet-geselecteerde kleuren worden uitgesloten. Alleen groen toont dus uitsluitend mono-groene kaarten; groen plus wit toont uitsluitend kaarten met exact een groen-witte kleuridentiteit. Kleurloze kaarten verschijnen alleen wanneer uitsluitend **Kleurloos** is geselecteerd. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 

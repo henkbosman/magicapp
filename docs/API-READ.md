@@ -1,4 +1,4 @@
-# Magic Collection Manager Read API 2.3.2
+# Magic Collection Manager Read API 2.3.3
 
 Base URL: `https://<host>`  
 Alle routes gebruiken `GET` en hebben geen JSON-body. Querywaarden staan in de URL.  
@@ -17,7 +17,7 @@ Controleert of de read-API bereikbaar is.
 ### Output JSON
 
 ```json
-{"status":"ok","version":"2.3.2"}
+{"status":"ok","version":"2.3.3"}
 ```
 
 ## `GET /api/read/dashboard`
@@ -286,7 +286,7 @@ Niet van toepassing. Responsebody is `text/csv` met kolommen `name,set_code,set_
 
 ## `GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}`
 
-Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. Eén kleur vereist exact die monokleur. Geef meerdere toegestane kleuren kommagescheiden op, bijvoorbeeld `?color=G,W`; herhaalde `color`-parameters worden ook geaccepteerd. Aanvullende kleuren worden uitgesloten en kleurloze kaarten vereisen `C`.
+Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. De kleurselectie is een exacte AND-filter: iedere gekozen kleur moet aanwezig zijn en aanvullende kleuren worden uitgesloten. `?color=G` toont alleen mono-groen en `?color=G,W` alleen exact groen-wit. Herhaalde `color`-parameters worden ook geaccepteerd; `C` toont alleen kleurloze kaarten.
 
 ### Input JSON
 
@@ -652,7 +652,7 @@ Geeft technische status van database, caches en lokale installatie.
 ```json
 {
   "data": {
-    "applicationVersion": "2.3.2",
+    "applicationVersion": "2.3.3",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

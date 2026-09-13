@@ -1,4 +1,4 @@
-# Magic Collection Manager AI API 2.3.2
+# Magic Collection Manager AI API 2.3.3
 
 Base: `https://<host>/api/ai`  
 Alle endpoints zijn `GET` en read-only.
@@ -113,7 +113,7 @@ Compacte, gepagineerde lijst van unieke kaarten in bezit. Alle filters zijn opti
 | `q` | Deel van de kaartnaam | Vrije tekst, hoofdletterongevoelig |
 | `type` | Hoofdkaarttype | Bijvoorbeeld `Creature`, `Land`, `Artifact`, `Enchantment`, `Instant`, `Sorcery`, `Planeswalker`, `Battle` |
 | `subtype` | Exact subtype | Bijvoorbeeld `Elf`, `Druid`, `Forest`, `Equipment` |
-| `colors` | Toegestane kleuridentiteit | Kommagescheiden `W,U,B,R,G,C`; `C` is kleurloos. `G,W` staat mono-groen, mono-wit en groen-wit toe |
+| `colors` | Exacte AND-kleuridentiteit | Kommagescheiden `W,U,B,R,G,C`. Iedere gekozen kleur is verplicht en aanvullende kleuren zijn uitgesloten. `G,W` toont alleen exact groen-witte kaarten; `G` alleen mono-groen; `C` alleen kleurloos |
 | `keyword` | Exact Scryfall-keyword | Bijvoorbeeld `Flying`, `Trample`, `Morph`, `Ward` |
 | `manaValue` | Mana value | Niet-negatief getal of `7+` |
 | `set` | Setcode van een printing in bezit | Bijvoorbeeld `mh3`, `cmm`, `tmp` |
@@ -129,7 +129,7 @@ Compacte, gepagineerde lijst van unieke kaarten in bezit. Alle filters zijn opti
 {
   "cards": [
     {
-      "id": 456,
+      "cardId": 456,
       "name": "Llanowar Elves",
       "owned": 2,
       "manaCost": "{G}",

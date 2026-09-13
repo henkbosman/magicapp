@@ -112,23 +112,30 @@ export function getAiCard(cardId) {
 function addCollectionColorCondition(conditions, params, rawColors) {
   const colors = normalizeColors(rawColors);
   if (!colors.length) return;
+
   const selectedColors = colors.filter((color) => color !== 'C');
   const includeColorless = colors.includes('C');
-  const clauses = [];
 
-  if (includeColorless) clauses.push('json_array_length(c.color_identity_json) = 0');
-  if (selectedColors.length) {
-    const placeholders = selectedColors.map(() => '?').join(', ');
-    clauses.push(`(
-      json_array_length(c.color_identity_json) BETWEEN 1 AND ?
-      AND NOT EXISTS (
-        SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
-        WHERE UPPER(CAST(identity_color.value AS TEXT)) NOT IN (${placeholders})
-      )
-    )`);
-    params.push(selectedColors.length, ...selectedColors);
+  // Kleurloos is een lege color identity en kan daarom niet tegelijk met een
+  // gekleurde identiteit voldoen aan een exacte AND-selectie.
+  if (includeColorless && selectedColors.length) {
+    conditions.push('0 = 1');
+    return;
   }
-  if (clauses.length) conditions.push(`(${clauses.join(' OR ')})`);
+  if (includeColorless) {
+    conditions.push('json_array_length(c.color_identity_json) = 0');
+    return;
+  }
+
+  const requiredColors = selectedColors.map(() => `EXISTS (
+    SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
+    WHERE UPPER(CAST(identity_color.value AS TEXT)) = ?
+  )`);
+  conditions.push(`(
+    json_array_length(c.color_identity_json) = ?
+    AND ${requiredColors.join('\n    AND ')}
+  )`);
+  params.push(selectedColors.length, ...selectedColors);
 }
 
 function collectionRows(filters) {
@@ -250,7 +257,7 @@ export function listAiCollection(filters = {}) {
   const offset = Number.isInteger(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
   const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 25;
   const page = cards.slice(offset, offset + limit).map((entry) => ({
-    id: entry.card.id,
+    cardId: entry.card.id,
     name: entry.card.name,
     owned: entry.card.usage.owned,
     manaCost: entry.card.manaCost,

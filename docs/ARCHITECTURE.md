@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.3.2
+# Architectuur - Magic Collection Manager 2.3.3
 
 ## Overzicht
 
@@ -104,7 +104,7 @@ Kaartafbeeldingen worden standaard onder `data/images/` gecachet. Cachebestanden
 
 ## Collectiefiltering
 
-De kleuridentiteitsfilter verzendt de gekozen kleuren als één canonieke `color`-waarde, bijvoorbeeld `color=G,W`; de backend accepteert daarnaast herhaalde parameters voor externe clients. Bij één gekozen kleur vereist de backend exact één kleur in de kaartidentiteit. Bij meerdere gekozen kleuren moet iedere kleur in de kaartidentiteit binnen de geselecteerde verzameling vallen; aanvullende kleuren worden uitgesloten. Kleurloze kaarten worden alleen toegevoegd wanneer `C` is geselecteerd. Filtering vindt vóór paginering in SQLite plaats.
+De kleuridentiteitsfilter verzendt de gekozen kleuren als één canonieke `color`-waarde, bijvoorbeeld `color=G,W`; de backend accepteert daarnaast herhaalde parameters voor externe clients. De selectie is exact en conjunctief: iedere gekozen kleur moet aanwezig zijn en de lengte van de kaartidentiteit moet gelijk zijn aan het aantal gekozen kleuren. Daardoor toont `G` alleen mono-groen en `G,W` alleen exact groen-wit. `C` correspondeert met een lege kleuridentiteit en kan niet met gekleurde selecties worden gecombineerd. Filtering vindt vóór paginering in SQLite plaats. De AI-collectie gebruikt dezelfde semantiek.
 
 ## Deckstatistieken
 

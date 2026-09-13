@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.3.3 - 2026-09-13
+
+### AI API
+
+- `GET /api/ai/collection` gebruikt per kaart voortaan `cardId` in plaats van `id`.
+- De `colors`-filter gebruikt een exacte AND-selectie: alle gekozen kleuren moeten aanwezig zijn en aanvullende kleuren worden uitgesloten. `G,W` toont daardoor uitsluitend exact groen-witte kaarten.
+
+### Collectie
+
+- De kleuridentiteitsknoppen gebruiken dezelfde exacte AND-selectie als de AI-API. Alleen groen toont uitsluitend mono-groen; groen plus wit toont uitsluitend exact groen-wit.
+- Kleurloos blijft een afzonderlijke exacte keuze. Een combinatie van kleurloos met gekleurde symbolen levert geen resultaten op, omdat color identity kleurloos of gekleurd is.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x-, 2.2.x- en 2.3.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.3.2 - 2026-09-13
 
 ### AI API
