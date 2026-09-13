@@ -2,13 +2,8 @@ import { db } from '../db/database.js';
 import { HttpError } from '../lib/http-error.js';
 import { normalizeSearchText } from '../lib/text.js';
 import { cardRowToApi } from './card-mapper.js';
-import {
-  addUsage,
-  getCardWithUsage,
-  listCollection,
-  usageMapsForKeys
-} from './card-repository.js';
-import { getDeckCards, listDecks, requireDeck } from './deck-service.js';
+import { addUsage, usageMapsForKeys } from './card-repository.js';
+import { requireDeck } from './deck-service.js';
 
 const COLOR_CODES = new Set(['W', 'U', 'B', 'R', 'G', 'C']);
 const AVAILABILITY_VALUES = new Set(['all', 'free', 'used', 'shortage']);
@@ -16,11 +11,6 @@ const RARITY_VALUES = new Set(['common', 'uncommon', 'rare', 'mythic', 'special'
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
-}
-
-function nonEmpty(value) {
-  const text = String(value ?? '').trim();
-  return text || null;
 }
 
 function compactObject(value) {
@@ -39,25 +29,56 @@ function normalizeColors(value) {
     .filter((entry) => COLOR_CODES.has(entry)));
 }
 
-function deckSummary(deck) {
-  return {
-    id: deck.id,
-    name: deck.name,
-    format: deck.format,
-    commander: deck.commander?.name || null,
-    cards: deck.totalCards,
-    missing: deck.missingQuantity,
-    updatedAt: deck.updatedAt
-  };
-}
-
 export function listAiDecks() {
-  return { decks: listDecks().map(deckSummary) };
+  const decks = db.prepare(`
+    SELECT
+      d.id,
+      d.name,
+      d.format,
+      commander.name AS commander,
+      COALESCE(SUM(CASE
+        WHEN dc.role IN ('commander', 'partner', 'main') THEN dc.quantity
+        ELSE 0
+      END), 0) AS card_count
+    FROM decks d
+    LEFT JOIN cards commander ON commander.id = d.commander_card_id
+    LEFT JOIN deck_cards dc ON dc.deck_id = d.id
+    GROUP BY d.id
+    ORDER BY d.updated_at DESC, d.name COLLATE NOCASE
+  `).all().map((row) => ({
+    id: Number(row.id),
+    name: row.name,
+    format: row.format,
+    commander: row.commander || null,
+    cards: Number(row.card_count || 0)
+  }));
+  return { decks };
 }
 
 export function getAiDeckCards(deckId) {
   const deck = requireDeck(deckId);
-  const items = getDeckCards(deckId);
+  const cards = db.prepare(`
+    SELECT c.id AS card_id, c.name, dc.quantity, dc.role
+    FROM deck_cards dc
+    JOIN cards c ON c.id = dc.card_id
+    WHERE dc.deck_id = ?
+    ORDER BY
+      CASE dc.role
+        WHEN 'commander' THEN 0
+        WHEN 'partner' THEN 1
+        WHEN 'companion' THEN 2
+        WHEN 'main' THEN 3
+        WHEN 'sideboard' THEN 4
+        ELSE 5
+      END,
+      c.name COLLATE NOCASE
+  `).all(deckId).map((row) => ({
+    cardId: Number(row.card_id),
+    name: row.name,
+    qty: Number(row.quantity),
+    role: row.role
+  }));
+
   return {
     deck: {
       id: deck.id,
@@ -65,102 +86,26 @@ export function getAiDeckCards(deckId) {
       format: deck.format,
       cards: deck.totalCards
     },
-    cards: items.map((item) => ({
-      entryId: item.id,
-      cardId: item.card.id,
-      name: item.card.name,
-      qty: item.quantity,
-      role: item.role,
-      manaCost: item.card.manaCost,
-      manaValue: item.card.manaValue,
-      type: item.card.typeLine,
-      colorIdentity: item.card.colorIdentity,
-      tags: item.tags,
-      owned: item.card.usage.owned,
-      missing: item.coverage.missingFromCollection
-    }))
+    cards
   };
 }
 
-function wantedForCardKey(cardKey) {
-  const rows = db.prepare(`
-    SELECT w.id, w.quantity, w.priority, w.maximum_price, w.notes
-    FROM wanted_items w
-    JOIN cards c ON c.id = w.card_id
-    WHERE COALESCE(c.oracle_id, c.scryfall_id) = ?
-    ORDER BY w.priority, w.id
-  `).all(cardKey);
-  if (!rows.length) return null;
-  return compactObject({
-    quantity: rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0),
-    priority: Math.min(...rows.map((row) => Number(row.priority || 3))),
-    maximumPrice: rows.find((row) => row.maximum_price !== null)?.maximum_price ?? null,
-    notes: rows.map((row) => String(row.notes || '').trim()).filter(Boolean).join('\n')
-  });
-}
-
 export function getAiCard(cardId) {
-  const card = getCardWithUsage(cardId);
-  const collectionItems = listCollection({ cardKey: card.cardKey, limit: 1000 }).items;
-  const manaInsight = card.insights?.manaProduction || {};
-  const searchInsight = card.insights?.librarySearch || {};
-
+  const row = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
+  if (!row) throw new HttpError(404, 'Kaart niet gevonden.');
+  const card = cardRowToApi(row);
   return {
-    card: compactObject({
+    card: {
       id: card.id,
-      scryfallId: card.scryfallId,
-      oracleId: card.oracleId,
       name: card.name,
       manaCost: card.manaCost,
       manaValue: card.manaValue,
       type: card.typeLine,
       text: card.oracleText,
-      colors: card.colors,
-      colorIdentity: card.colorIdentity,
       keywords: card.keywords,
       power: card.power,
-      toughness: card.toughness,
-      loyalty: card.loyalty,
-      defense: card.defense,
-      producesMana: manaInsight.entries || [],
-      manaNote: nonEmpty(manaInsight.note),
-      searchesLibraryFor: searchInsight.targets || [],
-      searchNote: nonEmpty(searchInsight.note),
-      commanderLegality: card.legalities?.commander,
-      printing: {
-        set: card.setName,
-        setCode: card.setCode,
-        collectorNumber: card.collectorNumber,
-        rarity: card.rarity,
-        language: card.language,
-        finishes: card.finishes,
-        pricesEur: compactObject({
-          nonfoil: card.prices?.eur,
-          foil: card.prices?.eur_foil,
-          etched: card.prices?.eur_etched
-        })
-      },
-      usage: {
-        owned: card.usage.owned,
-        used: card.usage.needed,
-        free: card.usage.free,
-        shortage: card.usage.shortage,
-        wanted: card.usage.wanted,
-        decks: card.usage.decks.map((deck) => ({ id: deck.id, name: deck.name, qty: deck.quantity }))
-      },
-      wanted: wantedForCardKey(card.cardKey),
-      collection: collectionItems.map((item) => compactObject({
-        cardId: item.card.id,
-        setCode: item.card.setCode,
-        collectorNumber: item.card.collectorNumber,
-        rarity: item.card.rarity,
-        qty: item.quantity,
-        finish: item.finish,
-        language: item.language,
-        condition: item.condition,
-        location: nonEmpty(item.location)
-      }))
-    })
+      toughness: card.toughness
+    }
   };
 }
 
@@ -266,12 +211,10 @@ function groupOwnedCards(rows) {
     if (!current) {
       groups.set(card.cardKey, {
         card,
-        representativeQuantity: quantity,
-        printingIds: new Set([card.id])
+        representativeQuantity: quantity
       });
       continue;
     }
-    current.printingIds.add(card.id);
     if (quantity > current.representativeQuantity) {
       current.card = card;
       current.representativeQuantity = quantity;
@@ -314,9 +257,7 @@ export function listAiCollection(filters = {}) {
     wanted: entry.card.usage.wanted,
     manaCost: entry.card.manaCost,
     manaValue: entry.card.manaValue,
-    type: entry.card.typeLine,
-    colorIdentity: entry.card.colorIdentity,
-    printings: entry.printingIds.size
+    type: entry.card.typeLine
   }));
   const nextOffset = offset + page.length < total ? offset + page.length : null;
 

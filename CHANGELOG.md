@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.3.1 - 2026-09-13
+
+### AI API
+
+- `GET /api/ai/decks` retourneert geen `missing` en `updatedAt` meer.
+- `GET /api/ai/decks/:id/cards` retourneert per kaart uitsluitend `cardId`, `name`, `qty` en `role`.
+- `GET /api/ai/cards/:id` retourneert uitsluitend `id`, `name`, `manaCost`, `manaValue`, `type`, `text`, `keywords`, `power` en `toughness`.
+- `GET /api/ai/collection` retourneert per kaart geen `colorIdentity` en `printings` meer.
+- De AI-services voeren voor deze compacte endpoints minder overbodige database- en beschikbaarheidsberekeningen uit.
+
+### Interface
+
+- De links naar Read API, Write API en LLM API staan op de onderhoudspagina in één rij met drie gelijkwaardige knoppen.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x-, 2.2.x- en 2.3.0-data blijft rechtstreeks bruikbaar.
+
 ## 2.3.0 - 2026-09-13
 
 ### Verbeterd

@@ -1,11 +1,11 @@
-# Magic Collection Manager AI API 2.3.0
+# Magic Collection Manager AI API 2.3.1
 
 Base: `https://<host>/api/ai`  
-Alle endpoints zijn `GET`, read-only en geven compacte JSON. Gebruik `id`/`cardId` voor detailverzoeken.
+Alle endpoints zijn `GET` en read-only.
 
 ## `GET /api/ai/decks`
 
-Alle decks, zonder volledige kaartlijsten.
+Compact overzicht van alle decks.
 
 ### Input JSON
 
@@ -23,9 +23,7 @@ Alle decks, zonder volledige kaartlijsten.
       "name": "Yedora",
       "format": "commander",
       "commander": "Yedora, Grave Gardener",
-      "cards": 100,
-      "missing": 4,
-      "updatedAt": "2026-09-13 10:00:00"
+      "cards": 100
     }
   ]
 }
@@ -33,7 +31,7 @@ Alle decks, zonder volledige kaartlijsten.
 
 ## `GET /api/ai/decks/:id/cards`
 
-Alle kaartregels van één deck. Vraag kaarttekst alleen op via `/api/ai/cards/:cardId` wanneer nodig.
+Kaarten in één deck. Gebruik `cardId` voor een gericht kaartdetailverzoek.
 
 ### Input JSON
 
@@ -45,21 +43,18 @@ Alle kaartregels van één deck. Vraag kaarttekst alleen op via `/api/ai/cards/:
 
 ```json
 {
-  "deck": {"id":7,"name":"Yedora","format":"commander","cards":100},
+  "deck": {
+    "id": 7,
+    "name": "Yedora",
+    "format": "commander",
+    "cards": 100
+  },
   "cards": [
     {
-      "entryId": 31,
       "cardId": 123,
       "name": "Sakura-Tribe Elder",
       "qty": 1,
-      "role": "main",
-      "manaCost": "{1}{G}",
-      "manaValue": 2,
-      "type": "Creature — Snake Shaman",
-      "colorIdentity": ["G"],
-      "tags": ["Ramp","Sacrifice"],
-      "owned": 1,
-      "missing": 0
+      "role": "main"
     }
   ]
 }
@@ -67,7 +62,7 @@ Alle kaartregels van één deck. Vraag kaarttekst alleen op via `/api/ai/cards/:
 
 ## `GET /api/ai/cards/:id`
 
-Detailinformatie van één lokale kaartprinting. Gebruik een `cardId` uit de andere AI-endpoints.
+Minimale functionele kaartinformatie.
 
 ### Input JSON
 
@@ -81,70 +76,29 @@ Detailinformatie van één lokale kaartprinting. Gebruik een `cardId` uit de and
 {
   "card": {
     "id": 123,
-    "scryfallId": "uuid",
-    "oracleId": "uuid",
     "name": "Sakura-Tribe Elder",
     "manaCost": "{1}{G}",
     "manaValue": 2,
     "type": "Creature — Snake Shaman",
     "text": "Sacrifice Sakura-Tribe Elder: Search your library for a basic land card...",
-    "colors": ["G"],
-    "colorIdentity": ["G"],
     "keywords": [],
     "power": "1",
-    "toughness": "1",
-    "producesMana": [],
-    "searchesLibraryFor": ["basic_land"],
-    "commanderLegality": "legal",
-    "printing": {
-      "set": "Commander Masters",
-      "setCode": "cmm",
-      "collectorNumber": "314",
-      "rarity": "common",
-      "language": "en",
-      "finishes": ["nonfoil","foil"],
-      "pricesEur": {"nonfoil":"0.15","foil":"0.35"}
-    },
-    "usage": {
-      "owned": 1,
-      "used": 1,
-      "free": 0,
-      "shortage": 0,
-      "wanted": 0,
-      "decks": [{"id":7,"name":"Yedora","qty":1}]
-    },
-    "collection": [
-      {"cardId":123,"setCode":"cmm","collectorNumber":"314","rarity":"common","qty":1,"finish":"nonfoil","language":"en","condition":"near_mint"}
-    ]
+    "toughness": "1"
   }
 }
 ```
 
 ## `GET /api/ai/collection?q=&type=&subtype=&colors=&keyword=&manaValue=&set=&rarity=&availability=&deckId=&limit=&offset=`
 
-Compacte, gepagineerde lijst van unieke kaarten in bezit. Standaard `limit=25`, maximaal `100`. `page.nextOffset` staat alleen in de response wanneer een volgende pagina bestaat.
+Compacte, gepagineerde lijst van unieke kaarten in bezit. Standaard `limit=25`, maximaal `100`.
 
-Filters:
-
-- `q`: deel van kaartnaam
-- `type`: exact kaarttype, bijvoorbeeld `Creature`
-- `subtype`: exact subtype, bijvoorbeeld `Elf`
-- `colors`: toegestane kleuridentiteit, bijvoorbeeld `G` of `G,W`; `C` staat voor kleurloos
-- `keyword`: exact keyword, bijvoorbeeld `Trample`
-- `manaValue`: exact getal of `7+`
-- `set`: setcode
-- `rarity`: `common|uncommon|rare|mythic|special|bonus`
-- `availability`: `all|free|used|shortage`
-- `deckId`: alleen kaarten die in dit deck staan
-- `limit`: `1..100`
-- `offset`: vanaf `0`
+Filters: `q`, `type`, `subtype`, `colors`, `keyword`, `manaValue`, `set`, `rarity`, `availability`, `deckId`, `limit`, `offset`.
 
 ### Input JSON
 
 ```json
 {
   "query": {
-    "q": "elf",
     "type": "Creature",
     "colors": "G",
     "availability": "free",
@@ -169,12 +123,15 @@ Filters:
       "wanted": 0,
       "manaCost": "{G}",
       "manaValue": 1,
-      "type": "Creature — Elf Druid",
-      "colorIdentity": ["G"],
-      "printings": 2
+      "type": "Creature — Elf Druid"
     }
   ],
-  "page": {"total":60,"limit":25,"offset":0,"nextOffset":25}
+  "page": {
+    "total": 60,
+    "limit": 25,
+    "offset": 0,
+    "nextOffset": 25
+  }
 }
 ```
 
