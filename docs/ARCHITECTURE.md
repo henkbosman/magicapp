@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.4.0
+# Architectuur - Magic Collection Manager 2.4.1
 
 ## Overzicht
 
@@ -119,7 +119,7 @@ De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regele
 
 ## Statische API-documentatie
 
-De machineleesbare endpointbeschrijving is opgesplitst in `public/API-READ.txt`, `public/API-WRITE.txt` en `public/API-AI.txt`. Express serveert deze als `/API-READ.txt`, `/API-WRITE.txt` en `/API-AI.txt` met content type `text/plain; charset=utf-8`. De gelijknamige bestanden onder `docs/` zijn bronkopieën. De onderhoudspagina linkt naar alle drie publieke documenten. Oude `.md`-URL’s sturen permanent door naar de nieuwe `.txt`-bestanden.
+De endpointbeschrijving is opgesplitst in `public/API-READ.txt`, `public/API-WRITE.txt` en `public/API-AI.html`. Read en Write worden als platte tekst aangeboden. De LLM-beschrijving is een zelfstandige, kale HTML-pagina zonder eigen CSS of JavaScript; endpointpaden zijn aanklikbare links. De gelijknamige bestanden onder `docs/` zijn bronkopieën. De onderhoudspagina linkt naar alle drie publieke documenten. Oude `/API-AI.md`- en `/API-AI.txt`-URL’s sturen permanent door naar `/API-AI.html`.
 
 Ieder endpoint gebruikt dezelfde compacte volgorde: URL, korte uitleg, input-JSON en output-JSON. Niet-JSON-responses zoals afbeeldingen, CSV, tekstexport en databaseback-ups worden expliciet als zodanig gemarkeerd.
 

@@ -59,7 +59,8 @@ app.use('/api/ai', aiRouter);
 const apiDocumentationRedirects = {
   '/API-READ.md': '/API-READ.txt',
   '/API-WRITE.md': '/API-WRITE.txt',
-  '/API-AI.md': '/API-AI.txt'
+  '/API-AI.md': '/API-AI.html',
+  '/API-AI.txt': '/API-AI.html'
 };
 for (const [oldPath, newPath] of Object.entries(apiDocumentationRedirects)) {
   app.get(oldPath, (req, res) => res.redirect(308, newPath));

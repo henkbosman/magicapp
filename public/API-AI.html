@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magic Collection Manager AI API 2.4.1</title>
+</head>
+<body>
+<pre>MAGIC COLLECTION MANAGER AI API 2.4.1
+
+Base: /api/ai
+Alle endpoints zijn GET en read-only.
+
+GET <a href="/api/ai/decks">/api/ai/decks</a>
+
+Compact overzicht van alle decks.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{
+  "decks": [
+    {
+      "id": 7,
+      "name": "Yedora",
+      "format": "commander",
+      "commander": "Yedora, Grave Gardener",
+      "cards": 100
+    }
+  ]
+}
+
+GET <a href="/api/ai/decks/7/cards">/api/ai/decks/:id/cards</a>
+
+Kaarten in één deck. Gebruik cardId voor een gericht kaartdetailverzoek.
+
+INPUT JSON
+
+{"path":{"id":7}}
+
+OUTPUT JSON
+
+{
+  "deck": {
+    "id": 7,
+    "name": "Yedora",
+    "format": "commander",
+    "cards": 100
+  },
+  "cards": [
+    {
+      "cardId": 123,
+      "name": "Sakura-Tribe Elder",
+      "qty": 1,
+      "role": "main"
+    }
+  ]
+}
+
+GET <a href="/api/ai/cards/123">/api/ai/cards/:id</a>
+
+Minimale functionele kaartinformatie.
+
+INPUT JSON
+
+{"path":{"id":123}}
+
+OUTPUT JSON
+
+{
+  "card": {
+    "id": 123,
+    "name": "Sakura-Tribe Elder",
+    "manaCost": "{1}{G}",
+    "manaValue": 2,
+    "type": "Creature — Snake Shaman",
+    "text": "Sacrifice Sakura-Tribe Elder: Search your library for a basic land card...",
+    "keywords": [],
+    "power": "1",
+    "toughness": "1"
+  }
+}
+
+GET <a href="/api/ai/collection">/api/ai/collection?q=&amp;type=&amp;subtype=&amp;colors=&amp;keyword=&amp;manaValue=&amp;set=&amp;rarity=&amp;availability=&amp;deckId=&amp;limit=&amp;offset=</a>
+
+Compacte, gepagineerde lijst van unieke kaarten in bezit. Alle filters zijn optioneel.
+
+INPUT JSON
+
+{
+  "query": {
+    "type": "Creature",
+    "colors": "G",
+    "availability": "beschikbaar",
+    "limit": 25,
+    "offset": 0
+  }
+}
+
+FILTERS
+
+Filter: q
+Betekenis: Deel van de kaartnaam
+Geldige waarden: Vrije tekst, hoofdletterongevoelig
+
+Filter: type
+Betekenis: Hoofdkaarttype
+Geldige waarden: Bijvoorbeeld Creature, Land, Artifact, Enchantment, Instant, Sorcery, Planeswalker, Battle
+
+Filter: subtype
+Betekenis: Exact subtype
+Geldige waarden: Bijvoorbeeld Elf, Druid, Forest, Equipment
+
+Filter: colors
+Betekenis: Exacte AND-kleuridentiteit
+Geldige waarden: Kommagescheiden W,U,B,R,G,C. Iedere gekozen kleur is verplicht en aanvullende kleuren zijn uitgesloten. G,W toont alleen exact groen-witte kaarten; G alleen mono-groen; C alleen kleurloos
+
+Filter: keyword
+Betekenis: Exact Scryfall-keyword
+Geldige waarden: Bijvoorbeeld Flying, Trample, Morph, Ward
+
+Filter: manaValue
+Betekenis: Mana value
+Geldige waarden: Niet-negatief getal of 7+
+
+Filter: set
+Betekenis: Setcode van een printing in bezit
+Geldige waarden: Bijvoorbeeld mh3, cmm, tmp
+
+Filter: rarity
+Betekenis: Rarity
+Geldige waarden: common, uncommon, rare, mythic, special, bonus
+
+Filter: availability
+Betekenis: Bezitssituatie
+Geldige waarden: alle (standaard), beschikbaar (minstens één vrij exemplaar), bezet (minstens één exemplaar in een deck). Engelse aliases: all, available, occupied
+
+Filter: deckId
+Betekenis: Alleen kaarten die in dit deck voorkomen
+Geldige waarden: Positief deck-ID
+
+Filter: limit
+Betekenis: Maximum aantal resultaten
+Geldige waarden: 1 t/m 100; standaard 25 wanneer afwezig of leeg
+
+Filter: offset
+Betekenis: Startpositie voor paginering
+Geldige waarden: Geheel getal vanaf 0; standaard 0
+
+OUTPUT JSON
+
+{
+  "cards": [
+    {
+      "cardId": 456,
+      "name": "Llanowar Elves",
+      "owned": 2,
+      "manaCost": "{G}",
+      "manaValue": 1,
+      "type": "Creature — Elf Druid"
+    }
+  ],
+  "page": {
+    "total": 60,
+    "limit": 25,
+    "offset": 0,
+    "nextOffset": 25
+  }
+}
+
+Fout
+
+{"error":{"message":"..."}}
+</pre>
+</body>
+</html>

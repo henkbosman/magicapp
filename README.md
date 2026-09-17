@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.4.0
+# Magic Collection Manager 2.4.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.4.0** verbetert de navigatie, kaartinvoer, kleuridentiteitsfilters, deckoverzichten en compacte LLM-filtering. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.4.1** zet de compacte LLM API-beschrijving om naar een kale HTML-pagina met aanklikbare endpoint-URL’s. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -21,7 +21,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.4.0** verbetert de n
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
-- Compacte statische API-documentatie in platte tekst via `/API-READ.txt`, `/API-WRITE.txt` en `/API-AI.txt`.
+- Compacte statische API-documentatie via `/API-READ.txt`, `/API-WRITE.txt` en de kale HTML-pagina `/API-AI.html`.
 
 ## Vereisten
 
@@ -119,18 +119,18 @@ Een Nginx-voorbeeld staat in:
 deploy/nginx-read-write.conf.example
 ```
 
-De endpointbeschrijvingen staan als compacte platte tekst in:
+De compacte endpointbeschrijvingen staan in:
 
 ```text
 public/API-READ.txt
 public/API-WRITE.txt
-public/API-AI.txt
+public/API-AI.html
 docs/API-READ.txt
 docs/API-WRITE.txt
-docs/API-AI.txt
+docs/API-AI.html
 ```
 
-Tijdens het draaien zijn de documenten bereikbaar via `/API-READ.txt`, `/API-WRITE.txt` en `/API-AI.txt`. De onderhoudspagina bevat alle drie links. Ieder endpoint staat zonder Markdown-opmaak in de volgorde URL, korte uitleg, input-JSON en output-JSON. De AI-API levert alleen compacte overzichten; volledige kaarttekst wordt pas via het afzonderlijke kaartdetailendpoint opgehaald.
+Tijdens het draaien zijn de documenten bereikbaar via `/API-READ.txt`, `/API-WRITE.txt` en `/API-AI.html`. De onderhoudspagina bevat alle drie links. De LLM-documentatie is een kale HTML-pagina zonder eigen CSS of applicatielayout; de endpointpaden zijn aanklikbare links. Ieder endpoint staat in de volgorde URL, korte uitleg, input-JSON en output-JSON. De AI-API levert alleen compacte overzichten; volledige kaarttekst wordt pas via het afzonderlijke kaartdetailendpoint opgehaald.
 
 Let op: de lees-API bevat persoonlijke collectie-, deck- en wantedgegevens. Als je de applicatie buiten het LAN publiceert, beveilig de toegang daarom zelf met bijvoorbeeld VPN, reverse-proxyauthenticatie en HTTPS.
 

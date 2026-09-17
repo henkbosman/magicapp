@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.1 - 2026-09-17
+
+### API-documentatie
+
+- De LLM API-beschrijving is omgezet van platte tekst naar `/API-AI.html`.
+- De pagina gebruikt geen eigen CSS, JavaScript of applicatielayout en blijft daardoor zo kaal mogelijk.
+- Ieder API-endpoint is als aanklikbare URL opgenomen.
+- De onderhoudspagina verwijst nu naar **LLM API (HTML)**.
+- Oude `/API-AI.md`- en `/API-AI.txt`-URL’s sturen door naar de HTML-pagina.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.4.0 - 2026-09-16
 
 ### Interface
