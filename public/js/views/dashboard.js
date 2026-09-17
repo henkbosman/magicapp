@@ -24,8 +24,7 @@ export async function renderDashboard() {
     html: `
       ${pageHeader({
         eyebrow: 'Overzicht',
-        title: 'Mijn Magic-verzameling',
-        actions: '<a class="button primary" data-write-action href="#/add">＋ Kaart toevoegen</a><a class="button secondary" href="#/decks">Deck bouwen</a>'
+        title: 'Mijn Magic-verzameling'
       })}
       <section class="metrics-grid">
         ${metric('Fysieke kaarten', formatNumber(totals.physicalCards), `${formatNumber(totals.uniqueCards)} unieke kaarten`, 'success')}

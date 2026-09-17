@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.4.0 - 2026-09-16
+
+### Interface
+
+- De globale zoekbalk scrolt voortaan met de pagina mee; de knop **Toevoegen** naast deze zoekbalk is verwijderd.
+- De kaartdetailpagina toont geen afzonderlijke knoppen **Collectie** en **Wanted** meer.
+- De kleuridentiteitsfilter in Collectie heeft een zevende knop om direct tussen exacte **AND**- en brede **OR**-filtering te wisselen.
+- Het deckoverzicht toont de kleuridentiteit van ieder deck met dezelfde manasymbolen als het collectiefilter.
+- De dashboardacties **Kaart toevoegen** en **Deck bouwen** zijn verwijderd.
+- De snelle kaartinvoer houdt de actieknoppen na een geslaagde toevoeging uitgeschakeld tot opnieuw een printing wordt gekozen en corrigeert de scrollpositie nadat de kaartafbeelding is geladen.
+
+### Onderhoud
+
+- Het onderdeel **Collectie importeren** en het bijbehorende write-endpoint en de ongebruikte CSV-importcode zijn verwijderd.
+
+### AI API
+
+- `GET /api/ai/collection` gebruikt standaard `availability=all` en ondersteunt `available` en `occupied`; de Nederlandse aliases `alle`, `beschikbaar` en `bezet` worden eveneens geaccepteerd.
+- `available` vereist minstens één vrij exemplaar; `occupied` vereist dat minstens één exemplaar in een deck wordt gebruikt.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.0.x-, 2.1.x-, 2.2.x- en 2.3.x-data blijft rechtstreeks bruikbaar.
+
 ## 2.3.4 - 2026-09-13
 
 ### API-documentatie

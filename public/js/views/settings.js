@@ -16,7 +16,7 @@ export async function renderSettings() {
       ${pageHeader({
         eyebrow: 'Beheer',
         title: 'Instellingen en onderhoud',
-        description: 'Maak back-ups, beheer de externe API-cache, importeer een collectie en vernieuw lokaal opgeslagen kaartgegevens.'
+        description: 'Maak back-ups, beheer de externe API-cache en vernieuw lokaal opgeslagen kaartgegevens.'
       })}
       <section class="grid-2 maintenance-grid">
         ${sectionCard('Lokale opslag', `<table class="status-table">
@@ -50,14 +50,6 @@ export async function renderSettings() {
             <div class="field maintenance-sync-field"><label for="refresh-limit">Maximaal aantal</label><input id="refresh-limit" name="limit" type="number" min="1" max="5000" value="500"><small aria-hidden="true">&nbsp;</small></div>
             <div class="form-actions full"><button class="button primary" type="submit" data-write-action>Kaartgegevens vernieuwen</button></div>
           </form><div id="refresh-result"></div>`)}
-
-        ${sectionCard('Collectie importeren (CSV)', `<div class="import-box">
-          <p>Ondersteunde kolommen: <strong>name</strong>, set_code, collector_number, quantity, finish, language, condition, location, notes en purchase_price.</p>
-          <input id="csv-file" type="file" accept=".csv,text/csv">
-          <textarea id="csv-text" rows="10" placeholder="name,set_code,collector_number,quantity,finish\nSol Ring,cmm,396,1,nonfoil"></textarea>
-          <button id="import-csv" class="button primary" data-write-action>CSV importeren</button>
-          <div id="import-result"></div>
-        </div>`)}
       </section>
 
       <section class="grid-2 maintenance-grid">
@@ -94,30 +86,6 @@ export async function renderSettings() {
         } finally {
           button.disabled = false;
           button.textContent = 'Externe API-cache leegmaken';
-        }
-      });
-
-      const file = document.getElementById('csv-file');
-      const text = document.getElementById('csv-text');
-      file?.addEventListener('change', async () => {
-        const selected = file.files?.[0];
-        if (selected) text.value = await selected.text();
-      });
-
-      document.getElementById('import-csv')?.addEventListener('click', async (event) => {
-        const button = event.currentTarget;
-        if (!text.value.trim()) return toast('Kies een CSV-bestand of plak CSV-tekst.', 'warning');
-        button.disabled = true;
-        button.textContent = 'Importeren…';
-        try {
-          const result = await api('/collection/import.csv', { method: 'POST', body: { csv: text.value } });
-          document.getElementById('import-result').innerHTML = `<div class="import-result"><strong>${result.importedCount} regels geïmporteerd.</strong>${result.failed.length ? `<br>${result.failed.length} regels mislukt: ${result.failed.slice(0, 5).map((row) => escapeHtml(`${row.name}: ${row.reason}`)).join('; ')}` : ''}</div>`;
-          toast('Collectie-import afgerond.', result.failed.length ? 'warning' : 'success');
-        } catch (error) {
-          toast(error.message, 'error');
-        } finally {
-          button.disabled = false;
-          button.textContent = 'CSV importeren';
         }
       });
 

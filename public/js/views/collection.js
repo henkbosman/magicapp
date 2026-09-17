@@ -28,19 +28,23 @@ function collectionPrice(item) {
   return `<span class="collection-market-price" title="Scryfall-prijs voor deze printing en afwerking"><small>Prijs</small><strong>${escapeHtml(value)}</strong></span>`;
 }
 
-function colorIdentityOptions(selectedColors = []) {
+function colorIdentityOptions(selectedColors = [], mode = 'and') {
   const selected = new Set(selectedColors.map((color) => String(color).toUpperCase()));
-  return [['W', 'Wit'], ['U', 'Blauw'], ['B', 'Zwart'], ['R', 'Rood'], ['G', 'Groen'], ['C', 'Kleurloos']]
+  const normalizedMode = mode === 'or' ? 'or' : 'and';
+  const colorButtons = [['W', 'Wit'], ['U', 'Blauw'], ['B', 'Zwart'], ['R', 'Rood'], ['G', 'Groen'], ['C', 'Kleurloos']]
     .map(([value, label]) => `<label class="color-identity-option" title="${escapeHtml(label)}">
       <input class="sr-only" type="checkbox" name="color" value="${value}" aria-label="${escapeHtml(label)}" ${selected.has(value) ? 'checked' : ''}>
       <span class="color-identity-icon" aria-hidden="true">${manaSymbol(value, { label })}</span>
     </label>`)
     .join('');
+  const modeLabel = normalizedMode.toUpperCase();
+  return `${colorButtons}<input type="hidden" name="colorMode" value="${normalizedMode}">
+    <button id="color-identity-mode" class="color-identity-option color-identity-mode" type="button" data-mode="${normalizedMode}" aria-label="Kleurfiltermodus ${modeLabel}" title="Kleurfiltermodus ${modeLabel}; klik om te wisselen">${modeLabel}</button>`;
 }
 
 function activeCollectionFilterCount(filters) {
   const scalarCount = Object.entries(filters)
-    .filter(([key, value]) => key !== 'color' && String(value || '').length > 0)
+    .filter(([key, value]) => !['color', 'colorMode'].includes(key) && String(value || '').length > 0)
     .length;
   return scalarCount + (filters.color.length ? 1 : 0);
 }
@@ -55,6 +59,9 @@ function normalizeCollectionQueryParams(values) {
     .filter((value, index, all) => ['W', 'U', 'B', 'R', 'G', 'C'].includes(value) && all.indexOf(value) === index);
   params.delete('color');
   if (colors.length) params.set('color', colors.join(','));
+  const colorMode = String(params.get('colorMode') || 'and').toLowerCase() === 'or' ? 'or' : 'and';
+  params.delete('colorMode');
+  if (colorMode === 'or') params.set('colorMode', 'or');
   return params;
 }
 
@@ -98,6 +105,7 @@ export async function renderCollection(context) {
       .flatMap((value) => String(value).split(','))
       .map((value) => value.trim().toUpperCase())
       .filter((value, index, values) => ['W', 'U', 'B', 'R', 'G', 'C'].includes(value) && values.indexOf(value) === index),
+    colorMode: String(context.query.get('colorMode') || 'and').toLowerCase() === 'or' ? 'or' : 'and',
     type: context.query.get('type') || '',
     subtype: context.query.get('subtype') || '',
     manaValue: context.query.get('manaValue') || '',
@@ -127,7 +135,7 @@ export async function renderCollection(context) {
       ${filterToggleHtml({ id: 'collection-filter-toggle', panelId: 'collection-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount, resetId: 'collection-filter-reset' })}
       <form id="collection-filters" class="filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>
         <div class="field filter-search"><label>Naam</label><input name="q" type="search" value="${escapeHtml(filters.q)}" placeholder="Zoek in lokale collectie"></div>
-        <fieldset class="field color-identity-filter"><legend>Kleuridentiteit</legend><div class="color-identity-options">${colorIdentityOptions(filters.color)}</div></fieldset>
+        <fieldset class="field color-identity-filter"><legend>Kleuridentiteit</legend><div class="color-identity-options">${colorIdentityOptions(filters.color, filters.colorMode)}</div></fieldset>
         <div class="field"><label>Kaarttype</label><select name="type"><option value="">Alle types</option>${['Creature','Land','Artifact','Enchantment','Instant','Sorcery','Planeswalker','Battle'].map((v) => option(v, v, filters.type)).join('')}</select></div>
         <div class="field"><label>Subtype</label><input name="subtype" type="text" value="${escapeHtml(filters.subtype)}" placeholder="Bijv. Elf"></div>
         <div class="field"><label>Mana value</label><select name="manaValue"><option value="">Alle waardes</option>${['0','1','2','3','4','5','6','7+'].map((v) => option(v, v, filters.manaValue)).join('')}</select></div>
@@ -145,12 +153,32 @@ export async function renderCollection(context) {
       const resultsElement = document.getElementById('collection-results');
       const countElement = document.getElementById('collection-result-count');
       let liveFilters;
+      const colorModeInput = filterForm.querySelector('[name="colorMode"]');
+      const colorModeButton = document.getElementById('color-identity-mode');
+      const updateColorModeButton = () => {
+        const mode = colorModeInput?.value === 'or' ? 'or' : 'and';
+        if (!colorModeButton) return;
+        const label = mode.toUpperCase();
+        const nextLabel = mode === 'and' ? 'OR' : 'AND';
+        colorModeButton.dataset.mode = mode;
+        colorModeButton.textContent = label;
+        colorModeButton.setAttribute('aria-label', `Kleurfiltermodus ${label}; klik voor ${nextLabel}`);
+        colorModeButton.title = `Kleurfiltermodus ${label}; klik voor ${nextLabel}`;
+      };
+      colorModeButton?.addEventListener('click', () => {
+        if (!colorModeInput) return;
+        colorModeInput.value = colorModeInput.value === 'or' ? 'and' : 'or';
+        updateColorModeButton();
+        colorModeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      updateColorModeButton();
+
       const filterToggle = bindFilterToggle({
         button: document.getElementById('collection-filter-toggle'),
         panel: filterForm,
         key: 'collection',
         getActiveCount: () => new Set([...new FormData(filterForm).entries()]
-          .filter(([, value]) => String(value || '').length > 0)
+          .filter(([name, value]) => name !== 'colorMode' && String(value || '').length > 0)
           .map(([name]) => name)).size
       });
 
@@ -170,12 +198,14 @@ export async function renderCollection(context) {
       liveFilters = bindLiveFilters({
         form: filterForm,
         routePath: '/collection',
+        defaults: { colorMode: 'and' },
         onApply: loadCurrentResults,
         onError: (error) => toast(error.message || 'Filteren is mislukt.', 'error')
       });
 
       document.getElementById('collection-filter-reset')?.addEventListener('click', () => {
-        resetFilterForm(filterForm);
+        resetFilterForm(filterForm, { colorMode: 'and' });
+        updateColorModeButton();
         liveFilters.apply();
       });
 

@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.3.4
+# Architectuur - Magic Collection Manager 2.4.0
 
 ## Overzicht
 
@@ -68,7 +68,7 @@ Belangrijke services:
 - `wanted-service.js`: wanted CRUD en deckrelaties;
 - `printing-catalog-service.js`: mogelijke printings/rarities per Oracle-kaart;
 - `card-insight-service.js`: afgeleide en handmatig corrigeerbare mana-/zoekkenmerken;
-- `import-export-service.js`: CSV- en deckimport/export.
+- `import-export-service.js`: collectie-export en deckimport/-export.
 
 ## API-zones
 
@@ -86,7 +86,7 @@ Express mount drie API-zones:
 
 De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart toevoegen, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
 
-Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie.
+Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. Na een geslaagde toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
 
 ## Caching
 
@@ -104,7 +104,7 @@ Kaartafbeeldingen worden standaard onder `data/images/` gecachet. Cachebestanden
 
 ## Collectiefiltering
 
-De kleuridentiteitsfilter verzendt de gekozen kleuren als één canonieke `color`-waarde, bijvoorbeeld `color=G,W`; de backend accepteert daarnaast herhaalde parameters voor externe clients. De selectie is exact en conjunctief: iedere gekozen kleur moet aanwezig zijn en de lengte van de kaartidentiteit moet gelijk zijn aan het aantal gekozen kleuren. Daardoor toont `G` alleen mono-groen en `G,W` alleen exact groen-wit. `C` correspondeert met een lege kleuridentiteit en kan niet met gekleurde selecties worden gecombineerd. Filtering vindt vóór paginering in SQLite plaats. De AI-collectie gebruikt dezelfde semantiek.
+De kleuridentiteitsfilter verzendt de gekozen kleuren als één canonieke `color`-waarde, bijvoorbeeld `color=G,W`, en de modus via `colorMode=and|or`; de backend accepteert daarnaast herhaalde kleurparameters. AND is standaard en vereist exact de gekozen identiteit: `G` toont mono-groen en `G,W` exact groen-wit. OR toont kaarten die minimaal één gekozen kleur bevatten. In OR-modus neemt `C` kleurloze kaarten als afzonderlijk alternatief mee. Filtering vindt vóór paginering in SQLite plaats. De AI-collectie houdt bewust zijn compacte exacte kleurfilter.
 
 ## Deckstatistieken
 

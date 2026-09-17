@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.3.4
+MAGIC COLLECTION MANAGER READ API 2.4.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.3.4"}
+{"status":"ok","version":"2.4.0"}
 
 GET /api/read/dashboard
 
@@ -246,9 +246,9 @@ OUTPUT JSON
 
 Niet van toepassing. Responsebody is text/csv met kolommen name,setcode,setname,collectornumber,quantity,finish,language,condition,location,notes,purchaseprice,scryfall_id.
 
-GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}
+GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&colorMode={and|or}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}
 
-Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. De kleurselectie is een exacte AND-filter: iedere gekozen kleur moet aanwezig zijn en aanvullende kleuren worden uitgesloten. ?color=G toont alleen mono-groen en ?color=G,W alleen exact groen-wit. Herhaalde color-parameters worden ook geaccepteerd; C toont alleen kleurloze kaarten.
+Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. colorMode=and is standaard en vereist exact de gekozen kleuridentiteit: color=G toont mono-groen en color=G,W exact groen-wit. colorMode=or toont kaarten die minimaal één gekozen kleur gebruiken; C neemt kleurloze kaarten als alternatief mee. Herhaalde color-parameters worden ook geaccepteerd.
 
 INPUT JSON
 
@@ -345,6 +345,7 @@ OUTPUT JSON
       "missingQuantity": 8,
       "missingUnique": 6,
       "globalShortage": 10,
+      "colorIdentity": ["G"],
       "commander": {"id":10,"name":"Yedora, Grave Gardener"},
       "secondCommander": null
     }
@@ -372,6 +373,7 @@ OUTPUT JSON
     "notes": "",
     "totalCards": 100,
     "uniqueCards": 80,
+    "colorIdentity": ["G"],
     "commander": {"id":10,"name":"Yedora, Grave Gardener"},
     "secondCommander": null,
     "createdAt": "2026-09-10 12:00:00",
@@ -563,7 +565,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.3.4",
+    "applicationVersion": "2.4.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

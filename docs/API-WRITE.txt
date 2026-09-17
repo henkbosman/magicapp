@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.3.4
+MAGIC COLLECTION MANAGER WRITE API 2.4.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.3.4"}
+{"status":"ok","writeAvailable":true,"version":"2.4.0"}
 
 POST /api/write/cards/cache
 
@@ -90,25 +90,6 @@ INPUT JSON
 OUTPUT JSON
 
 {"data":{"id":123,"scryfallId":"uuid","name":"Eternal Witness","setCode":"m3c","collectorNumber":"226","updatedAt":"2026-09-10 12:00:00","usage":{}}}
-
-POST /api/write/collection/import.csv
-
-Importeert fysieke collectie-items uit een CSV-string.
-
-INPUT JSON
-
-{"csv":"name,set_code,collector_number,quantity\nEternal Witness,m3c,226,1\n"}
-
-OUTPUT JSON
-
-{
-  "data": {
-    "importedCount": 1,
-    "imported": [{"id":55,"quantity":1,"card":{"id":123,"name":"Eternal Witness"}}],
-    "failed": [],
-    "notFound": []
-  }
-}
 
 POST /api/write/collection
 

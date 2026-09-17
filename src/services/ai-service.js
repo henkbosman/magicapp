@@ -6,7 +6,18 @@ import { addUsage, usageMapsForKeys } from './card-repository.js';
 import { requireDeck } from './deck-service.js';
 
 const COLOR_CODES = new Set(['W', 'U', 'B', 'R', 'G', 'C']);
-const AVAILABILITY_VALUES = new Set(['all', 'free', 'used', 'shortage']);
+const AVAILABILITY_ALIASES = new Map([
+  ['all', 'all'],
+  ['alle', 'all'],
+  ['available', 'available'],
+  ['beschikbaar', 'available'],
+  ['free', 'available'],
+  ['occupied', 'occupied'],
+  ['bezet', 'occupied'],
+  ['used', 'occupied'],
+  // Bestaande externe clients mogen de historische tekortfilter blijven gebruiken.
+  ['shortage', 'shortage']
+]);
 const RARITY_VALUES = new Set(['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus']);
 
 function unique(values) {
@@ -231,10 +242,9 @@ function groupOwnedCards(rows) {
 }
 
 export function listAiCollection(filters = {}) {
-  const availability = String(filters.availability || 'all').toLowerCase();
-  if (!AVAILABILITY_VALUES.has(availability)) {
-    throw new HttpError(400, 'availability moet all, free, used of shortage zijn.');
-  }
+  const availabilityInput = String(filters.availability || 'all').trim().toLowerCase();
+  const availability = AVAILABILITY_ALIASES.get(availabilityInput);
+  if (!availability) throw new HttpError(400, 'availability moet all/alle, available/beschikbaar of occupied/bezet zijn.');
 
   const grouped = groupOwnedCards(collectionRows(filters));
   const maps = usageMapsForKeys(grouped.map((entry) => entry.card.cardKey));
@@ -244,8 +254,8 @@ export function listAiCollection(filters = {}) {
       card: addUsage(entry.card, maps)
     }))
     .filter((entry) => {
-      if (availability === 'free') return entry.card.usage.free > 0;
-      if (availability === 'used') return entry.card.usage.needed > 0;
+      if (availability === 'available') return entry.card.usage.free > 0;
+      if (availability === 'occupied') return entry.card.usage.needed > 0;
       if (availability === 'shortage') return entry.card.usage.shortage > 0;
       return true;
     })

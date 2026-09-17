@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.3.4
+# Magic Collection Manager 2.4.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.3.4** levert de Read-, Write- en LLM-API-documentatie als echte platte tekstbestanden in plaats van Markdown. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.4.0** verbetert de navigatie, kaartinvoer, kleuridentiteitsfilters, deckoverzichten en compacte LLM-filtering. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -17,7 +17,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.3.4** levert de Read
 - Wanted-list met prioriteit, rarity, mogelijke printings, gekozen printing, prijsinformatie en deckfilter.
 - Basic lands worden niet als ontbrekend beschouwd en komen niet op Wanted.
 - Handmatig corrigeerbare kaartkenmerken voor mana-productie en library-searchfuncties.
-- CSV-import/-export voor de collectie en tekstimport/-export voor decks.
+- CSV-export voor de collectie en tekstimport/-export voor decks.
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
@@ -77,7 +77,7 @@ Voor de schoonste productie-installatie:
 
 1. Bewaar eventuele 1.x-data als aparte back-up.
 2. Start de 2.0-productiebasis met een nieuwe lege `data/`-map.
-3. Importeer collectiegegevens zo nodig via CSV en decks via de bestaande deckimport.
+3. Voeg collectiegegevens via de normale kaartinvoer toe en importeer decks desgewenst via de bestaande deckimport.
 
 Een oudere 1.x-database kan technisch tabellen bevatten die op delen van het 2.0-schema lijken, maar dit is geen ondersteund productie-upgradepad. Gebruik voor productie daarom een verse 2.0-database.
 
@@ -146,7 +146,7 @@ Via **Instellingen en onderhoud** kan de externe responsecache worden geleegd of
 
 Na het kiezen van een kaartnaam worden alle papieren printings getoond. Een keuzelijst met collectornummers kan de lijst beperken tot één kaartnummer. Na selectie springt de pagina naar de invoer en toont zij uitsluitend de beschikbare EUR-prijzen van die printing.
 
-Het opmerkingenveld is uit deze snelle invoer verwijderd. Aantal, taal, afwerking, conditie, locatie, aankoopprijs en de wanted-afstemming blijven staan nadat een actie is uitgevoerd en worden pas opnieuw geïnitialiseerd wanneer een andere printing wordt gekozen.
+Het opmerkingenveld is uit deze snelle invoer verwijderd. Aantal, taal, afwerking, conditie, locatie, aankoopprijs en de wanted-afstemming blijven staan nadat een actie is uitgevoerd. Na een geslaagde actie worden de drie actieknoppen geblokkeerd om dubbel toevoegen te voorkomen; een nieuwe printingselectie activeert ze weer.
 
 De drie acties staan naast elkaar:
 
@@ -172,7 +172,7 @@ De collectie ondersteunt onder andere filters op:
 - deck;
 - beschikbaarheid.
 
-Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt compacte, aanklikbare manasymbolen. Een geselecteerd symbool krijgt een dikke rand. De gekozen kleuren werken als een exacte AND-filter: iedere gekozen kleur moet aanwezig zijn en niet-geselecteerde kleuren worden uitgesloten. Alleen groen toont dus uitsluitend mono-groene kaarten; groen plus wit toont uitsluitend kaarten met exact een groen-witte kleuridentiteit. Kleurloze kaarten verschijnen alleen wanneer uitsluitend **Kleurloos** is geselecteerd. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
+Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt compacte, aanklikbare manasymbolen. Een geselecteerd symbool krijgt een dikke rand. De zevende knop wisselt tussen **AND** en **OR**. AND vereist exact de gekozen identiteit; OR toont kaarten die minimaal één gekozen kleur gebruiken. Kleurloos is in OR-modus een afzonderlijk alternatief. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 
@@ -180,7 +180,7 @@ Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaa
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven.
 

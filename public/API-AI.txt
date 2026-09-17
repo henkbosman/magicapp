@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER AI API 2.3.4
+MAGIC COLLECTION MANAGER AI API 2.4.0
 
 Base: https://<host>/api/ai
 Alle endpoints zijn GET en read-only.
@@ -86,7 +86,7 @@ INPUT JSON
   "query": {
     "type": "Creature",
     "colors": "G",
-    "availability": "free",
+    "availability": "beschikbaar",
     "limit": 25,
     "offset": 0
   }
@@ -127,8 +127,8 @@ Betekenis: Rarity
 Geldige waarden: common, uncommon, rare, mythic, special, bonus
 
 Filter: availability
-Betekenis: Gebruikssituatie
-Geldige waarden: all, free, used, shortage; standaard all
+Betekenis: Bezitssituatie
+Geldige waarden: alle (standaard), beschikbaar (minstens één vrij exemplaar), bezet (minstens één exemplaar in een deck). Engelse aliases: all, available, occupied
 
 Filter: deckId
 Betekenis: Alleen kaarten die in dit deck voorkomen

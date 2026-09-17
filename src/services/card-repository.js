@@ -306,17 +306,29 @@ export function listCollection(filters = {}) {
   }
   if (filters.color) {
     const colors = normalizeCollectionColors(filters.color);
+    const colorMode = String(filters.colorMode || 'and').toLowerCase() === 'or' ? 'or' : 'and';
 
     // De historische API-waarde M blijft ondersteund. De normale kleurknoppen
-    // gebruiken een exacte AND-selectie: alle gekozen kleuren moeten aanwezig
-    // zijn en aanvullende kleuren worden uitgesloten.
+    // kunnen wisselen tussen een exacte AND-selectie en een brede OR-selectie.
     if (colors.length === 1 && colors[0] === 'M') {
       conditions.push('json_array_length(c.color_identity_json) > 1');
     } else {
       const selectedColors = colors.filter((color) => ['W', 'U', 'B', 'R', 'G'].includes(color));
       const includeColorless = colors.includes('C');
 
-      if (includeColorless && selectedColors.length) {
+      if (colorMode === 'or') {
+        const alternatives = [];
+        if (selectedColors.length) {
+          alternatives.push(`EXISTS (
+            SELECT 1 FROM json_each(c.color_identity_json) AS identity_color
+            WHERE UPPER(CAST(identity_color.value AS TEXT)) IN (${selectedColors.map(() => '?').join(', ')})
+          )`);
+          params.push(...selectedColors);
+        }
+        if (includeColorless) alternatives.push('json_array_length(c.color_identity_json) = 0');
+        if (alternatives.length) conditions.push(`(${alternatives.join(' OR ')})`);
+      } else if (includeColorless && selectedColors.length) {
+        // Een kleurloze identiteit is leeg en kan niet tegelijk exact gekleurd zijn.
         conditions.push('0 = 1');
       } else if (includeColorless) {
         conditions.push('json_array_length(c.color_identity_json) = 0');

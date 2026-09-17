@@ -13,7 +13,7 @@ import { booleanValue, oneOf, optionalNumber, optionalString, positiveInteger } 
 import { transaction } from '../db/database.js';
 import { addDeckCard } from '../services/deck-service.js';
 import { HttpError } from '../lib/http-error.js';
-import { exportCollectionCsv, importCollectionCsv } from '../services/import-export-service.js';
+import { exportCollectionCsv } from '../services/import-export-service.js';
 
 export const collectionReadRouter = express.Router();
 export const collectionWriteRouter = express.Router();
@@ -53,11 +53,6 @@ collectionReadRouter.get('/export.csv', (req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="collection.csv"');
   res.send(`\uFEFF${csv}`);
-});
-
-collectionWriteRouter.post('/import.csv', async (req, res) => {
-  const result = await importCollectionCsv(req.body?.csv);
-  res.status(201).json({ data: result });
 });
 
 collectionReadRouter.get('/', (req, res) => {

@@ -14,6 +14,28 @@ import {
 import { resolveSinglePrintingCard } from './printing-catalog-service.js';
 
 const COUNTED_ROLES = ['commander', 'partner', 'main'];
+const COLOR_IDENTITY_ORDER = ['W', 'U', 'B', 'R', 'G'];
+
+function deckColorIdentity(deckId, commanderCardId = null, secondCommanderCardId = null) {
+  const commanderIds = [commanderCardId, secondCommanderCardId].filter(Boolean).map(Number);
+  const rows = commanderIds.length
+    ? db.prepare(`
+        SELECT DISTINCT UPPER(CAST(identity_color.value AS TEXT)) AS color
+        FROM cards c
+        JOIN json_each(c.color_identity_json) AS identity_color
+        WHERE c.id IN (${commanderIds.map(() => '?').join(', ')})
+      `).all(...commanderIds)
+    : db.prepare(`
+        SELECT DISTINCT UPPER(CAST(identity_color.value AS TEXT)) AS color
+        FROM deck_cards dc
+        JOIN cards c ON c.id = dc.card_id
+        JOIN json_each(c.color_identity_json) AS identity_color
+        WHERE dc.deck_id = ?
+          AND dc.role IN ('commander', 'partner', 'main')
+      `).all(deckId);
+  const colors = new Set(rows.map((row) => row.color));
+  return COLOR_IDENTITY_ORDER.filter((color) => colors.has(color));
+}
 
 function deckRowToApi(row) {
   if (!row) return null;
@@ -36,6 +58,7 @@ export function getDeck(id) {
   const deck = deckRowToApi(row);
   deck.commander = row.commander_card_id ? requireCardById(row.commander_card_id) : null;
   deck.secondCommander = row.second_commander_card_id ? requireCardById(row.second_commander_card_id) : null;
+  deck.colorIdentity = deckColorIdentity(id, row.commander_card_id, row.second_commander_card_id);
   deck.totalCards = Number(db.prepare(`
     SELECT COALESCE(SUM(quantity), 0) AS total FROM deck_cards
     WHERE deck_id = ? AND role IN ('commander', 'partner', 'main')
@@ -71,6 +94,7 @@ export function listDecks() {
       missingQuantity: missing.summary.missingFromCollection,
       missingUnique: missing.summary.uniqueMissingFromCollection,
       globalShortage: missing.summary.globalShortage,
+      colorIdentity: deckColorIdentity(deck.id, row.commander_card_id, row.second_commander_card_id),
       commander: row.commander_card_id ? requireCardById(row.commander_card_id) : null
     };
   });

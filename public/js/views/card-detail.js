@@ -1,8 +1,7 @@
 import { api, queryString } from '../api.js';
-import { addCardToCollection, addCardToDeck, addCardToWanted } from '../card-actions.js';
+import { addCardToDeck } from '../card-actions.js';
 import { cardImage, cardInsightSourceLabel, colorIdentity, librarySearchHtml, manaCost, manaProductionHtml, pageHeader, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
-import { isBasicLand } from '../card-rules.js';
 import { escapeHtml, formatEuro, refreshView, toast } from '../utils.js';
 import { getCardReturnLabel, returnToCardSource } from '../navigation-state.js';
 
@@ -106,7 +105,7 @@ export async function renderCardDetail(context) {
         eyebrow: `${card.setName} · ${card.setCode.toUpperCase()} #${card.collectorNumber}`,
         title: card.name,
         description: card.printedName && card.printedName !== card.name ? card.printedName : card.typeLine,
-        actions: `<button id="card-detail-back" class="button secondary" type="button">← ${escapeHtml(returnLabel)}</button><button id="card-add-collection" class="button primary" data-write-action>＋ Collectie</button><button id="card-add-deck" class="button secondary" data-write-action>▤ Deck</button>${isBasicLand(card) ? '' : '<button id="card-add-wanted" class="button secondary" data-write-action>☆ Wanted</button>'}`
+        actions: `<button id="card-detail-back" class="button secondary" type="button">← ${escapeHtml(returnLabel)}</button><button id="card-add-deck" class="button secondary" data-write-action>▤ Deck</button>`
       })}
       <section class="card-detail-grid">
         <div class="card-detail-image-stack">
@@ -166,8 +165,6 @@ export async function renderCardDetail(context) {
 
       document.getElementById('card-detail-back')?.addEventListener('click', () => returnToCardSource(returnToken));
       document.getElementById('edit-card-insights')?.addEventListener('click', () => openCardInsightsEditor(card, { onDone: refreshView }));
-      document.getElementById('card-add-collection')?.addEventListener('click', () => addCardToCollection(card, { onDone: refreshView }));
-      document.getElementById('card-add-wanted')?.addEventListener('click', () => addCardToWanted(card, { onDone: refreshView }));
       document.getElementById('card-add-deck')?.addEventListener('click', () => addCardToDeck(card, { onDone: refreshView }));
       document.getElementById('refresh-card')?.addEventListener('click', async (event) => {
         const button = event.currentTarget;

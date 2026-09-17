@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { cardImage, pageHeader } from '../components.js';
+import { cardImage, colorIdentity, pageHeader } from '../components.js';
 import { emptyState, escapeHtml, formValue, openDialog, refreshView, toast } from '../utils.js';
 
 export async function renderDecks() {
@@ -8,7 +8,7 @@ export async function renderDecks() {
     <a class="deck-card" href="#/decks/${deck.id}">
       <div class="deck-card-top">
         ${deck.commander ? cardImage(deck.commander, { className: 'commander-thumb' }) : '<div class="card-image-placeholder commander-thumb"><span>?</span></div>'}
-        <div><span class="format-pill">${escapeHtml(deck.format)}</span><h2>${escapeHtml(deck.name)}</h2><small>${deck.commander ? escapeHtml(deck.commander.name) : 'Commander nog niet ingesteld'}</small></div>
+        <div><span class="format-pill">${escapeHtml(deck.format)}</span><h2>${escapeHtml(deck.name)}</h2><small>${deck.commander ? escapeHtml(deck.commander.name) : 'Commander nog niet ingesteld'}</small><div class="deck-card-colors" title="Kleuridentiteit">${colorIdentity(deck.colorIdentity || [])}</div></div>
       </div>
       ${deck.description ? `<p>${escapeHtml(deck.description)}</p>` : ''}
       <div class="deck-card-stats">

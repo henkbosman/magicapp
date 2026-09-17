@@ -9,6 +9,7 @@ import {
   variantForLanguage
 } from '../printing-utils.js';
 import { debounce, emptyState, escapeHtml, formValue, openDialog, parseTags, toast } from '../utils.js';
+import { applyWriteAvailability } from '../write-access.js';
 
 const ROLE_OPTIONS = [
   ['main', 'Main deck'],
@@ -91,9 +92,9 @@ function selectedPanel(card, printing) {
             <label class="checkbox-field full"><input name="reconcileWanted" type="checkbox" checked> Wanted-aantal automatisch verminderen</label>
           </div>
           <div class="add-card-actions">
-            <button class="button primary" type="submit" data-write-action>Collectie</button>
-            ${isBasicLand(card) ? '<button type="button" class="button secondary" disabled title="Basic lands komen niet op Wanted">Wanted</button>' : '<button type="button" id="selected-to-wanted" class="button secondary" data-write-action>Wanted</button>'}
-            <button type="button" id="selected-to-collection-deck" class="button secondary" data-write-action>Collectie + Deck</button>
+            <button class="button primary" type="submit" data-write-action data-add-card-action>Collectie</button>
+            ${isBasicLand(card) ? '<button type="button" class="button secondary" disabled title="Basic lands komen niet op Wanted">Wanted</button>' : '<button type="button" id="selected-to-wanted" class="button secondary" data-write-action data-add-card-action>Wanted</button>'}
+            <button type="button" id="selected-to-collection-deck" class="button secondary" data-write-action data-add-card-action>Collectie + Deck</button>
           </div>
         </form>
       </div>
@@ -114,6 +115,7 @@ export async function renderAddCard(context) {
   let selectedCard = null;
   let selectedPrinting = null;
   let loadedPrintings = [];
+  let actionsLocked = false;
 
   return {
     html: `
@@ -149,6 +151,17 @@ export async function renderAddCard(context) {
       const status = document.getElementById('printing-status');
       const list = document.getElementById('printing-list');
       const panel = document.getElementById('selected-card-panel');
+
+      const setAddActionsLocked = (locked) => {
+        actionsLocked = Boolean(locked);
+        const actions = panel.querySelector('.add-card-actions');
+        actions?.classList.toggle('is-locked', actionsLocked);
+        panel.querySelectorAll('[data-add-card-action], #selected-to-wanted').forEach((button) => {
+          button.dataset.writeInitiallyDisabled = actionsLocked ? 'true' : 'false';
+          button.disabled = actionsLocked;
+        });
+        applyWriteAvailability(panel);
+      };
 
       const updateAddRoute = ({
         name = search.value.trim(),
@@ -240,22 +253,33 @@ export async function renderAddCard(context) {
             await refreshSelectedUsage(result.collectionItem.card || result.deckCard.card || null);
             const deckName = decks.find((deck) => deck.id === deckId)?.name || 'het deck';
             toast(`${selectedCard.name} is toegevoegd aan je collectie en aan ${deckName}.`, 'success', { position: 'top' });
+            setAddActionsLocked(true);
             return true;
           }
         });
       };
 
       const scrollActionsIntoView = () => {
-        const actions = panel.querySelector('.add-card-actions');
-        if (!actions || actions.offsetParent === null) return;
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        const alignActions = (behavior = 'smooth') => {
+          if (!document.body.contains(panel)) return;
+          const actions = panel.querySelector('.add-card-actions');
+          if (!actions || actions.offsetParent === null) return;
           const rect = actions.getBoundingClientRect();
-          const topBoundary = 88;
+          const topBoundary = 18;
           const bottomBoundary = window.innerHeight - 18;
           if (rect.top < topBoundary || rect.bottom > bottomBoundary) {
-            actions.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            actions.scrollIntoView({ behavior, block: 'center' });
           }
-        }));
+        };
+
+        requestAnimationFrame(() => requestAnimationFrame(() => alignActions('smooth')));
+        const image = panel.querySelector('.preview-image');
+        if (image && !image.complete) {
+          image.addEventListener('load', () => alignActions('smooth'), { once: true });
+          image.addEventListener('error', () => alignActions('auto'), { once: true });
+        }
+        // Fonts and cached images can still change the panel height shortly after render.
+        [180, 500, 900].forEach((delay) => window.setTimeout(() => alignActions('auto'), delay));
       };
 
       const bindSelectedActions = () => {
@@ -294,19 +318,22 @@ export async function renderAddCard(context) {
 
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
+          if (actionsLocked) return;
           const button = form.querySelector('[type="submit"]');
-          button.disabled = true;
+          setAddActionsLocked(true);
           button.textContent = 'Toevoegen…';
+          let succeeded = false;
           try {
             const added = await api('/collection', { method: 'POST', body: currentCollectionPayload(form) });
             await refreshSelectedUsage(added.card || null);
             toast(`${selectedCard.name} is aan je collectie toegevoegd.`, 'success', { position: 'top' });
+            succeeded = true;
           } catch (error) {
             toast(error.message, 'error', { position: 'top' });
           } finally {
             if (document.body.contains(button)) {
-              button.disabled = false;
               button.textContent = 'Collectie';
+              if (!succeeded) setAddActionsLocked(false);
             }
           }
         });
@@ -316,7 +343,10 @@ export async function renderAddCard(context) {
           addCardToWanted(selectedCard, {
             quantity: Number(formValue(data, 'quantity', '1')),
             toastOptions: { position: 'top' },
-            onDone: () => refreshSelectedUsage()
+            onDone: async () => {
+              await refreshSelectedUsage();
+              setAddActionsLocked(true);
+            }
           });
         });
 
@@ -361,6 +391,7 @@ export async function renderAddCard(context) {
         const index = Number(button.dataset.printingIndex);
         const nextPrinting = loadedPrintings[index];
         if (!nextPrinting) return;
+        setAddActionsLocked(false);
         if (selectedPrinting?.printingKey === nextPrinting.printingKey && panel.querySelector('#add-collection-form')) {
           if (updateRoute) updateAddRoute({ name: search.value.trim(), printing: selectedPrinting.scryfallId });
           if (scrollToActions) scrollActionsIntoView();
@@ -377,6 +408,7 @@ export async function renderAddCard(context) {
           selectedCard = await api(`/cards/preview/${encodeURIComponent(selectedPrinting.scryfallId)}`);
           panel.innerHTML = selectedPanel(selectedCard, selectedPrinting);
           bindSelectedActions();
+          setAddActionsLocked(false);
           if (scrollToActions) scrollActionsIntoView();
         } catch (error) {
           toast(error.message, 'error', { position: 'top' });
@@ -390,6 +422,7 @@ export async function renderAddCard(context) {
       };
 
       const resetSelection = () => {
+        actionsLocked = false;
         selectedCard = null;
         selectedPrinting = null;
         panel.innerHTML = selectedPanel(null, null);

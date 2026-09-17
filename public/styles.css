@@ -70,7 +70,7 @@ small { color: var(--ink-soft); }
 .main-nav a.active { background: rgba(197, 223, 204, .15); color: #fff; box-shadow: inset 3px 0 #c7a253; }
 .workspace { min-height: 100vh; margin-left: var(--sidebar); }
 .topbar {
-  position: sticky; top: 0; z-index: 25; height: var(--topbar); padding: 14px clamp(18px, 3vw, 40px);
+  position: relative; z-index: 25; height: var(--topbar); padding: 14px clamp(18px, 3vw, 40px);
   display: flex; align-items: center; gap: 18px; background: rgba(244,245,241,.92); border-bottom: 1px solid rgba(203,212,204,.8); backdrop-filter: blur(12px);
 }
 .mobile-brand { display: none; }
@@ -281,9 +281,9 @@ input[type="checkbox"] { width: 18px; height: 18px; }
 .printing-card img, .printing-card .card-image-placeholder { width: 46px; height: 64px; object-fit: cover; border-radius: 4px; }
 .printing-card strong, .printing-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .printing-card small + small { margin-top: 2px; }
-.selected-printing { position: sticky; top: calc(var(--topbar) + 18px); }
+.selected-printing { position: sticky; top: 18px; }
 .selected-card-preview { display: grid; grid-template-columns: 170px minmax(0,1fr); gap: 18px; }
-.selected-card-preview .preview-image { width: 170px; border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,.18); }
+.selected-card-preview .preview-image { width: 170px; aspect-ratio: 5 / 7; object-fit: cover; border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,.18); }
 .selected-card-preview .card-image-placeholder { width: 170px; aspect-ratio: 5 / 7; }
 .oracle-text { white-space: pre-wrap; line-height: 1.46; }
 
@@ -347,7 +347,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .wanted-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 7px; color: var(--ink-soft); font-size: .76rem; }
 
 .card-detail-grid { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 26px; align-items: start; }
-.card-detail-image-stack { position: sticky; top: calc(var(--topbar) + 20px); display: grid; gap: 13px; }
+.card-detail-image-stack { position: sticky; top: 20px; display: grid; gap: 13px; }
 .card-detail-image { width: 100%; border-radius: 16px; box-shadow: 0 18px 40px rgba(16,26,19,.2); }
 .card-detail-image-stack .card-image-placeholder { width: 100%; aspect-ratio: 5 / 7; border-radius: 16px; }
 .card-facts { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
@@ -399,7 +399,6 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .status-table { width: 100%; border-collapse: collapse; }
 .status-table td { padding: 9px 0; border-bottom: 1px solid var(--line); }
 .status-table td:last-child { text-align: right; font-weight: 650; }
-.import-box { display: grid; gap: 10px; }
 .import-result { margin-top: 10px; padding: 11px; border-radius: 9px; background: var(--surface-soft); font-size: .82rem; }
 
 .mobile-nav { display: none; }
@@ -420,15 +419,6 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
   .mobile-brand { display: block; }
   .mobile-brand .brand-mark { width: 38px; height: 38px; }
   .topbar { padding: 10px 14px; gap: 10px; }
-  .button.top-add {
-    width: 42px; height: 42px; min-height: 42px; padding: 0; gap: 0;
-    display: inline-grid; place-items: center; font-size: 0;
-  }
-  .button.top-add span:last-child { display: none; }
-  .button.top-add span:first-child {
-    width: 100%; height: 100%; display: grid; place-items: center;
-    font-size: 1.1rem; line-height: 1;
-  }
   #app { padding: 24px 16px 102px; }
   .mobile-nav {
     position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
@@ -491,7 +481,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
   .form-grid .full { grid-column: auto; }
   .coverage-details { width: 100%; }
   .card-facts, .legality-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .search-popover { position: fixed; top: var(--topbar); left: 8px; right: 8px; max-height: calc(100vh - var(--topbar) - 84px); }
+  .search-popover { position: absolute; top: calc(100% + 8px); left: 0; right: 0; max-height: calc(100vh - var(--topbar) - 84px); }
   .toast-region { bottom: 82px; }
   .modal-card > footer .button { flex: 1; }
 }
@@ -995,7 +985,7 @@ button[data-write-action].write-disabled,
 .library-pile strong { font-size: 1.55rem; line-height: 1; }
 .library-pile small { color: #d8c98d; font-size: .62rem; }
 .library-card-back { width: 31px; height: 31px; border: 2px solid #c7ae69; border-radius: 50%; box-shadow: inset 0 0 0 4px #1c2921, inset 0 0 0 6px #c7ae69; }
-.simulator-information { position: sticky; top: calc(var(--topbar) + 16px); display: grid; gap: 11px; }
+.simulator-information { position: sticky; top: 16px; display: grid; gap: 11px; }
 .sim-info-card { padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .sim-info-card h3 { margin-bottom: 9px; font-size: .86rem; }
 .turn-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px 12px; border-top: 3px solid var(--info); }
@@ -1396,7 +1386,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 
 /* Release 2.2.x: kaartinvoer, multi-kleurfilter en prijsweergave */
 .toast-region-top {
-  top: calc(var(--topbar) + 12px);
+  top: 12px;
   bottom: auto;
 }
 .toast-region-top .toast { transform: translateY(-10px); }
@@ -1509,7 +1499,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .collection-market-price strong { margin-top: 2px; font-size: .72rem; }
 
 @media (max-width: 640px) {
-  .toast-region-top { top: calc(var(--topbar) + 8px); }
+  .toast-region-top { top: 8px; }
   .add-card-search-controls { grid-template-columns: 1fr; }
   .printing-price-grid { grid-template-columns: 1fr; }
   .color-identity-filter { grid-column: auto; }
@@ -1536,3 +1526,36 @@ html.write-unavailable [data-write-only] { display: none !important; }
   .maintenance-sync-field > label { min-height: 0; }
   .maintenance-sync-field > small { min-height: 0; }
 }
+
+/* Release 2.4.0: kleurmodus, deckkleuren en onderhoudsopmaak */
+.color-identity-mode {
+  color: var(--primary-dark);
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .025em;
+}
+.color-identity-mode[data-mode="and"] {
+  border-width: 3px;
+  border-color: var(--primary-dark);
+  background: var(--primary-soft);
+}
+.color-identity-mode[data-mode="or"] {
+  border-width: 3px;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: #704b14;
+}
+.deck-card-colors {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.deck-card-colors .mana-symbol {
+  width: 25px;
+  height: 25px;
+  flex-basis: 25px;
+}
+.maintenance-grid > .panel:only-child { grid-column: 1 / -1; }
+.add-card-actions.is-locked .button { cursor: not-allowed; }
+
