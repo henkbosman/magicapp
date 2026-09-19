@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.4.1
+MAGIC COLLECTION MANAGER WRITE API 2.5.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.4.1"}
+{"status":"ok","writeAvailable":true,"version":"2.5.0"}
 
 POST /api/write/cards/cache
 

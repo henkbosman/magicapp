@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.5.0 - 2026-09-19
+
+### Deckoverzicht
+
+- Basic lands met dezelfde kaartnaam en rol worden visueel samengevoegd, ook wanneer verschillende fysieke printings in het deck staan. Een deck met meerdere Forest-printings toont bijvoorbeeld één regel als `24× Forest`.
+- Bij een samengevoegde basic-landregel blijft een apart printingoverzicht beschikbaar om de onderliggende deckregels te bekijken, bewerken of verwijderen.
+- De zichtbare aantallen boven de decklijst en in de rolfilters tellen voortaan echte kaartaantallen in plaats van alleen database- of kaartregels.
+
+### Deckexport
+
+- De tekstexport telt gelijke Oracle-kaarten over verschillende printings en deckregels bij elkaar op. Meerdere Forest-regels worden bijvoorbeeld als één regel `24 Forest` geëxporteerd.
+
+### Deckstatistieken
+
+- Het gecombineerde vlak **Mana en deckzoekfuncties** is opgesplitst in de afzonderlijke vlakken **Mana-productie** en **Deckzoekfuncties**.
+- Het mana-productieoverzicht groepeert dezelfde Oracle-kaart over verschillende printings en toont het totale aantal exemplaren, zodat bijvoorbeeld Forest maar één keer als `24× in deck` voorkomt.
+- Deckzoekkaarten worden om dezelfde reden eveneens per Oracle-kaart samengevoegd.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.4.1 - 2026-09-17
 
 ### API-documentatie

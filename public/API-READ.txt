@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.4.1
+MAGIC COLLECTION MANAGER READ API 2.5.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.4.1"}
+{"status":"ok","version":"2.5.0"}
 
 GET /api/read/dashboard
 
@@ -434,7 +434,7 @@ OUTPUT JSON
 
 GET /api/read/decks/:id/stats?excludeLands={true|false}
 
-Geeft lokaal berekende deckstatistieken. excludeLands is standaard true.
+Geeft lokaal berekende deckstatistieken. excludeLands is standaard true. Mana-producers en deckzoekkaarten zijn per Oracle-kaart samengevoegd; quantity is het totale aantal exemplaren over alle printings.
 
 INPUT JSON
 
@@ -484,7 +484,7 @@ OUTPUT JSON
 
 GET /api/read/decks/:id/export.txt?missing={true|false}
 
-Exporteert het hele deck of alleen missende kaarten als tekst. missing is standaard false.
+Exporteert het hele deck of alleen missende kaarten als tekst. missing is standaard false. Gelijke Oracle-kaarten uit verschillende printings of deckregels worden tot een regel met een opgeteld aantal samengevoegd.
 
 INPUT JSON
 
@@ -565,7 +565,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.4.1",
+    "applicationVersion": "2.5.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

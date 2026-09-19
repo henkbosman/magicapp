@@ -91,26 +91,27 @@ function linkStatisticsHtml(links) {
     ${linkGroupsHtml(links.groups)}`;
 }
 
-function cardFunctionStatisticsHtml(functions = {}) {
+function manaProductionStatisticsHtml(functions = {}) {
   const manaCards = functions.manaProducers || [];
+  return `<div class="function-stat-summary">
+    <div class="coverage-details">
+      <div class="coverage-detail"><strong>${functions.manaProducerCardLines || 0}</strong><small>Unieke mana-producers</small></div>
+      <div class="coverage-detail"><strong>${functions.manaProducerQuantity || 0}</strong><small>Exemplaren in deck</small></div>
+      <div class="coverage-detail"><strong>${functions.variableManaProducers || 0}</strong><small>Variabele producers</small></div>
+    </div>
+    ${manaCards.length ? `<div class="function-card-list">${manaCards.map((entry) => `<a data-card-detail-link href="#/cards/${entry.cardId}"><span><strong>${escapeHtml(entry.name)}</strong>${entry.quantity > 1 ? `<small>${entry.quantity}× in deck</small>` : ''}</span>${manaProductionHtml(entry.entries)}</a>`).join('')}</div>` : '<p class="muted">Geen mana-producerende kaarten herkend.</p>'}
+  </div>`;
+}
+
+function librarySearchStatisticsHtml(functions = {}) {
   const searchCards = functions.librarySearchCards || [];
   return `<div class="function-stat-summary">
     <div class="coverage-details">
-      <div class="coverage-detail"><strong>${functions.manaProducerCardLines || 0}</strong><small>Mana-producerende kaartregels</small></div>
-      <div class="coverage-detail"><strong>${functions.variableManaProducers || 0}</strong><small>Variabele producers</small></div>
-      <div class="coverage-detail"><strong>${functions.librarySearchCardLines || 0}</strong><small>Kaarten die zoeken</small></div>
+      <div class="coverage-detail"><strong>${functions.librarySearchCardLines || 0}</strong><small>Unieke zoekkaarten</small></div>
+      <div class="coverage-detail"><strong>${functions.librarySearchQuantity || 0}</strong><small>Exemplaren in deck</small></div>
     </div>
-    <div class="function-stat-columns">
-      <section>
-        <h3>Mana-productie</h3>
-        ${manaCards.length ? `<div class="function-card-list">${manaCards.map((entry) => `<a data-card-detail-link href="#/cards/${entry.cardId}"><span><strong>${escapeHtml(entry.name)}</strong>${entry.quantity > 1 ? `<small>${entry.quantity}× in deck</small>` : ''}</span>${manaProductionHtml(entry.entries)}</a>`).join('')}</div>` : '<p class="muted">Geen mana-producerende kaarten herkend.</p>'}
-      </section>
-      <section>
-        <h3>Library doorzoeken</h3>
-        ${searchCards.length ? `<div class="function-card-list">${searchCards.map((entry) => `<a data-card-detail-link href="#/cards/${entry.cardId}"><span><strong>${escapeHtml(entry.name)}</strong>${entry.quantity > 1 ? `<small>${entry.quantity}× in deck</small>` : ''}</span>${librarySearchHtml(entry.targets)}</a>`).join('')}</div>` : '<p class="muted">Geen kaarten met een deckzoekfunctie herkend.</p>'}
-        ${Object.keys(functions.librarySearchByTarget || {}).length ? `<div class="tag-list function-target-summary">${Object.entries(functions.librarySearchByTarget).map(([target, count]) => `<span class="tag">${escapeHtml(librarySearchTargetLabel(target))} · ${count}</span>`).join('')}</div>` : ''}
-      </section>
-    </div>
+    ${searchCards.length ? `<div class="function-card-list">${searchCards.map((entry) => `<a data-card-detail-link href="#/cards/${entry.cardId}"><span><strong>${escapeHtml(entry.name)}</strong>${entry.quantity > 1 ? `<small>${entry.quantity}× in deck</small>` : ''}</span>${librarySearchHtml(entry.targets)}</a>`).join('')}</div>` : '<p class="muted">Geen kaarten met een deckzoekfunctie herkend.</p>'}
+    ${Object.keys(functions.librarySearchByTarget || {}).length ? `<div class="tag-list function-target-summary">${Object.entries(functions.librarySearchByTarget).map(([target, count]) => `<span class="tag">${escapeHtml(librarySearchTargetLabel(target))} · ${count}</span>`).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -179,7 +180,8 @@ export async function renderDeckStatistics(context) {
         <section class="panel"><header class="panel-header"><h2>Lands</h2></header><div class="panel-body"><div class="coverage-details"><div class="coverage-detail"><strong>${stats.lands.total}</strong><small>Totaal</small></div><div class="coverage-detail"><strong>${stats.lands.basic}</strong><small>Basic</small></div><div class="coverage-detail"><strong>${stats.lands.nonBasic}</strong><small>Non-basic</small></div><div class="coverage-detail"><strong>${stats.lands.ratio}%</strong><small>Van deck</small></div></div><h3>Betrouwbaar geproduceerde mana</h3>${manaBarChart(stats.lands.produces)}</div></section>
         <section class="panel"><header class="panel-header"><h2>Creatures</h2></header><div class="panel-body"><div class="coverage-details"><div class="coverage-detail"><strong>${stats.creatures.total}</strong><small>Creatures</small></div><div class="coverage-detail"><strong>${stats.creatures.averagePower ?? '—'}</strong><small>Gem. power</small></div><div class="coverage-detail"><strong>${stats.creatures.averageToughness ?? '—'}</strong><small>Gem. toughness</small></div><div class="coverage-detail"><strong>${stats.creatures.legendary}</strong><small>Legendary</small></div></div>${stats.creatures.topSubtypes.length ? `<h3>Veelvoorkomende subtypes</h3>${barChart(Object.fromEntries(stats.creatures.topSubtypes.map((row) => [row.name, row.count])))}` : ''}</div></section>
         <section class="panel"><header class="panel-header"><h2>Creature-keywords</h2></header><div class="panel-body">${barChart(stats.creatures.keywords)}</div></section>
-        <section class="panel deck-function-stats-panel"><header class="panel-header"><h2>Mana en deckzoekfuncties</h2></header><div class="panel-body">${cardFunctionStatisticsHtml(stats.functions)}</div></section>
+        <section class="panel deck-mana-stats-panel"><header class="panel-header"><h2>Mana-productie</h2></header><div class="panel-body">${manaProductionStatisticsHtml(stats.functions)}</div></section>
+        <section class="panel deck-search-stats-panel"><header class="panel-header"><h2>Deckzoekfuncties</h2></header><div class="panel-body">${librarySearchStatisticsHtml(stats.functions)}</div></section>
         <section class="panel"><header class="panel-header"><h2>Handmatige functies</h2></header><div class="panel-body">${barChart(stats.tags, { emptyText: 'Nog geen handmatige functietags vastgelegd.' })}</div></section>
         <section class="panel deck-links-stats-panel"><header class="panel-header"><h2>Combo’s en synergieën</h2></header><div class="panel-body">${linkStatisticsHtml(stats.links)}</div></section>
       </section>`,

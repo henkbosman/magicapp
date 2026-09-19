@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.4.1
+# Architectuur - Magic Collection Manager 2.5.0
 
 ## Overzicht
 
@@ -61,7 +61,7 @@ Belangrijke services:
 - `card-cache-service.js`: lokale kaartcache en Scryfall-ophalen;
 - `scryfall-service.js`: externe verzoeken met rate limiting/cache;
 - `image-cache-service.js`: lokale schijfcache voor kaartafbeeldingen;
-- `deck-service.js`: deck CRUD, deckkaarten, ontbrekende kaarten;
+- `deck-service.js`: deck CRUD, deckkaarten, ontbrekende kaarten en geaggregeerde tekstexport;
 - `deck-stats-service.js`: centrale deterministische deckstatistieken;
 - `deck-link-service.js`: combo-/synergiegroepen;
 - `deck-printing-service.js`: deckprinting afstemmen na aankoop;
@@ -108,7 +108,7 @@ De kleuridentiteitsfilter verzendt de gekozen kleuren als één canonieke `color
 
 ## Deckstatistieken
 
-`deck-stats-service.js` berekent statistieken uitsluitend uit lokale data. Hieronder vallen mana curves, kleuren, types, lands, creatures, keywords, tags, Commander-waarschuwingen, ontbrekende kaarten, mana-productie, library-searchfuncties en combo-/synergiegroepstatistieken.
+`deck-stats-service.js` berekent statistieken uitsluitend uit lokale data. Hieronder vallen mana curves, kleuren, types, lands, creatures, keywords, tags, Commander-waarschuwingen, ontbrekende kaarten, mana-productie, library-searchfuncties en combo-/synergiegroepstatistieken. Mana-producers en zoekkaarten worden op Oracle-identiteit samengevoegd, zodat verschillende printings van dezelfde kaart als één statistiekregel met een opgeteld aantal worden teruggegeven.
 
 Er is geen Monte Carlo- of regelsimulatieanalyse in 2.0.
 

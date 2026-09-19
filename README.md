@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.4.1
+# Magic Collection Manager 2.5.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.4.1** zet de compacte LLM API-beschrijving om naar een kale HTML-pagina met aanklikbare endpoint-URL’s. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.5.0** groepeert basic lands en gelijke printings logisch in deckoverzichten, exports en mana-statistieken. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -180,9 +180,9 @@ Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaa
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels. Via het printingoverzicht van zo'n samengevoegde regel blijven de afzonderlijke printings beheerbaar.
 
-Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven.
+Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven. De tekstexport bundelt gelijke Oracle-kaarten over verschillende printings en exporteert bijvoorbeeld één regel `24 Forest` in plaats van meerdere losse Forest-regels.
 
 ## Deckstatistieken
 
@@ -197,8 +197,8 @@ De aparte statistiekenpagina berekent lokaal onder andere:
 - Commander-waarschuwingen;
 - handmatige functietags;
 - combo-/synergiegroepstatistieken;
-- mana-productie;
-- library-searchfuncties;
+- mana-productie in een eigen vlak, met gelijke Oracle-kaarten en printings samengevoegd;
+- library-searchfuncties in een afzonderlijk vlak;
 - ontbrekende kaarten en wanted-status.
 
 Deterministische statistieken worden zonder AI berekend.

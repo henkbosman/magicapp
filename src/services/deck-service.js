@@ -440,17 +440,27 @@ export async function addMissingToWanted(deckId) {
   return { added, missing: getDeckMissing(deckId) };
 }
 
+function aggregateExportRows(rows) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = row.cardKey || String(row.name || '').trim().toLocaleLowerCase('en');
+    if (!grouped.has(key)) grouped.set(key, { quantity: 0, name: row.name });
+    grouped.get(key).quantity += Number(row.quantity || 0);
+  }
+  return [...grouped.values()].filter((row) => row.quantity > 0);
+}
+
 export function exportDeckText(deckId, { missingOnly = false } = {}) {
   const deck = requireDeck(deckId);
   let rows;
   if (missingOnly) {
-    rows = getDeckMissing(deckId).items
+    rows = aggregateExportRows(getDeckMissing(deckId).items
       .filter((row) => row.globalShortage > 0)
-      .map((row) => ({ quantity: row.globalShortage, name: row.card.name }));
+      .map((row) => ({ quantity: row.globalShortage, name: row.card.name, cardKey: row.card.cardKey })));
   } else {
-    rows = getDeckCards(deckId)
+    rows = aggregateExportRows(getDeckCards(deckId)
       .filter((row) => row.role !== 'maybeboard')
-      .map((row) => ({ quantity: row.quantity, name: row.card.name, role: row.role }));
+      .map((row) => ({ quantity: row.quantity, name: row.card.name, cardKey: row.card.cardKey })));
   }
   return {
     filename: `${deck.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'deck'}${missingOnly ? '-ontbrekend' : ''}.txt`,

@@ -189,6 +189,8 @@ export function calculateDeckStats(deckId, { excludeLandsFromAverage = true } = 
   let toughnessCount = 0;
   const subtypeCounts = {};
   const coverageByKey = new Map();
+  const manaProducersByKey = new Map();
+  const librarySearchCardsByKey = new Map();
 
   for (const item of items) {
     const { card, quantity } = item;
@@ -236,33 +238,43 @@ export function calculateDeckStats(deckId, { excludeLandsFromAverage = true } = 
     const manaEntries = card.insights?.manaProduction?.entries || [];
     const searchTargets = card.insights?.librarySearch?.targets || [];
     if (manaEntries.length) {
-      stats.functions.manaProducerCardLines += 1;
       stats.functions.manaProducerQuantity += quantity;
       if (manaEntries.some((entry) => entry.variable)) stats.functions.variableManaProducers += quantity;
       for (const entry of manaEntries) {
         increment(stats.functions.manaByType, entry.mana, Number(entry.amount || 1) * quantity);
       }
-      stats.functions.manaProducers.push({
-        cardId: card.id,
-        name: card.name,
-        quantity,
-        entries: manaEntries,
-        source: card.insights?.manaProduction?.source || 'none',
-        note: card.insights?.manaProduction?.note || ''
-      });
+      const key = card.cardKey;
+      const existing = manaProducersByKey.get(key);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        manaProducersByKey.set(key, {
+          cardId: card.id,
+          name: card.name,
+          quantity,
+          entries: manaEntries,
+          source: card.insights?.manaProduction?.source || 'none',
+          note: card.insights?.manaProduction?.note || ''
+        });
+      }
     }
     if (searchTargets.length) {
-      stats.functions.librarySearchCardLines += 1;
       stats.functions.librarySearchQuantity += quantity;
       for (const target of searchTargets) increment(stats.functions.librarySearchByTarget, target, quantity);
-      stats.functions.librarySearchCards.push({
-        cardId: card.id,
-        name: card.name,
-        quantity,
-        targets: searchTargets,
-        source: card.insights?.librarySearch?.source || 'none',
-        note: card.insights?.librarySearch?.note || ''
-      });
+      const key = card.cardKey;
+      const existing = librarySearchCardsByKey.get(key);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        librarySearchCardsByKey.set(key, {
+          cardId: card.id,
+          name: card.name,
+          quantity,
+          targets: searchTargets,
+          source: card.insights?.librarySearch?.source || 'none',
+          note: card.insights?.librarySearch?.note || ''
+        });
+      }
     }
 
     if (isLand) {
@@ -304,6 +316,14 @@ export function calculateDeckStats(deckId, { excludeLandsFromAverage = true } = 
     }
     coverageByKey.get(card.cardKey).quantity += quantity;
   }
+
+
+  stats.functions.manaProducers = [...manaProducersByKey.values()]
+    .sort((left, right) => left.name.localeCompare(right.name, 'nl'));
+  stats.functions.manaProducerCardLines = stats.functions.manaProducers.length;
+  stats.functions.librarySearchCards = [...librarySearchCardsByKey.values()]
+    .sort((left, right) => left.name.localeCompare(right.name, 'nl'));
+  stats.functions.librarySearchCardLines = stats.functions.librarySearchCards.length;
 
   stats.manaValue.averageIncludingLands = manaCountAll ? Number((manaTotalAll / manaCountAll).toFixed(2)) : 0;
   stats.manaValue.averageExcludingLands = manaCountNonland ? Number((manaTotalNonland / manaCountNonland).toFixed(2)) : 0;

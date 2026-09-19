@@ -6,6 +6,7 @@ import { openCardInsightsEditor } from '../card-insights.js';
 import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, parseTags, refreshView, toast } from '../utils.js';
 import { prepareDeckSimulatorNavigation, prepareDeckStatsNavigation, preserveCurrentScrollForNextRender } from '../navigation-state.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
+import { isBasicLand } from '../card-rules.js';
 
 const ROLE_LABELS = {
   commander: 'Commander', partner: 'Tweede commander', companion: 'Companion',
@@ -48,8 +49,9 @@ function relationTypeBadge(type) {
 
 function relationPills(relations = [], deckCardId = null) {
   if (!relations.length) return '';
+  const deckCardIds = new Set((Array.isArray(deckCardId) ? deckCardId : [deckCardId]).filter(Boolean).map(Number));
   return `<div class="deck-relation-list">${relations.map((relation) => {
-    const member = (relation.members || []).find((candidate) => Number(candidate.deckCardId) === Number(deckCardId));
+    const member = (relation.members || []).find((candidate) => deckCardIds.has(Number(candidate.deckCardId)));
     const step = member ? Number(member.position || 0) + 1 : null;
     return `
     <button type="button" class="deck-relation-pill ${escapeHtml(relation.type)} show-deck-group" data-group-id="${relation.id}" title="${escapeHtml(relation.note || `${RELATION_LABELS[relation.type] || relation.type}: ${relation.name}`)}">
@@ -264,6 +266,151 @@ function openRelationsDialog(item, cards, deck) {
   return dialog;
 }
 
+function uniqueById(items = []) {
+  const values = new Map();
+  for (const item of items) {
+    if (item?.id !== undefined && item?.id !== null) values.set(Number(item.id), item);
+  }
+  return [...values.values()];
+}
+
+function groupDeckCardsForDisplay(cards) {
+  const displayRows = [];
+  const basicLandGroups = new Map();
+
+  for (const item of cards) {
+    if (!isBasicLand(item.card)) {
+      displayRows.push({ ...item, displayMembers: [item], groupedBasicLand: false });
+      continue;
+    }
+
+    const key = `${item.role}\u0000${String(item.card.name || '').toLocaleLowerCase('en')}`;
+    let group = basicLandGroups.get(key);
+    if (!group) {
+      group = {
+        ...item,
+        quantity: 0,
+        tags: [],
+        relations: [],
+        note: '',
+        displayMembers: [],
+        groupedBasicLand: true,
+        coverage: {
+          physicallyOwned: 0,
+          assumedBasicLand: 0,
+          assumedAvailable: true,
+          directlyOwned: 0,
+          missingFromCollection: 0,
+          globalShortage: 0,
+          wantedGap: 0,
+          sharedConflict: false,
+          onWanted: false
+        }
+      };
+      basicLandGroups.set(key, group);
+      displayRows.push(group);
+    }
+
+    group.quantity += Number(item.quantity || 0);
+    group.displayMembers.push(item);
+    group.tags = [...new Set([...group.tags, ...(item.tags || [])])].sort((left, right) => left.localeCompare(right, 'nl'));
+    group.relations = uniqueById([...group.relations, ...(item.relations || [])]);
+    group.coverage.physicallyOwned += Number(item.coverage?.physicallyOwned || 0);
+    group.coverage.assumedBasicLand += Number(item.coverage?.assumedBasicLand || 0);
+    group.coverage.directlyOwned += Number(item.coverage?.directlyOwned || 0);
+  }
+
+  for (const group of basicLandGroups.values()) {
+    const notes = [...new Set(group.displayMembers.map((member) => String(member.note || '').trim()).filter(Boolean))];
+    group.note = notes.length === 1 ? notes[0] : notes.length > 1 ? `${notes.length} afzonderlijke notities bij de printings` : '';
+  }
+
+  return displayRows;
+}
+
+function deckCardQuantity(cards, role = 'all') {
+  return cards.reduce((total, item) => total + (role === 'all' || item.role === role ? Number(item.quantity || 0) : 0), 0);
+}
+
+function openDeckCardEditor(item, deck) {
+  return openDialog({
+    title: `${item.card.name} in deck`,
+    submitLabel: 'Opslaan',
+    content: `<div class="form-grid"><div class="field"><label>Aantal</label><input name="quantity" type="number" min="1" value="${item.quantity}"></div><div class="field"><label>Rol</label><select name="role">${roleOptions(item.role)}</select></div><div class="field full"><label>Functionele tags</label><input name="tags" value="${escapeHtml(item.tags.join(', '))}" placeholder="Ramp, Draw, Protection"></div><div class="field full"><label>Notitie</label><textarea name="note">${escapeHtml(item.note)}</textarea></div></div>`,
+    onSubmit: async (data) => {
+      await api(`/decks/${deck.id}/cards/${item.id}`, {
+        method: 'PATCH',
+        body: {
+          quantity: Number(formValue(data, 'quantity', '1')),
+          role: formValue(data, 'role'),
+          tags: parseTags(formValue(data, 'tags')),
+          note: formValue(data, 'note')
+        }
+      });
+      toast(`${item.card.name} is bijgewerkt.`);
+      refreshDeckView();
+      return true;
+    }
+  });
+}
+
+async function removeDeckCardItem(item, deck) {
+  const confirmed = await confirmDialog({
+    title: 'Kaart uit deck verwijderen',
+    message: `Verwijder ${item.card.name} (${item.card.setCode.toUpperCase()} #${item.card.collectorNumber}) uit ${deck.name}?`
+  });
+  if (!confirmed) return false;
+  await api(`/decks/${deck.id}/cards/${item.id}`, { method: 'DELETE' });
+  toast(`${item.card.name} is uit het deck verwijderd.`);
+  refreshDeckView();
+  return true;
+}
+
+function openBasicLandPrintingsDialog(group, cards, deck) {
+  const members = group.displayMembers || [];
+  const dialog = openDialog({
+    title: `${group.quantity}× ${group.card.name}`,
+    wide: true,
+    cancelLabel: 'Sluiten',
+    content: `<div class="basic-land-printing-list">${members.map((member) => `
+      <article class="basic-land-printing-row">
+        <a data-card-detail-link href="#/cards/${member.card.id}">${cardImage(member.card, { className: 'group-card-thumb' })}</a>
+        <div>
+          <a data-card-detail-link href="#/cards/${member.card.id}"><strong>${member.quantity}× ${escapeHtml(member.card.name)}</strong></a>
+          <small>${escapeHtml(member.card.setName)} (${escapeHtml(member.card.setCode.toUpperCase())}) #${escapeHtml(member.card.collectorNumber)}${member.card.language ? ` · ${escapeHtml(member.card.language.toUpperCase())}` : ''}</small>
+          ${member.note ? `<small>${escapeHtml(member.note)}</small>` : ''}
+        </div>
+        <div class="basic-land-printing-actions">
+          <button type="button" class="button secondary small manage-basic-land-relations" data-id="${member.id}" data-write-action>Combo’s/synergieën</button>
+          <button type="button" class="button secondary small edit-basic-land-printing" data-id="${member.id}" data-write-action>Bewerken</button>
+          <button type="button" class="button ghost small remove-basic-land-printing text-danger" data-id="${member.id}" data-write-action>Verwijderen</button>
+        </div>
+      </article>`).join('')}</div>`
+  });
+
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  dialog.querySelectorAll('[data-card-detail-link]').forEach((link) => link.addEventListener('click', () => dialog.close()));
+  dialog.querySelectorAll('.manage-basic-land-relations').forEach((button) => button.addEventListener('click', () => {
+    const member = memberById.get(Number(button.dataset.id));
+    if (!member) return;
+    dialog.close();
+    openRelationsDialog(member, cards, deck);
+  }));
+  dialog.querySelectorAll('.edit-basic-land-printing').forEach((button) => button.addEventListener('click', () => {
+    const member = memberById.get(Number(button.dataset.id));
+    if (!member) return;
+    dialog.close();
+    openDeckCardEditor(member, deck);
+  }));
+  dialog.querySelectorAll('.remove-basic-land-printing').forEach((button) => button.addEventListener('click', async () => {
+    const member = memberById.get(Number(button.dataset.id));
+    if (!member) return;
+    dialog.close();
+    await removeDeckCardItem(member, deck);
+  }));
+  return dialog;
+}
+
 function deckCardHtml(item) {
   const conflict = item.coverage.globalShortage > 0;
   const status = item.coverage.assumedAvailable
@@ -273,13 +420,18 @@ function deckCardHtml(item) {
       : conflict
         ? `<span class="badge warning">Missende kaarten ${item.coverage.globalShortage}</span>`
         : '<span class="badge free">In bezit</span>';
+  const members = item.displayMembers || [item];
   const searchText = [
     item.card.name,
     item.card.printedName,
     item.card.typeLine,
-    item.card.setName,
-    item.card.setCode,
-    ...(item.tags || []),
+    ...members.flatMap((member) => [
+      member.card.setName,
+      member.card.setCode,
+      member.card.collectorNumber,
+      member.note,
+      ...(member.tags || [])
+    ]),
     ...(item.relations || []).flatMap((group) => [
       group.name,
       group.type,
@@ -291,21 +443,27 @@ function deckCardHtml(item) {
     ? `<button class="button secondary small deck-card-to-wanted" data-write-action data-id="${item.id}">☆ ${item.coverage.wantedGap > 1 ? `${item.coverage.wantedGap} naar Wanted` : 'Naar Wanted'}</button>`
     : '';
   const cardTypes = (item.card.cardTypes || []).join('|');
-  return `<article class="card-list-item deck-card-row" data-role="${escapeHtml(item.role)}" data-types="${escapeHtml(cardTypes)}" data-search="${escapeHtml(searchText)}">
+  const groupedPrintings = item.groupedBasicLand && members.length > 1;
+  const meta = groupedPrintings
+    ? `${escapeHtml(item.card.typeLine)} · ${members.length} printings`
+    : `${escapeHtml(item.card.typeLine)} · ${escapeHtml(item.card.setCode.toUpperCase())} #${escapeHtml(item.card.collectorNumber)}`;
+  const actions = groupedPrintings
+    ? `<button class="button secondary small manage-basic-land-printings" data-id="${item.id}">Printings (${members.length})</button><button class="button secondary small edit-deck-card-insights" data-write-action data-id="${item.id}">Kenmerken</button>`
+    : `${wantedAction}<button class="button secondary small manage-deck-relations" data-write-action data-id="${item.id}">Combo’s/synergieën${item.relations?.length ? ` (${item.relations.length})` : ''}</button><button class="button secondary small edit-deck-card-insights" data-write-action data-id="${item.id}">Kenmerken</button><button class="button secondary small edit-deck-card" data-write-action data-id="${item.id}">Bewerken</button><button class="button ghost small remove-deck-card text-danger" data-write-action data-id="${item.id}" data-name="${escapeHtml(item.card.name)}">Verwijderen</button>`;
+  return `<article class="card-list-item deck-card-row" data-role="${escapeHtml(item.role)}" data-types="${escapeHtml(cardTypes)}" data-search="${escapeHtml(searchText)}" data-quantity="${item.quantity}">
     <a class="card-thumb-link" data-card-detail-link href="#/cards/${item.card.id}">${cardImage(item.card, { className: 'list-thumb' })}</a>
     <div class="card-list-content">
       <div class="card-title-row"><div><span class="role-label">${escapeHtml(ROLE_LABELS[item.role] || item.role)}</span><br><a data-card-detail-link href="#/cards/${item.card.id}"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></a></div>${manaCost(item.card.manaCost)}</div>
-      <p class="card-meta">${escapeHtml(item.card.typeLine)} · ${escapeHtml(item.card.setCode.toUpperCase())} #${escapeHtml(item.card.collectorNumber)}</p>
+      <p class="card-meta">${meta}</p>
       <div class="usage-badges compact">${status}${item.coverage.onWanted ? '<span class="badge wanted">Wanted</span>' : ''}<span class="badge neutral">Totaal bezit ${item.card.usage.owned}</span><span class="badge used">Alle decks ${item.card.usage.needed}</span></div>
       ${tagPills(item.tags)}
       ${cardInsightBadges(item.card)}
-      ${relationPills(item.relations, item.id)}
+      ${relationPills(item.relations, members.map((member) => member.id))}
       ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}
     </div>
-    <div class="card-list-actions">${wantedAction}<button class="button secondary small manage-deck-relations" data-write-action data-id="${item.id}">Combo’s/synergieën${item.relations?.length ? ` (${item.relations.length})` : ''}</button><button class="button secondary small edit-deck-card-insights" data-write-action data-id="${item.id}">Kenmerken</button><button class="button secondary small edit-deck-card" data-write-action data-id="${item.id}">Bewerken</button><button class="button ghost small remove-deck-card text-danger" data-write-action data-id="${item.id}" data-name="${escapeHtml(item.card.name)}">Verwijderen</button></div>
+    <div class="card-list-actions">${actions}</div>
   </article>`;
 }
-
 
 export async function renderDeckDetail(context) {
   const deckId = Number(context.params.id);
@@ -321,14 +479,17 @@ export async function renderDeckDetail(context) {
   const second = deck.secondCommander;
   const groupsById = new Map();
   cards.flatMap((item) => item.relations || []).forEach((group) => groupsById.set(group.id, group));
+  const displayCards = groupDeckCardsForDisplay(cards);
+  const displayCardByLeadId = new Map(displayCards.map((item) => [item.id, item]));
+  const totalCardCount = deckCardQuantity(cards);
   const deckCardTypes = sortCardTypes(new Set(cards.flatMap((item) => item.card.cardTypes || [])));
   const selectedType = deckCardTypes.includes(initialType) ? initialType : '';
   const filterPanelKey = `deck-${deck.id}`;
   const filterPanelExpanded = filtersExpanded(filterPanelKey);
   const activeFilterCount = Number(Boolean(initialSearch)) + Number(initialRole !== 'all') + Number(Boolean(selectedType));
 
-  const cardList = cards.length
-    ? `<div id="deck-card-list" class="card-list">${cards.map(deckCardHtml).join('')}</div>`
+  const cardList = displayCards.length
+    ? `<div id="deck-card-list" class="card-list">${displayCards.map(deckCardHtml).join('')}</div>`
     : emptyState('Nog geen kaarten in dit deck', 'Voeg een commander of eerste kaart toe.', '<button id="empty-add-card" class="button primary" data-write-action>Kaart zoeken</button>');
 
   const commanderStrip = commander ? `<section class="commander-strip">
@@ -352,7 +513,7 @@ export async function renderDeckDetail(context) {
         <div class="panel-body">
           <div class="deck-filter-heading">
             ${filterToggleHtml({ id: 'deck-filter-toggle', panelId: 'deck-filters-panel', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
-            <span id="deck-filter-summary" class="muted">${cards.length} kaartregels zichtbaar</span>
+            <span id="deck-filter-summary" class="muted">${totalCardCount} kaarten zichtbaar</span>
           </div>
           <div id="deck-filters-panel" class="deck-filters-panel collapsible-filters" ${filterPanelExpanded ? '' : 'hidden'}>
             <div class="deck-list-toolbar">
@@ -361,7 +522,7 @@ export async function renderDeckDetail(context) {
                 <div class="field deck-list-type"><label for="deck-card-type">Kaarttype</label><select id="deck-card-type">${cardTypeOptions(deckCardTypes, selectedType)}</select></div>
               </div>
             </div>
-            <div class="section-tabs" id="deck-tabs"><button class="${initialRole === 'all' ? 'active' : ''}" data-filter="all">Alles (${cards.length})</button>${Object.entries(ROLE_LABELS).map(([role,label]) => `<button class="${initialRole === role ? 'active' : ''}" data-filter="${role}">${escapeHtml(label)} (${cards.filter((item) => item.role === role).length})</button>`).join('')}</div>
+            <div class="section-tabs" id="deck-tabs"><button class="${initialRole === 'all' ? 'active' : ''}" data-filter="all">Alles (${totalCardCount})</button>${Object.entries(ROLE_LABELS).map(([role,label]) => `<button class="${initialRole === role ? 'active' : ''}" data-filter="${role}">${escapeHtml(label)} (${deckCardQuantity(cards, role)})</button>`).join('')}</div>
           </div>
           ${cardList}
           <div id="deck-filter-empty" class="filter-empty" hidden>Geen kaarten voldoen aan deze zoekopdracht en selectie.</div>
@@ -422,15 +583,12 @@ export async function renderDeckDetail(context) {
 
       document.querySelectorAll('.edit-deck-card').forEach((button) => button.addEventListener('click', () => {
         const item = cards.find((row) => row.id === Number(button.dataset.id));
-        if (!item) return;
-        openDialog({
-          title: `${item.card.name} in deck`, submitLabel: 'Opslaan',
-          content: `<div class="form-grid"><div class="field"><label>Aantal</label><input name="quantity" type="number" min="1" value="${item.quantity}"></div><div class="field"><label>Rol</label><select name="role">${roleOptions(item.role)}</select></div><div class="field full"><label>Functionele tags</label><input name="tags" value="${escapeHtml(item.tags.join(', '))}" placeholder="Ramp, Draw, Protection"></div><div class="field full"><label>Notitie</label><textarea name="note">${escapeHtml(item.note)}</textarea></div></div>`,
-          onSubmit: async (data) => {
-            await api(`/decks/${deck.id}/cards/${item.id}`, { method: 'PATCH', body: { quantity: Number(formValue(data,'quantity','1')), role: formValue(data,'role'), tags: parseTags(formValue(data,'tags')), note: formValue(data,'note') } });
-            toast(`${item.card.name} is bijgewerkt.`); refreshDeckView(); return true;
-          }
-        });
+        if (item) openDeckCardEditor(item, deck);
+      }));
+
+      document.querySelectorAll('.manage-basic-land-printings').forEach((button) => button.addEventListener('click', () => {
+        const group = displayCardByLeadId.get(Number(button.dataset.id));
+        if (group) openBasicLandPrintingsDialog(group, cards, deck);
       }));
 
       document.querySelectorAll('.manage-deck-relations').forEach((button) => button.addEventListener('click', () => {
@@ -444,10 +602,8 @@ export async function renderDeckDetail(context) {
       }));
 
       document.querySelectorAll('.remove-deck-card').forEach((button) => button.addEventListener('click', async () => {
-        const confirmed = await confirmDialog({ title: 'Kaart uit deck verwijderen', message: `Verwijder ${button.dataset.name} uit ${deck.name}?` });
-        if (!confirmed) return;
-        await api(`/decks/${deck.id}/cards/${button.dataset.id}`, { method: 'DELETE' });
-        toast(`${button.dataset.name} is uit het deck verwijderd.`); refreshDeckView();
+        const item = cards.find((row) => row.id === Number(button.dataset.id));
+        if (item) await removeDeckCardItem(item, deck);
       }));
 
       let activeDeckFilter = initialRole;
@@ -482,12 +638,12 @@ export async function renderDeckDetail(context) {
           const typeMatch = !selectedCardType || types.includes(selectedCardType);
           const searchMatch = !query || String(row.dataset.search || '').includes(query);
           row.hidden = !(roleMatch && typeMatch && searchMatch);
-          if (!row.hidden) visible += 1;
+          if (!row.hidden) visible += Number(row.dataset.quantity || 0);
         });
         const summary = document.getElementById('deck-filter-summary');
-        if (summary) summary.textContent = `${visible} van ${cards.length} kaartregels zichtbaar`;
+        if (summary) summary.textContent = `${visible} van ${totalCardCount} kaarten zichtbaar`;
         const empty = document.getElementById('deck-filter-empty');
-        if (empty) empty.hidden = visible > 0 || cards.length === 0;
+        if (empty) empty.hidden = visible > 0 || totalCardCount === 0;
       };
       const applyAndRememberDeckFilters = () => {
         applyDeckListFilters();
