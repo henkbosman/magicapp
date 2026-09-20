@@ -164,6 +164,35 @@ class ScryfallService {
     );
   }
 
+  cardsBySetAndLanguage(setCode, language) {
+    const normalizedSet = String(setCode || '').toLowerCase();
+    const normalizedLanguage = String(language || 'en').toLowerCase();
+    const cacheKey = `set-language:v1:${normalizedSet}:${normalizedLanguage}`;
+    return this.cached(cacheKey, config.scryfallCardCacheTtlMs, async () => {
+      const params = new URLSearchParams({
+        q: `set:${normalizedSet} lang:${normalizedLanguage} game:paper`,
+        unique: 'prints',
+        order: 'set',
+        include_extras: 'true',
+        include_multilingual: 'true'
+      });
+      let url = `${API_BASE}/cards/search?${params}`;
+      const cards = [];
+      while (url) {
+        let result;
+        try {
+          result = await this.request(url);
+        } catch (error) {
+          if (error?.status === 404) return [];
+          throw error;
+        }
+        cards.push(...(result.data || []));
+        url = result.has_more ? result.next_page : null;
+      }
+      return cards;
+    });
+  }
+
   async getCollection(identifiers) {
     const results = [];
     const notFound = [];

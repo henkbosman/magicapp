@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.5.0
+# Magic Collection Manager 2.6.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.5.0** groepeert basic lands en gelijke printings logisch in deckoverzichten, exports en mana-statistieken. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.6.0** voegt een gecontroleerde, atomaire kaartenlijstimport toe en toont mana- en tapsymbolen ook in kaartteksten als iconen. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -17,7 +17,7 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.5.0** groepeert basi
 - Wanted-list met prioriteit, rarity, mogelijke printings, gekozen printing, prijsinformatie en deckfilter.
 - Basic lands worden niet als ontbrekend beschouwd en komen niet op Wanted.
 - Handmatig corrigeerbare kaartkenmerken voor mana-productie en library-searchfuncties.
-- CSV-export voor de collectie en tekstimport/-export voor decks.
+- CSV-export voor de collectie, gecontroleerde tekstimport voor meerdere fysieke kaarten en tekstimport/-export voor decks.
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
@@ -97,7 +97,10 @@ SCRYFALL_PRINTINGS_CACHE_TTL_HOURS=12
 SCRYFALL_PRINTING_CATALOG_TTL_HOURS=168
 SCRYFALL_CARD_CACHE_TTL_HOURS=168
 CACHE_IMAGES=true
+PUBLIC_ORIGIN=
 ```
+
+Vul `PUBLIC_ORIGIN` in met de volledige oorsprong (bijvoorbeeld `https://cards.example.nl`) wanneer je de app via een domeinnaam of reverse proxy opent. Zonder deze instelling zijn browser-schrijfacties alleen toegestaan via localhost, lokale hostnamen en private LAN-adressen; dit beperkt DNS-rebinding. Een ongeldige waarde stopt de server met een duidelijke configuratiefout. API-clients zonder `Origin`-header blijven bruikbaar.
 
 Ongeldige numerieke waarden voor poort, time-out of request delay vallen veilig terug op de standaardwaarde.
 

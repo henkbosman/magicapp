@@ -229,7 +229,7 @@ function openRelationsDialog(item, cards, deck) {
               <button type="button" class="button ghost small delete-deck-group text-danger" data-group-id="${group.id}" data-write-action>Verwijderen</button>
             </div>
           </article>`).join('')}</div>` : '<p class="muted">Deze kaart hoort nog niet bij een combo of synergie.</p>'}
-        <button type="button" class="button primary create-deck-group" data-write-action ${cards.length < 2 ? 'disabled title="Voeg eerst nog een kaart aan het deck toe"' : ''}>＋ Nieuwe combo of synergie</button>
+        <button type="button" class="button primary create-deck-group" data-write-action ${cards.length < 2 ? 'disabled title="Voeg eerst nog een kaart aan het deck toe"' : ''}><span class="icon-plus" aria-hidden="true"></span> Nieuwe combo of synergie</button>
       </section>`
   });
 
@@ -504,7 +504,7 @@ export async function renderDeckDetail(context) {
         eyebrow: deck.format,
         title: deck.name,
         description: deck.description || '',
-        actions: `<a id="deck-simulator-link" class="button secondary" href="#/decks/${deck.id}/simulate">Simulator</a><a id="deck-statistics-link" class="button secondary" href="#/decks/${deck.id}/stats">Statistieken</a><button id="add-deck-card" class="button primary" data-write-action>＋ Kaart toevoegen</button><button id="edit-deck" class="button secondary" data-write-action>Bewerken</button><button id="more-deck" class="button secondary" data-write-action>Importeren</button>`
+        actions: `<a id="deck-simulator-link" class="button secondary" href="#/decks/${deck.id}/simulate">Simulator</a><a id="deck-statistics-link" class="button secondary" href="#/decks/${deck.id}/stats">Statistieken</a><button id="add-deck-card" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</button><button id="edit-deck" class="button secondary" data-write-action>Bewerken</button><button id="more-deck" class="button secondary" data-write-action>Importeren</button>`
       })}
       ${commanderStrip}
 

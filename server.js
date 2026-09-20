@@ -3,6 +3,7 @@ import express from 'express';
 import { config } from './src/config.js';
 import { closeDatabase } from './src/db/database.js';
 import { HttpError } from './src/lib/http-error.js';
+import { isCrossOriginBrowserRequest } from './src/lib/request-security.js';
 import { cardsReadRouter, cardsWriteRouter } from './src/routes/cards.js';
 import { collectionReadRouter, collectionWriteRouter } from './src/routes/collection.js';
 import { dashboardReadRouter } from './src/routes/dashboard.js';
@@ -41,6 +42,18 @@ readApi.use('/wanted', wantedReadRouter);
 readApi.use('/maintenance', maintenanceReadRouter);
 
 const writeApi = express.Router();
+writeApi.use((req, res, next) => {
+  const crossOrigin = isCrossOriginBrowserRequest({
+    origin: req.get('origin'),
+    host: req.get('host'),
+    fetchSite: req.get('sec-fetch-site'),
+    allowedOrigin: config.publicOrigin
+  });
+  if (crossOrigin) {
+    return res.status(403).json({ error: { message: 'Cross-origin schrijfacties zijn niet toegestaan.' } });
+  }
+  next();
+});
 writeApi.use((req, res, next) => {
   if (!['GET', 'HEAD'].includes(req.method)) return next();
   return res.status(405).json({ error: { message: 'Deze API-zone accepteert uitsluitend schrijfacties.' } });

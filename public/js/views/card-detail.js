@@ -1,15 +1,15 @@
 import { api, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
-import { cardImage, cardInsightSourceLabel, colorIdentity, librarySearchHtml, manaCost, manaProductionHtml, pageHeader, usageBadges } from '../components.js';
+import { cardImage, cardInsightSourceLabel, cardTextHtml, colorIdentity, librarySearchHtml, manaCost, manaProductionHtml, pageHeader, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { escapeHtml, formatEuro, refreshView, toast } from '../utils.js';
 import { getCardReturnLabel, returnToCardSource } from '../navigation-state.js';
 
 function faceText(card) {
   if (card.cardFaces?.length) {
-    return card.cardFaces.map((face) => `<div class="face-block"><h3>${escapeHtml(face.name || card.name)} ${manaCost(face.mana_cost || '')}</h3><p class="card-meta">${escapeHtml(face.type_line || '')}</p><div class="oracle-text">${escapeHtml(face.oracle_text || face.printed_text || '')}</div>${face.power !== undefined && face.power !== null ? `<p><strong>${escapeHtml(face.power)} / ${escapeHtml(face.toughness)}</strong></p>` : ''}</div>`).join('');
+    return card.cardFaces.map((face) => `<div class="face-block"><h3>${escapeHtml(face.name || card.name)} ${manaCost(face.mana_cost || '')}</h3><p class="card-meta">${escapeHtml(face.type_line || '')}</p><div class="oracle-text">${cardTextHtml(face.oracle_text || face.printed_text || '')}</div>${face.power !== undefined && face.power !== null ? `<p><strong>${escapeHtml(face.power)} / ${escapeHtml(face.toughness)}</strong></p>` : ''}</div>`).join('');
   }
-  return `<div class="oracle-text">${escapeHtml(card.oracleText || 'Geen Oracle text beschikbaar.')}</div>${card.power !== null ? `<p><strong>${escapeHtml(card.power)} / ${escapeHtml(card.toughness)}</strong></p>` : ''}`;
+  return `<div class="oracle-text">${cardTextHtml(card.oracleText || 'Geen kaarttekst beschikbaar.')}</div>${card.power !== null ? `<p><strong>${escapeHtml(card.power)} / ${escapeHtml(card.toughness)}</strong></p>` : ''}`;
 }
 
 function legalityGrid(card) {

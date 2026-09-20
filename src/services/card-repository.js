@@ -140,15 +140,31 @@ export function getCardByScryfallId(scryfallId) {
 export function findCardByName(name, setCode = '') {
   const search = normalizeSearchText(name);
   const row = setCode
-    ? db.prepare('SELECT * FROM cards WHERE search_name = ? AND set_code = ? ORDER BY released_at DESC LIMIT 1').get(search, setCode.toLowerCase())
-    : db.prepare('SELECT * FROM cards WHERE name = ? COLLATE NOCASE ORDER BY released_at DESC LIMIT 1').get(name);
+    ? db.prepare(`
+      SELECT * FROM cards
+      WHERE search_name = ? AND set_code = ? AND language = 'en'
+        AND (
+          NOT EXISTS (SELECT 1 FROM json_each(cards.raw_json, '$.games'))
+          OR EXISTS (SELECT 1 FROM json_each(cards.raw_json, '$.games') WHERE value = 'paper')
+        )
+      ORDER BY released_at DESC LIMIT 1
+    `).get(search, setCode.toLowerCase())
+    : db.prepare(`
+      SELECT * FROM cards
+      WHERE name = ? COLLATE NOCASE AND language = 'en'
+        AND (
+          NOT EXISTS (SELECT 1 FROM json_each(cards.raw_json, '$.games'))
+          OR EXISTS (SELECT 1 FROM json_each(cards.raw_json, '$.games') WHERE value = 'paper')
+        )
+      ORDER BY released_at DESC LIMIT 1
+    `).get(name);
   return enrichCardWithInsights(cardRowToApi(row));
 }
 
 export function findCardByCollector(setCode, collectorNumber, language = '') {
   const row = language
-    ? db.prepare('SELECT * FROM cards WHERE set_code = ? AND collector_number = ? AND language = ? LIMIT 1').get(String(setCode).toLowerCase(), String(collectorNumber), language)
-    : db.prepare("SELECT * FROM cards WHERE set_code = ? AND collector_number = ? ORDER BY CASE WHEN language = 'en' THEN 0 ELSE 1 END LIMIT 1").get(String(setCode).toLowerCase(), String(collectorNumber));
+    ? db.prepare('SELECT * FROM cards WHERE set_code = ? AND collector_number = ? COLLATE NOCASE AND language = ? LIMIT 1').get(String(setCode).toLowerCase(), String(collectorNumber), language)
+    : db.prepare("SELECT * FROM cards WHERE set_code = ? AND collector_number = ? COLLATE NOCASE ORDER BY CASE WHEN language = 'en' THEN 0 ELSE 1 END LIMIT 1").get(String(setCode).toLowerCase(), String(collectorNumber));
   return enrichCardWithInsights(cardRowToApi(row));
 }
 
@@ -610,4 +626,3 @@ export function deleteCollectionItem(id) {
   db.prepare('DELETE FROM collection_items WHERE id = ?').run(id);
   return existing;
 }
-

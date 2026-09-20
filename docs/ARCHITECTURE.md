@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.5.0
+# Architectuur - Magic Collection Manager 2.6.0
 
 ## Overzicht
 
@@ -52,7 +52,7 @@ Joined queries aliasen de database-ID van `cards` expliciet als `card_record_id`
 
 ## Routes en services
 
-`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`. `POST /api/write/collection/with-deck` is het expliciete endpoint voor een gecombineerde collectie- en decktoevoeging binnen één buitenste SQLite-transactie. `POST /api/write/collection` ondersteunt voor API-compatibiliteit dezelfde bewerking wanneer `deckId` aanwezig is. De bestaande collectie- en deckservices nemen via savepoints veilig aan die transactie deel.
+`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`. `POST /api/write/collection/with-deck` is het expliciete endpoint voor een gecombineerde collectie- en decktoevoeging binnen één buitenste SQLite-transactie. `POST /api/write/collection` ondersteunt voor API-compatibiliteit dezelfde bewerking wanneer `deckId` aanwezig is. De collectie-import resolveert en valideert alle regels vóór de synchrone SQLite-transactie; hierdoor wordt een lijst volledig of helemaal niet toegevoegd. De bestaande collectie- en deckservices nemen via savepoints veilig aan buitenste transacties deel.
 
 Belangrijke services:
 
@@ -68,7 +68,7 @@ Belangrijke services:
 - `wanted-service.js`: wanted CRUD en deckrelaties;
 - `printing-catalog-service.js`: mogelijke printings/rarities per Oracle-kaart;
 - `card-insight-service.js`: afgeleide en handmatig corrigeerbare mana-/zoekkenmerken;
-- `import-export-service.js`: collectie-export en deckimport/-export.
+- `import-export-service.js`: collectie-export, gecontroleerde collectie-import en deckimport/-export.
 
 ## API-zones
 
@@ -86,7 +86,7 @@ Express mount drie API-zones:
 
 De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart toevoegen, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
 
-Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. Na een geslaagde toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
+Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
 
 ## Caching
 
@@ -128,6 +128,7 @@ Ieder endpoint gebruikt dezelfde compacte volgorde: URL, korte uitleg, input-JSO
 - API-errors gebruiken consistente JSON-foutresponses.
 - Onverwachte serverfouten worden gelogd zonder interne details naar de browser te sturen.
 - CSP beperkt scripts/styles tot de eigen origin; afbeeldingen mogen daarnaast van Scryfall worden geladen.
+- De write-API weigert browserrequests uit een andere site. Zonder configuratie accepteert de browser-writezone alleen localhost, lokale hostnamen en private LAN-adressen om DNS-rebinding te beperken. Voor domeinnamen of een reverse proxy moet `PUBLIC_ORIGIN` als gezaghebbende volledige oorsprong worden ingesteld; niet-browserclients zonder Origin-header blijven bruikbaar.
 - De afbeeldingsproxy accepteert alleen gevalideerde Scryfall HTTPS-hosts.
 - SQLite foreign keys bewaken relaties en cascades.
 - Reverse-proxyfiltering kan de schrijfzone tot het LAN beperken.

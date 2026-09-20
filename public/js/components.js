@@ -23,7 +23,7 @@ const SEARCH_TARGET_LABELS = {
 };
 
 function manaClass(part) {
-  return ['W', 'U', 'B', 'R', 'G', 'C', 'S', 'P', 'M'].includes(part) ? part : 'generic';
+  return ['W', 'U', 'B', 'R', 'G', 'C', 'S', 'P', 'M', 'T'].includes(part) ? part : 'generic';
 }
 
 function manaGlyph(part) {
@@ -37,11 +37,11 @@ function manaGlyph(part) {
     C: '<path d="M12 2.8 21.2 12 12 21.2 2.8 12Zm0 4.1L6.9 12l5.1 5.1 5.1-5.1Z" fill-rule="evenodd"/>',
     S: '<path d="M12 2.5v19M3.8 7.2l16.4 9.6M3.8 16.8l16.4-9.6M9.8 4.8 12 7l2.2-2.2M9.8 19.2 12 17l2.2 2.2M4.8 9.8 7.6 9l-.7-2.8M19.2 14.2l-2.8.8.7 2.8M4.8 14.2l2.8.8-.7 2.8M19.2 9.8 16.4 9l.7-2.8" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/>',
     P: '<circle cx="12" cy="12" r="7.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.3v17.4M8.2 8.2h5.2a3.6 3.6 0 0 1 0 7.2H9.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
-    M: '<path d="m12 3 2.2 5.6 6 .4-4.6 3.8 1.5 5.9-5.1-3.2-5.1 3.2 1.5-5.9L3.8 9l6-.4Z"/>'
+    M: '<path d="m12 3 2.2 5.6 6 .4-4.6 3.8 1.5 5.9-5.1-3.2-5.1 3.2 1.5-5.9L3.8 9l6-.4Z"/>',
+    T: '<path d="M5.2 14.4a7.2 7.2 0 1 0 1.4-7.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M3.8 7.8 7 5.7l1.1 3.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
   };
   if (paths[value]) return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[value]}</svg>`;
-  const shown = value === 'T' ? '↷' : value;
-  return `<span class="mana-symbol-text">${escapeHtml(shown)}</span>`;
+  return `<span class="mana-symbol-text ${value.length > 3 ? 'compact' : ''}">${escapeHtml(value)}</span>`;
 }
 
 function manaName(value) {
@@ -49,6 +49,13 @@ function manaName(value) {
   if (COLOR_LABELS[token]) return `${COLOR_LABELS[token]} mana`;
   if (token === 'S') return 'Sneeuwmana';
   if (token === 'P') return 'Phyrexian mana';
+  if (token === 'T') return 'Tappen';
+  if (token === 'Q') return 'Onttappen';
+  if (token === 'E') return 'Energie';
+  if (token === 'PW') return 'Planeswalker';
+  if (token === 'CHAOS') return 'Chaos';
+  if (token === 'A') return 'Acorn';
+  if (token === 'TK') return 'Ticket';
   if (/^\d+$/.test(token)) return `${token} generieke mana`;
   if (token === 'X' || token === 'Y' || token === 'Z') return `${token} variabele mana`;
   return token;
@@ -58,10 +65,44 @@ export function manaSymbol(value, { label = '' } = {}) {
   const token = String(value || '').replace(/^\{?|\}?$/g, '').toUpperCase();
   const ariaLabel = label || (token.includes('/') ? token.split('/').map(manaName).join(' of ') : manaName(token));
   if (token.includes('/')) {
-    const parts = token.split('/').slice(0, 2);
+    const parts = token.split('/').filter(Boolean);
+    if (parts.length !== 2) {
+      return `<span class="mana-symbol mana-bg-generic" role="img" aria-label="${escapeHtml(ariaLabel)}"><span aria-hidden="true">${manaGlyph(token)}</span></span>`;
+    }
     return `<span class="mana-symbol mana-hybrid" role="img" aria-label="${escapeHtml(ariaLabel)}">${parts.map((part, index) => `<span class="mana-symbol-part mana-bg-${manaClass(part)} ${index === 0 ? 'left' : 'right'}" aria-hidden="true">${manaGlyph(part)}</span>`).join('')}</span>`;
   }
   return `<span class="mana-symbol mana-bg-${manaClass(token)}" role="img" aria-label="${escapeHtml(ariaLabel)}"><span aria-hidden="true">${manaGlyph(token)}</span></span>`;
+}
+
+const CARD_TEXT_SYMBOLS = new Set([
+  'W', 'U', 'B', 'R', 'G', 'C', 'S', 'P', 'T', 'Q', 'E', 'X', 'Y', 'Z',
+  'PW', 'CHAOS', 'A', 'TK', 'HW', 'HR', '½', '∞'
+]);
+
+function isKnownCardTextSymbol(value) {
+  const token = String(value || '').toUpperCase();
+  if (CARD_TEXT_SYMBOLS.has(token) || /^\d{1,7}$/.test(token)) return true;
+  const parts = token.split('/');
+  if (parts.length === 2) {
+    return parts.every((part) => CARD_TEXT_SYMBOLS.has(part) || /^\d{1,7}$/.test(part));
+  }
+  return parts.length === 3
+    && parts[2] === 'P'
+    && parts.slice(0, 2).every((part) => ['W', 'U', 'B', 'R', 'G'].includes(part));
+}
+
+export function cardTextHtml(value) {
+  const text = String(value ?? '');
+  const symbolPattern = /\{([^{}\r\n]+)\}/g;
+  let html = '';
+  let cursor = 0;
+  for (const match of text.matchAll(symbolPattern)) {
+    html += escapeHtml(text.slice(cursor, match.index));
+    const token = match[1].trim();
+    html += isKnownCardTextSymbol(token) ? manaSymbol(token) : escapeHtml(match[0]);
+    cursor = Number(match.index) + match[0].length;
+  }
+  return html + escapeHtml(text.slice(cursor));
 }
 
 export function manaLabel(value, label = '') {

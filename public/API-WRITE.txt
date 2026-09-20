@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.5.0
+MAGIC COLLECTION MANAGER WRITE API 2.6.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.5.0"}
+{"status":"ok","writeAvailable":true,"version":"2.6.0"}
 
 POST /api/write/cards/cache
 
@@ -139,6 +139,59 @@ Met deckId:
   "data": {
     "collectionItem": {"id":55,"quantity":1,"card":{"id":123,"name":"Eternal Witness"}},
     "deckCard": {"id":81,"quantity":1,"role":"main","tags":["Ramp"],"card":{"id":123,"name":"Eternal Witness"}}
+  }
+}
+
+POST /api/write/collection/import/preview
+
+Controleert een kaartenlijst en toont de fysieke printings die zouden worden gebruikt, zonder collectieregels toe te voegen. Ondersteunt onder meer 1 Card Name, 1x Card Name, 1 Card Name (SET) 123, koppen zoals Commander, Main, Main Deck en Deck, *F* als foilmarkering en *E* als etched-markering. Setcode, kaartnummer, kaartnaam en taal moeten bij dezelfde paper-printing horen; officiële alternatieve namen zoals Godzilla-printings worden ook herkend. Regels zonder set en kaartnummer gebruiken een automatisch gekozen printing en krijgen inferredPrinting=true; voor een niet-Engelse taal zijn setcode en kaartnummer verplicht. Gebruik expliciet 1x bij een kaartnaam die met een getal begint wanneer die regel anders dubbelzinnig kan zijn.
+
+INPUT JSON
+
+{
+  "text": "Commander\n1 Sol Ring (CMM) 396\n\nDeck\n10 Forest (CMM) 450\n1 Command Tower (CMM) 995 *F*",
+  "finish": "nonfoil",
+  "language": "en",
+  "condition": "near_mint",
+  "location": "Precon-doos",
+  "notes": "Complete listing",
+  "reconcileWanted": true
+}
+
+OUTPUT JSON
+
+{
+  "data": {
+    "canImport": true,
+    "previewToken": "64-tekens-sha256-token",
+    "items": [
+      {"line":2,"cardId":123,"name":"Sol Ring","setCode":"cmm","collectorNumber":"396","quantity":1,"finish":"nonfoil","language":"en","inferredPrinting":false,"warning":""}
+    ],
+    "failures": [],
+    "summary": {"rows":3,"resolvedRows":3,"quantity":12,"failureCount":0,"inferredPrintings":0}
+  }
+}
+
+POST /api/write/collection/import
+
+Voegt dezelfde volledig geldige kaartenlijst atomair toe. Stuur de previewToken uit de direct voorafgaande controle mee. Bij één parse-, kaart- of afwerkingsfout wordt niets aan de collectie toegevoegd en volgt status 422 met de preview en fouten onder error.details. Als de opgeloste printings na de controle zijn gewijzigd, volgt status 409 met een nieuwe preview onder error.details.
+
+INPUT JSON
+
+Gebruik dezelfde invoer als bij /api/write/collection/import/preview en voeg toe:
+
+{"previewToken":"64-tekens-sha256-token"}
+
+OUTPUT JSON
+
+{
+  "data": {
+    "importedCount": 3,
+    "importedQuantity": 12,
+    "imported": [
+      {"id":55,"cardId":123,"name":"Sol Ring","setCode":"cmm","collectorNumber":"396","quantity":1,"finish":"nonfoil","sourceLines":[2]}
+    ],
+    "summary": {"rows":3,"resolvedRows":3,"quantity":12,"failureCount":0,"inferredPrintings":0,"importedRows":3,"importedQuantity":12,"collectionItems":3}
   }
 }
 

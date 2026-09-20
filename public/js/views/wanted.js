@@ -277,7 +277,7 @@ export async function renderWanted(context) {
         eyebrow: 'Aanschaflijst',
         title: 'Wanted',
         description: 'Filter per deck of doorzoek de series waarin je wanted-kaarten zijn verschenen.',
-        actions: `<button id="add-wanted" class="button primary" data-write-action>＋ Kaart toevoegen</button><a class="button secondary" href="${apiPath('/wanted/export.csv')}">CSV exporteren</a>`
+        actions: `<button id="add-wanted" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</button><a class="button secondary" href="${apiPath('/wanted/export.csv')}">CSV exporteren</a>`
       })}
       ${filterToggleHtml({ id: 'wanted-filter-toggle', panelId: 'wanted-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount, resetId: 'wanted-filter-reset' })}
       <form id="wanted-filters" class="filters compact-filters wanted-filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>

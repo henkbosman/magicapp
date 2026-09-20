@@ -39,7 +39,7 @@ export async function renderDashboard() {
         </div>
         <div>
           ${sectionCard('Snelle acties', `<div class="quick-actions">
-            <a class="quick-action" data-write-action href="#/add"><span>＋</span><div>Kaart registreren<small>Zoek printing en voeg toe</small></div></a>
+            <a class="quick-action" data-write-action href="#/add"><span class="icon-plus" aria-hidden="true"></span><div>Kaart registreren<small>Zoek printing en voeg toe</small></div></a>
             <a class="quick-action" href="#/decks"><span>▤</span><div>Deck beheren<small>Bouw ook met ontbrekende kaarten</small></div></a>
             <a class="quick-action" href="#/wanted"><span>☆</span><div>Wanted bekijken<small>Filter op deck en prioriteit</small></div></a>
           </div>`)}

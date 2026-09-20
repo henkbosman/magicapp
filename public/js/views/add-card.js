@@ -3,6 +3,7 @@ import { addCardToWanted } from '../card-actions.js';
 import { isBasicLand } from '../card-rules.js';
 import { cachedCardImageUrl, cardImage, manaCost, pageHeader, usageBadges } from '../components.js';
 import {
+  allLanguageOptions,
   defaultLanguage,
   finishOptions,
   languageOptions,
@@ -107,6 +108,68 @@ function uniqueCollectorNumbers(printings) {
     .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
+function collectionImportFormHtml() {
+  return `<div id="collection-import-input">
+    <p class="form-note">Plak één kaart per regel. Gebruik voor de juiste fysieke printing bij voorkeur <strong>1 Sol Ring (CMM) 396</strong>. Regels zonder set en kaartnummer krijgen eerst een automatisch gekozen printing ter controle.</p>
+    <div class="field collection-import-text">
+      <label for="collection-import-list">Kaartenlijst</label>
+      <textarea id="collection-import-list" name="text" rows="14" required placeholder="1 Sol Ring (CMM) 396\n1 Arcane Signet (CMM) 365\n10 Forest (CMM) 450\n1 Command Tower (CMM) 995 *F*"></textarea>
+      <p class="help-text">Ondersteunt ook 1x, koppen zoals Commander, Main en Deck, *F* voor foil en *E* voor etched foil. Kies je een niet-Engelse taal, vermeld dan altijd setcode en kaartnummer.</p>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label for="collection-import-language">Taal</label><select id="collection-import-language" name="language">${allLanguageOptions('en')}</select></div>
+      <div class="field"><label for="collection-import-finish">Standaardafwerking</label><select id="collection-import-finish" name="finish">${finishOptions(['nonfoil', 'foil', 'etched'], 'nonfoil')}</select></div>
+      <div class="field"><label for="collection-import-condition">Conditie</label><select id="collection-import-condition" name="condition"><option value="near_mint">Near mint</option><option value="mint">Mint</option><option value="excellent">Excellent</option><option value="good">Good</option><option value="light_played">Light played</option><option value="played">Played</option><option value="poor">Poor</option></select></div>
+      <div class="field"><label for="collection-import-location">Locatie</label><input id="collection-import-location" name="location" maxlength="200" placeholder="Map, doos of lade"></div>
+      <div class="field full"><label for="collection-import-notes">Notitie voor alle kaarten</label><textarea id="collection-import-notes" name="notes" maxlength="5000" placeholder="Bijvoorbeeld naam of datum van de listing"></textarea></div>
+      <label class="checkbox-field full"><input name="reconcileWanted" type="checkbox" checked> Wanted-aantal automatisch verminderen</label>
+    </div>
+  </div>
+  <p id="collection-import-status" class="sr-only" role="status" aria-live="polite"></p>
+  <div id="collection-import-preview" role="region" aria-label="Importcontrole" hidden></div>`;
+}
+
+function importFailuresHtml(failures = []) {
+  if (!failures.length) return '';
+  return `<section class="import-validation-errors">
+    <h3>${failures.length} ${failures.length === 1 ? 'regel kan' : 'regels kunnen'} niet worden geïmporteerd</h3>
+    <div class="import-validation-list">${failures.map((failure) => `<div class="import-validation-item">
+      <strong>${failure.lineNumber || failure.line ? `Regel ${Number(failure.lineNumber || failure.line)}: ` : ''}${escapeHtml(failure.rawLine || failure.name || 'Onbekende regel')}</strong>
+      <span>${escapeHtml(failure.reason || failure.message || 'Kaart of printing niet gevonden.')}</span>
+    </div>`).join('')}</div>
+  </section>`;
+}
+
+function importPreviewHtml(preview, defaults = {}) {
+  const items = preview.items || [];
+  const totalQuantity = Number(preview.summary?.totalQuantity ?? items.reduce((total, item) => total + Number(item.quantity || 0), 0));
+  const inferredCount = Number(preview.summary?.inferredCount ?? items.filter((item) => item.inferredPrinting || item.inferred).length);
+  const rows = items.map((item) => {
+    const card = item.card || item;
+    const setCode = String(item.setCode || card.setCode || '').toUpperCase();
+    const collectorNumber = item.collectorNumber || card.collectorNumber || '';
+    const inferred = Boolean(item.inferredPrinting || item.inferred);
+    return `<tr>
+      <td><strong>${Number(item.quantity || 0)}×</strong></td>
+      <td>${escapeHtml(item.name || card.name || '')}${inferred ? '<small class="import-inferred">Automatisch gekozen</small>' : ''}</td>
+      <td>${escapeHtml(setCode)} #${escapeHtml(collectorNumber)}</td>
+      <td>${escapeHtml(item.finish || 'nonfoil')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="import-preview-summary">
+    <h3 class="import-preview-title" tabindex="-1">Import controleren</h3>
+    <p class="form-note"><strong>${totalQuantity} kaarten</strong> worden vanuit ${items.length} lijstregels toegevoegd of opgehoogd.</p>
+    <p class="import-preview-defaults">Taal: <strong>${escapeHtml(String(defaults.language || 'en').toUpperCase())}</strong> · Conditie: <strong>${escapeHtml(defaults.condition || 'near_mint')}</strong>${defaults.location ? ` · Locatie: <strong>${escapeHtml(defaults.location)}</strong>` : ''} · Wanted verminderen: <strong>${defaults.reconcileWanted ? 'ja' : 'nee'}</strong>${defaults.notes ? ` · Notitie: <strong>${escapeHtml(defaults.notes)}</strong>` : ''}</p>
+    ${inferredCount ? `<p class="import-warning"><strong>Controleer de automatisch gekozen printings.</strong> Voor ${inferredCount} ${inferredCount === 1 ? 'regel ontbrak' : 'regels ontbraken'} een set en kaartnummer.</p>` : ''}
+    <div class="import-preview-scroll"><table class="import-preview-table">
+      <caption class="sr-only">Gecontroleerde kaarten die worden geïmporteerd</caption>
+      <thead><tr><th>Aantal</th><th>Kaart</th><th>Printing</th><th>Afwerking</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="form-actions"><button id="collection-import-back" type="button" class="button secondary">Lijst aanpassen</button></div>
+  </div>`;
+}
+
 export async function renderAddCard(context) {
   const initialQuery = context.query.get('q') || '';
   const initialName = context.query.get('name') || '';
@@ -119,7 +182,12 @@ export async function renderAddCard(context) {
 
   return {
     html: `
-      ${pageHeader({ eyebrow: 'Snelle invoer', title: 'Kaart toevoegen', description: 'Zoek op naam, kies de juiste set en selecteer daarna taal en afwerking.' })}
+      ${pageHeader({
+        eyebrow: 'Snelle invoer',
+        title: 'Kaart toevoegen',
+        description: 'Zoek op naam, kies de juiste set en selecteer daarna taal en afwerking.',
+        actions: '<button id="import-collection-list" class="button secondary" type="button" data-write-action>Importeren</button>'
+      })}
       <section class="add-layout">
         <div>
           <div class="search-hero">
@@ -206,6 +274,120 @@ export async function renderAddCard(context) {
         if (usage) usage.innerHTML = usageBadges(selectedCard.usage);
         panel.querySelectorAll('[data-card-detail-link]').forEach((link) => {
           link.setAttribute('href', `#/cards/${Number(selectedCard.id)}`);
+        });
+      };
+
+      const openCollectionImportDialog = () => {
+        let preparedPayload = null;
+        let previewReady = false;
+        const dialog = openDialog({
+          title: 'Kaartenlijst importeren',
+          submitLabel: 'Controleren',
+          cancelLabel: 'Sluiten',
+          wide: true,
+          initialFocus: '#collection-import-list',
+          content: collectionImportFormHtml(),
+          onSubmit: async (data, dialogElement) => {
+            const input = dialogElement.querySelector('#collection-import-input');
+            const previewContainer = dialogElement.querySelector('#collection-import-preview');
+            const previewStatus = dialogElement.querySelector('#collection-import-status');
+            const submitButton = dialogElement.querySelector('button[type="submit"]');
+            const inputControls = [...input.querySelectorAll('input, select, textarea')];
+            const setInputLocked = (locked) => inputControls.forEach((control) => { control.disabled = locked; });
+
+            if (!previewReady) {
+              preparedPayload = {
+                text: formValue(data, 'text'),
+                language: formValue(data, 'language', 'en'),
+                finish: formValue(data, 'finish', 'nonfoil'),
+                condition: formValue(data, 'condition', 'near_mint'),
+                location: formValue(data, 'location'),
+                notes: formValue(data, 'notes'),
+                reconcileWanted: data.has('reconcileWanted')
+              };
+              setInputLocked(true);
+              let preview;
+              try {
+                preview = await api('/collection/import/preview', {
+                  method: 'POST',
+                  body: preparedPayload
+                });
+              } finally {
+                if (dialogElement.open) setInputLocked(false);
+              }
+              const failures = preview.failures || preview.failed || [];
+              previewContainer.hidden = false;
+              if (!preview.canImport || failures.length) {
+                previewContainer.innerHTML = importFailuresHtml(failures);
+                previewStatus.textContent = `${failures.length} ${failures.length === 1 ? 'regel bevat' : 'regels bevatten'} een fout.`;
+                const errorTitle = previewContainer.querySelector('h3');
+                errorTitle?.setAttribute('tabindex', '-1');
+                window.requestAnimationFrame(() => errorTitle?.focus());
+                preparedPayload = null;
+                return false;
+              }
+
+              preparedPayload.previewToken = preview.previewToken;
+              previewReady = true;
+              input.hidden = true;
+              previewContainer.innerHTML = importPreviewHtml(preview, preparedPayload);
+              previewStatus.textContent = `${Number(preview.summary?.totalQuantity || 0)} kaarten zijn gecontroleerd en klaar om toe te voegen.`;
+              window.requestAnimationFrame(() => previewContainer.querySelector('.import-preview-title')?.focus({ preventScroll: true }));
+              previewContainer.querySelector('#collection-import-back')?.addEventListener('click', () => {
+                previewReady = false;
+                preparedPayload = null;
+                input.hidden = false;
+                previewContainer.hidden = true;
+                previewContainer.innerHTML = '';
+                previewStatus.textContent = '';
+                submitButton.textContent = 'Controleren';
+                input.querySelector('textarea')?.focus();
+              });
+              window.setTimeout(() => { submitButton.textContent = 'Alles toevoegen'; }, 0);
+              return false;
+            }
+
+            dialogElement.dataset.preventClose = 'true';
+            dialogElement.querySelectorAll('button, input, select, textarea').forEach((control) => { control.disabled = true; });
+            let result;
+            try {
+              result = await api('/collection/import', { method: 'POST', body: preparedPayload });
+            } catch (error) {
+              dialogElement.dataset.preventClose = 'false';
+              dialogElement.querySelectorAll('button, input, select, textarea').forEach((control) => { control.disabled = false; });
+              const failures = error?.details?.failures || [];
+              if (failures.length || error?.status === 409) {
+                const currentFailures = failures.length ? failures : [{
+                  rawLine: 'Importcontrole verlopen',
+                  message: error.message
+                }];
+                previewReady = false;
+                preparedPayload = null;
+                input.hidden = false;
+                previewContainer.hidden = false;
+                previewContainer.innerHTML = importFailuresHtml(currentFailures);
+                previewStatus.textContent = 'De import moet opnieuw worden gecontroleerd.';
+                const errorTitle = previewContainer.querySelector('h3');
+                errorTitle?.setAttribute('tabindex', '-1');
+                window.requestAnimationFrame(() => errorTitle?.focus());
+                window.setTimeout(() => { submitButton.textContent = 'Controleren'; }, 0);
+                return false;
+              }
+              toast(`${error.message} Controleer je collectie voordat je de import opnieuw probeert.`, error?.status === 0 ? 'warning' : 'error', { position: 'top' });
+              dialogElement.close();
+              return false;
+            }
+            const importedQuantity = Number(result.summary?.totalQuantity ?? result.importedQuantity ?? 0);
+            const importedItems = Number(result.summary?.collectionItems ?? result.importedCount ?? 0);
+            try {
+              await refreshSelectedUsage();
+            } catch {
+              // De import is al atomair bevestigd. Een niet-kritieke refreshfout
+              // mag de gebruiker nooit uitnodigen om dezelfde write te herhalen.
+            }
+            toast(`${importedQuantity} kaarten zijn in ${importedItems} collectieregels toegevoegd of opgehoogd.`, 'success', { position: 'top' });
+            return true;
+          }
         });
       };
 
@@ -487,6 +669,7 @@ export async function renderAddCard(context) {
         renderPrintingList();
         updateAddRoute();
       });
+      document.getElementById('import-collection-list')?.addEventListener('click', openCollectionImportDialog);
       search.addEventListener('input', suggest);
       search.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;

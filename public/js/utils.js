@@ -62,12 +62,16 @@ export function parseTags(value) {
 }
 
 
-export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabel = 'Annuleren', destructive = false, wide = false, writeAction = true, onSubmit }) {
+let dialogSequence = 0;
+
+export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabel = 'Annuleren', destructive = false, wide = false, writeAction = true, initialFocus = '', onSubmit }) {
   const dialog = document.createElement('dialog');
+  const titleId = `dialog-title-${++dialogSequence}`;
   dialog.className = `modal ${wide ? 'modal-wide' : ''}`;
+  dialog.setAttribute('aria-labelledby', titleId);
   dialog.innerHTML = `
     <form class="modal-card" method="dialog">
-      <header><h2>${escapeHtml(title)}</h2><button type="button" class="icon-button close-dialog" aria-label="Sluiten">×</button></header>
+      <header><h2 id="${titleId}">${escapeHtml(title)}</h2><button type="button" class="icon-button close-dialog" aria-label="Sluiten">×</button></header>
       <div class="modal-body">${content}</div>
       <footer>
         <button type="button" class="button secondary close-dialog">${escapeHtml(cancelLabel)}</button>
@@ -76,10 +80,16 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
     </form>`;
   document.body.append(dialog);
   const form = dialog.querySelector('form');
-  const close = () => dialog.close();
+  const close = () => {
+    if (dialog.dataset.preventClose === 'true') return;
+    dialog.close();
+  };
   dialog.querySelectorAll('.close-dialog').forEach((button) => button.addEventListener('click', close));
   dialog.addEventListener('click', (event) => {
     if (event.target === dialog) close();
+  });
+  dialog.addEventListener('cancel', (event) => {
+    if (dialog.dataset.preventClose === 'true') event.preventDefault();
   });
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   if (onSubmit) {
@@ -103,7 +113,10 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
     });
   }
   dialog.showModal();
-  setTimeout(() => dialog.querySelector('input, select, textarea, button')?.focus(), 0);
+  setTimeout(() => (
+    (initialFocus ? dialog.querySelector(initialFocus) : null)
+    || dialog.querySelector('.modal-body input, .modal-body select, .modal-body textarea, .modal-body button, footer button, header button')
+  )?.focus(), 0);
   return dialog;
 }
 

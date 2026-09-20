@@ -18,6 +18,13 @@ export function languageLabel(language) {
   return LANGUAGE_LABELS[code] || code.toUpperCase();
 }
 
+export function allLanguageOptions(selectedLanguage = 'en') {
+  const selected = String(selectedLanguage || 'en').toLowerCase();
+  return Object.entries(LANGUAGE_LABELS).map(([language, label]) =>
+    `<option value="${escapeHtml(language)}" ${language === selected ? 'selected' : ''}>${escapeHtml(label)}</option>`
+  ).join('');
+}
+
 export function finishLabel(finish) {
   return FINISH_LABELS[finish] || String(finish || '');
 }

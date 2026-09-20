@@ -66,3 +66,53 @@ export async function ensureCardsByIdentifiers(identifiers) {
 
   return { resolved, notFound: [] };
 }
+
+export async function ensureCardsByCollectorLanguage(identifiers, language = 'en') {
+  const normalizedLanguage = String(language || 'en').toLowerCase();
+  const resolved = [];
+  const missingBySet = new Map();
+
+  for (const identifier of identifiers) {
+    const setCode = String(identifier.set || identifier.setCode || '').toLowerCase();
+    const collectorNumber = String(identifier.collector_number || identifier.collectorNumber || '');
+    const normalizedIdentifier = { set: setCode, collector_number: collectorNumber };
+    const local = findCardByCollector(setCode, collectorNumber, normalizedLanguage);
+    if (local) {
+      resolved.push({ identifier: normalizedIdentifier, card: local });
+      continue;
+    }
+    if (!missingBySet.has(setCode)) missingBySet.set(setCode, []);
+    missingBySet.get(setCode).push(normalizedIdentifier);
+  }
+
+  const notFound = [];
+  if (normalizedLanguage === 'en' && missingBySet.size) {
+    const missing = [...missingBySet.values()].flat();
+    const response = await scryfallService.getCollection(missing);
+    const byPrinting = new Map((response.cards || [])
+      .filter((card) => String(card.lang || 'en').toLowerCase() === 'en')
+      .map((card) => [
+        `${String(card.set || '').toLowerCase()}|${String(card.collector_number || '').toLowerCase()}`,
+        card
+      ]));
+    for (const identifier of missing) {
+      const key = `${identifier.set}|${String(identifier.collector_number).toLowerCase()}`;
+      const raw = byPrinting.get(key);
+      if (raw) resolved.push({ identifier, card: upsertScryfallCard(raw) });
+      else notFound.push(identifier);
+    }
+    return { resolved, notFound };
+  }
+
+  for (const [setCode, missing] of missingBySet) {
+    const rawCards = await scryfallService.cardsBySetAndLanguage(setCode, normalizedLanguage);
+    const byCollector = new Map(rawCards.map((card) => [String(card.collector_number).toLowerCase(), card]));
+    for (const identifier of missing) {
+      const raw = byCollector.get(String(identifier.collector_number).toLowerCase());
+      if (raw) resolved.push({ identifier, card: upsertScryfallCard(raw) });
+      else notFound.push(identifier);
+    }
+  }
+
+  return { resolved, notFound };
+}

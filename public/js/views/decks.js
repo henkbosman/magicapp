@@ -39,7 +39,7 @@ export async function renderDecks() {
   });
 
   return {
-    html: `${pageHeader({ eyebrow: 'Deckbouw', title: 'Decks', actions: '<button id="create-deck" class="button primary" data-write-action>＋ Nieuw deck</button>' })}${content}`,
+    html: `${pageHeader({ eyebrow: 'Deckbouw', title: 'Decks', actions: '<button id="create-deck" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Nieuw deck</button>' })}${content}`,
     mount() {
       document.getElementById('create-deck')?.addEventListener('click', createDeck);
       document.getElementById('empty-create-deck')?.addEventListener('click', createDeck);

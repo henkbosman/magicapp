@@ -130,7 +130,7 @@ export async function renderCollection(context) {
       ${pageHeader({
         eyebrow: 'Fysiek bezit', title: 'Collectie',
         description: `${items.length} collectieregels zichtbaar. Beschikbaarheid wordt over alle printings van dezelfde Oracle-kaart berekend.`,
-        actions: `<a class="button primary" data-write-action href="#/add">＋ Kaart toevoegen</a><a class="button secondary" href="${apiPath('/collection/export.csv')}">CSV exporteren</a>`
+        actions: `<a class="button primary" data-write-action href="#/add"><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</a><a class="button secondary" href="${apiPath('/collection/export.csv')}">CSV exporteren</a>`
       })}
       ${filterToggleHtml({ id: 'collection-filter-toggle', panelId: 'collection-filters', expanded: filterPanelExpanded, activeCount: activeFilterCount, resetId: 'collection-filter-reset' })}
       <form id="collection-filters" class="filters live-filters collapsible-filters" autocomplete="off" ${filterPanelExpanded ? '' : 'hidden'}>

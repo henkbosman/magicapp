@@ -13,7 +13,11 @@ import { booleanValue, oneOf, optionalNumber, optionalString, positiveInteger } 
 import { transaction } from '../db/database.js';
 import { addDeckCard } from '../services/deck-service.js';
 import { HttpError } from '../lib/http-error.js';
-import { exportCollectionCsv } from '../services/import-export-service.js';
+import {
+  exportCollectionCsv,
+  importCollectionList,
+  previewCollectionImport
+} from '../services/import-export-service.js';
 
 export const collectionReadRouter = express.Router();
 export const collectionWriteRouter = express.Router();
@@ -22,13 +26,24 @@ function collectionInput(body, { allowZero = false } = {}) {
   return {
     quantity: positiveInteger(body.quantity ?? 1, 'Aantal', { allowZero }),
     finish: oneOf(body.finish, ['nonfoil', 'foil', 'etched'], 'Afwerking', 'nonfoil'),
-    language: optionalString(body.language, 10, 'en') || 'en',
+    language: (optionalString(body.language, 10, 'en') || 'en').toLowerCase(),
     condition: oneOf(body.condition, ['mint', 'near_mint', 'excellent', 'good', 'light_played', 'played', 'poor'], 'Conditie', 'near_mint'),
     location: optionalString(body.location, 200),
     notes: optionalString(body.notes, 5000),
     purchasePrice: optionalNumber(body.purchasePrice, 'Aankoopprijs'),
     reconcileWanted: booleanValue(body.reconcileWanted, true),
     sourceWantedId: body.sourceWantedId ? positiveInteger(body.sourceWantedId, 'Wanted-ID') : null
+  };
+}
+
+function collectionImportInput(body) {
+  return {
+    finish: oneOf(body.finish, ['nonfoil', 'foil', 'etched'], 'Afwerking', 'nonfoil'),
+    language: (optionalString(body.language, 10, 'en') || 'en').toLowerCase(),
+    condition: oneOf(body.condition, ['mint', 'near_mint', 'excellent', 'good', 'light_played', 'played', 'poor'], 'Conditie', 'near_mint'),
+    location: optionalString(body.location, 200),
+    notes: optionalString(body.notes, 5000),
+    reconcileWanted: booleanValue(body.reconcileWanted, true)
   };
 }
 
@@ -96,6 +111,19 @@ async function createCollection(req, res, { requireDeck = false } = {}) {
 }
 
 collectionWriteRouter.post('/', (req, res) => createCollection(req, res));
+
+collectionWriteRouter.post('/import/preview', async (req, res) => {
+  const body = req.body || {};
+  res.json({ data: await previewCollectionImport(body.text, collectionImportInput(body)) });
+});
+
+collectionWriteRouter.post('/import', async (req, res) => {
+  const body = req.body || {};
+  const previewToken = optionalString(body.previewToken, 128);
+  if (!previewToken) throw new HttpError(400, 'Controleer de importlijst voordat je deze toevoegt.');
+  const result = await importCollectionList(body.text, collectionImportInput(body), previewToken);
+  res.status(201).json({ data: result });
+});
 
 // Dedicated endpoint used by the interface. Requiring deck fields prevents a
 // collection-only success when an outdated backend is still running.

@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.6.0 - 2026-09-20
+
+### Interface
+
+- De brede Unicode-plus op actieknoppen is vervangen door een fontonafhankelijk CSS-icoon, zodat er niet langer `FF0B` verschijnt wanneer een systeemfont de glyph mist.
+- Manasymbolen in kaartteksten worden voortaan als dezelfde ronde iconen weergegeven als manakosten. Voor `{T}` is een passend tap-icoon toegevoegd.
+
+### Collectie-import
+
+- De pagina **Kaart toevoegen** heeft een importactie voor lijsten in formaten zoals `1 Card Name` en `1 Card Name (SET) 123`.
+- Een controlestap toont vóór het toevoegen alle gevonden fysieke printings, aantallen en afwerkingen. Regels zonder set en kaartnummer worden duidelijk als automatisch gekozen printing gemarkeerd.
+- De definitieve import is aan die controlestap gekoppeld; als een automatisch gekozen printing tussentijds wijzigt, moet de lijst opnieuw worden gecontroleerd.
+- De import ondersteunt kopregels, `1x`, commentaarregels en de markeringen `*F*` voor foil en `*E*` voor etched foil.
+- Setcode, kaartnummer, kaartnaam, gekozen taal en paper-beschikbaarheid worden onderling gecontroleerd, zodat een typefout of digitale printing niet ongemerkt als fysieke kaart wordt opgeslagen.
+- Niet-Engelse imports worden per set gebundeld opgehaald; Unicode-, alternatieve en numeriek beginnende kaartnamen worden veilig gevalideerd.
+- Ongeldige of niet gevonden regels blokkeren de volledige import. De uiteindelijke collectie-update gebeurt atomair, zodat opnieuw proberen geen gedeeltelijk verdubbelde aantallen veroorzaakt.
+
+### API
+
+- `POST /api/write/collection/import/preview` controleert en resolveert een kaartenlijst zonder collectieregels toe te voegen.
+- `POST /api/write/collection/import` voegt een volledig geldige lijst in één transactie toe.
+- Browserrequests vanaf een andere origin worden voor de volledige write-API geweigerd; API-clients zonder browser-Origin-header blijven ondersteund.
+- Een optionele `PUBLIC_ORIGIN` maakt dezelfde schrijfbescherming betrouwbaar achter reverse proxies.
+
+### Database
+
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.5.0 - 2026-09-19
 
 ### Deckoverzicht

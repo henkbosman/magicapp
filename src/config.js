@@ -24,6 +24,20 @@ function hoursToMs(value, fallbackHours) {
   return Math.round(hours * 60 * 60 * 1000);
 }
 
+function publicOrigin(value) {
+  const input = String(value || '').trim();
+  if (!input) return '';
+  try {
+    const url = new URL(input);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
+      throw new Error('invalid origin');
+    }
+    return url.origin;
+  } catch {
+    throw new Error('PUBLIC_ORIGIN moet een volledige http(s)-origin zijn, bijvoorbeeld https://cards.example.nl');
+  }
+}
+
 export const config = Object.freeze({
   applicationVersion,
   rootDir,
@@ -33,6 +47,7 @@ export const config = Object.freeze({
   imageCacheDir: path.join(dataDir, 'images'),
   port: positiveInteger(process.env.PORT, 3000),
   host: process.env.HOST || '0.0.0.0',
+  publicOrigin: publicOrigin(process.env.PUBLIC_ORIGIN),
   scryfallUserAgent:
     process.env.SCRYFALL_USER_AGENT || `MagicCollectionManager/${applicationVersion} (local personal app)`,
   scryfallTimeoutMs: positiveInteger(process.env.SCRYFALL_TIMEOUT_MS, 15000),

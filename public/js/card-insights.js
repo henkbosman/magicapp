@@ -66,7 +66,7 @@ export function openCardInsightsEditor(card, { onDone } = {}) {
         <div class="field"><label>Mana-productie</label><select name="manaMode"><option value="automatic" ${manaMode === 'automatic' ? 'selected' : ''}>Automatisch (${escapeHtml(cardInsightSourceLabel(manaInsight.automaticSource || (manaInsight.source === 'manual' ? 'none' : manaInsight.source)))})</option><option value="manual" ${manaMode === 'manual' ? 'selected' : ''}>Handmatig instellen</option></select></div>
         <div class="manual-insight-area" data-manual-area="mana" ${manaMode === 'manual' ? '' : 'hidden'}>
           <div id="manual-mana-rows">${(manualMana || []).map(manaRowHtml).join('')}</div>
-          <button id="add-mana-row" type="button" class="button secondary small">＋ Manasoort</button>
+          <button id="add-mana-row" type="button" class="button secondary small"><span class="icon-plus" aria-hidden="true"></span> Manasoort</button>
           <small>Gebruik meerdere regels wanneer een kaart meerdere soorten of hoeveelheden kan produceren. Vink Variabel aan bij effecten zoals “voor elke …”.</small>
         </div>
         <div class="field full"><label>Toelichting bij mana-productie</label><textarea name="manaProductionNote" maxlength="1000" placeholder="Bijvoorbeeld: alleen wanneer er drie Elves liggen.">${escapeHtml(manaInsight.note || '')}</textarea></div>
