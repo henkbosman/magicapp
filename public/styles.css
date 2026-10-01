@@ -318,6 +318,7 @@ input[type="checkbox"] { width: 18px; height: 18px; }
   vertical-align: -.16em;
 }
 .oracle-text .mana-symbol.mana-bg-C { vertical-align: -.1em; }
+.oracle-text .mana-symbol.mana-bg-generic { vertical-align: -.1em; }
 .oracle-text .mana-symbol-text { font-size: .57em; }
 .mana-symbol-text.compact { font-size: .48rem; letter-spacing: -.08em; }
 
@@ -392,8 +393,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 }
 .deck-card-name-slot,
 .deck-card-mana-slot { min-width: 0; }
-.deck-card-name-slot { display: block; }
-.deck-card-name-preview { max-width: 100%; overflow-wrap: anywhere; }
+.deck-card-name-slot { display: block; overflow-wrap: anywhere; }
 .deck-card-mana-slot { min-height: 24px; display: flex; align-items: center; justify-content: flex-end; }
 .deck-card-mana-slot .mana-cost { flex-wrap: nowrap; justify-content: flex-end; }
 .deck-card-rules-text { min-width: 0; color: var(--ink-soft); font-size: .78rem; overflow-wrap: anywhere; }
@@ -1368,7 +1368,19 @@ body.simulator-touch-dragging { overflow: hidden; user-select: none; }
 }
 .collapsible-filters { transform-origin: top; }
 .deck-filter-heading { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.deck-filter-controls { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .deck-filter-heading .filter-toggle-row { margin: 0; }
+.deck-cards-per-row-control {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: .74rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+.deck-cards-per-row-control select { width: 76px; height: 42px; background: var(--surface); }
 .deck-filters-panel { margin-bottom: 10px; }
 .wanted-printing-image-button {
   width: 52px; height: 73px; padding: 0; border: 0; border-radius: 5px;
@@ -1382,6 +1394,9 @@ body.simulator-touch-dragging { overflow: hidden; user-select: none; }
 @media (max-width: 640px) {
   .filter-toggle { width: 100%; }
   .deck-filter-heading { align-items: stretch; flex-direction: column; }
+  .deck-filter-controls { align-items: stretch; }
+  .deck-filter-controls .filter-toggle-row { flex: 1 1 150px; }
+  .deck-cards-per-row-control { flex: 1 1 190px; justify-content: space-between; }
   .wanted-printing-image-button { width: 45px; height: 63px; }
   .printing-image-preview { min-height: 0; }
   .printing-image-preview img { width: 100%; max-height: 72vh; }
@@ -1744,14 +1759,12 @@ html.write-unavailable [data-write-only] { display: none !important; }
 }
 .deck-view-button:focus-visible,
 .deck-card-preview-trigger:focus-visible,
-.deck-card-name-preview:focus-visible,
 .deck-visual-card-trigger:focus-visible,
 .deck-card-action-choice:focus-visible {
   outline: 3px solid var(--primary);
   outline-offset: 2px;
 }
 .deck-card-preview-trigger,
-.deck-card-name-preview,
 .deck-visual-card-trigger {
   appearance: none;
   padding: 0;
@@ -1763,23 +1776,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .deck-card-preview-trigger,
 .deck-visual-card-trigger { cursor: zoom-in; }
 .deck-card-preview-trigger { align-self: center; display: block; border-radius: 6px; }
-.deck-card-name-preview { text-align: left; cursor: zoom-in; }
-.deck-card-name-preview:hover { color: var(--primary); }
 
-.deck-visual-toolbar {
-  margin-bottom: 20px;
-  padding: 11px 13px;
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 14px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: var(--surface-soft);
-}
-.deck-visual-toolbar label { display: grid; gap: 5px; color: var(--ink-soft); font-size: .74rem; font-weight: 760; }
-.deck-visual-toolbar select { width: 150px; height: 38px; background: var(--surface); }
-.deck-visual-toolbar small { color: var(--ink-faint); font-size: .7rem; text-align: right; }
 .deck-visual-groups { display: grid; gap: 28px; }
 .deck-visual-group { min-width: 0; }
 .deck-visual-group-header {
@@ -1963,9 +1960,6 @@ html.write-unavailable [data-write-only] { display: none !important; }
   .deck-panel-heading { justify-content: space-between; }
   .deck-panel-actions { justify-content: flex-start; }
   .deck-panel-actions .button { flex: 1 1 auto; }
-  .deck-visual-toolbar { align-items: stretch; flex-direction: column; }
-  .deck-visual-toolbar select { width: 100%; }
-  .deck-visual-toolbar small { text-align: left; }
   .deck-visual-grid { gap: 10px; }
   .deck-visual-card-quantity { left: 7px; bottom: 7px; }
 }

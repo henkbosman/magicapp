@@ -75,8 +75,10 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     assert.match(view.html, /id="deck-card-list" class="card-list" hidden/);
     assert.match(view.html, /data-deck-type-group="Creature"[\s\S]*?<h3>Creatures<\/h3>/);
     assert.match(view.html, /data-deck-type-group="Instant"[\s\S]*?<h3>Instants<\/h3>/);
+    assert.match(view.html, /<div class="deck-filter-controls">[\s\S]*?id="deck-filter-toggle"[\s\S]*?<label id="deck-cards-per-row-control"[\s\S]*?<select id="deck-cards-per-row"[\s\S]*?<\/label>\s*<\/div>\s*<span id="deck-filter-summary"/);
     assert.match(view.html, /id="deck-cards-per-row"[\s\S]*?<option value="5" selected>5<\/option>/);
     assert.match(view.html, /id="deck-card-visual" class="deck-visual-groups" data-columns="5"/);
+    assert.doesNotMatch(view.html, /deck-visual-toolbar/);
     assert.match(view.html, /data-card-preview-id="11"/);
     assert.doesNotMatch(view.html, /data-deck-card-context-actions/);
     assert.doesNotMatch(view.html, /•••/);
@@ -87,15 +89,31 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     assert.match(view.html, /aria-label="Acties voor Artifact Creature">Acties<\/button>/);
     assert.match(view.html, /class="deck-card-rules-text oracle-text">[\s\S]*?aria-label="Tappen"[\s\S]*?aria-label="Groen mana"/);
     assert.match(view.html, /class="deck-card-name-mana">[\s\S]*?class="deck-card-name-slot">[\s\S]*?Artifact Creature[\s\S]*?class="deck-card-mana-slot">[\s\S]*?aria-label="Manakosten \{1\}"/);
+    assert.match(view.html, /class="deck-card-name-slot"><strong>2× Artifact Creature<\/strong><\/span>/);
+    assert.doesNotMatch(view.html, /class="deck-card-name-preview"/);
+    assert.match(view.html, /<button type="button" class="card-thumb-link deck-card-preview-trigger"[^>]+data-card-preview-id="11"/);
     assert.doesNotMatch(view.html, /class="[^\"]*manage-deck-relations/);
     assert.doesNotMatch(view.html, /class="[^\"]*remove-deck-card/);
     assert.doesNotMatch(view.html, />Meer<\/button>/);
     assert.doesNotMatch(view.html, /class="[^"]*deck-card-to-wanted/);
     assert.doesNotMatch(view.html, /class="[^"]*edit-deck-card-insights/);
     assert.doesNotMatch(view.html, /class="[^"]*edit-deck-card(?:\s|")/);
+
+    const listView = await renderDeckDetail({
+      params: { id: '7' },
+      query: new URLSearchParams()
+    });
+    assert.match(listView.html, /id="deck-cards-per-row-control"[^>]*\shidden(?:\s|>)/);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('kaarten-per-rij-keuze staat compact naast de filterknop en kan responsief omslaan', () => {
+  const styles = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(styles, /\.deck-filter-controls\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/s);
+  assert.match(styles, /\.deck-cards-per-row-control\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;/s);
+  assert.match(styles, /\.deck-cards-per-row-control select\s*\{[^}]*width:\s*76px;[^}]*height:\s*42px;/s);
 });
 
 test('decklijst geeft de naam flexibele ruimte en lijnt mana aan de rechterrand uit', () => {

@@ -130,7 +130,7 @@ export function renderCollectionRows(items, hasFilters = false) {
       <a class="card-thumb-link card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}">${cardImage(item.card, { className: 'list-thumb' })}</a>
       <div class="card-list-content">
         <div class="collection-card-name-mana">
-          <a class="card-preview-trigger collection-card-name" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}"><strong>${escapeHtml(item.card.name)}</strong></a>
+          <strong class="collection-card-name">${escapeHtml(item.card.name)}</strong>
           <span class="collection-card-mana-slot">${manaCost(item.card.manaCost)}</span>
         </div>
         <p class="card-meta">${escapeHtml(item.card.setName)} (${escapeHtml(item.card.setCode.toUpperCase())}) #${escapeHtml(item.card.collectorNumber)} · ${escapeHtml(item.language)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</p>

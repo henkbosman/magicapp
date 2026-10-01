@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.10.2 - 2026-10-01
+
+### Kaartlijsten en kaartweergave
+
+- Kaartnamen in de collectie- en decklijst zijn weer gewone, niet-interactieve tekst. De kaartafbeelding blijft de ingang voor de grotere kaartpreview.
+- Generieke en numerieke manasymbolen in kaarttekst staan verticaal op één lijn met de andere manasymbolen.
+- In de visuele kaartenweergave van een deck staat de selectie voor het aantal kaarten per rij direct naast **Filters tonen**.
+
+### API en database
+
+- Geen nieuwe of gewijzigde endpointpaden.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.10.1 - 2026-10-01
 
 ### Collectie- en decklijsten

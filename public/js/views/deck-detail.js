@@ -611,7 +611,7 @@ function deckCardHtml(item) {
   return `<article class="card-list-item deck-card-row" ${deckCardFilterAttributes(item)}>
     <button type="button" class="card-thumb-link deck-card-preview-trigger" data-card-preview-id="${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}">${cardImage(item.card, { className: 'list-thumb' })}</button>
     <div class="card-list-content">
-      <div class="card-title-row deck-card-title-row"><div><span class="role-label">${escapeHtml(ROLE_LABELS[item.role] || item.role)}</span><div class="deck-card-name-mana"><span class="deck-card-name-slot"><button type="button" class="deck-card-name-preview" data-card-preview-id="${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${item.quantity}× ${escapeHtml(item.card.name)}"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></button></span><span class="deck-card-mana-slot">${manaCost(item.card.manaCost)}</span></div></div></div>
+      <div class="card-title-row deck-card-title-row"><div><span class="role-label">${escapeHtml(ROLE_LABELS[item.role] || item.role)}</span><div class="deck-card-name-mana"><span class="deck-card-name-slot"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></span><span class="deck-card-mana-slot">${manaCost(item.card.manaCost)}</span></div></div></div>
       <p class="card-meta">${meta}</p>
       <div class="usage-badges compact">${status}${item.coverage.onWanted ? '<span class="badge wanted">Wanted</span>' : ''}<span class="badge neutral">Totaal bezit ${item.card.usage.owned}</span><span class="badge used">Alle decks ${item.card.usage.needed}</span></div>
       ${tagPills(item.tags)}
@@ -654,10 +654,6 @@ export async function renderDeckDetail(context) {
   const cardList = displayCards.length
     ? `<div id="deck-card-list" class="card-list" ${initialView === 'list' ? '' : 'hidden'}>${displayCards.map(deckCardHtml).join('')}</div>
       <div id="deck-card-visual-container" ${initialView === 'cards' ? '' : 'hidden'}>
-        <div class="deck-visual-toolbar">
-          <label for="deck-cards-per-row"><span>Kaarten per rij</span><select id="deck-cards-per-row">${deckVisualColumnOptions(initialColumns)}</select></label>
-          <small>Op kleine schermen wordt het aantal automatisch begrensd.</small>
-        </div>
         ${deckVisualGroupsHtml(displayCards, initialColumns)}
       </div>`
     : emptyState('Nog geen kaarten in dit deck', 'Voeg een commander of eerste kaart toe.', '<button id="empty-add-card" class="button primary" data-write-action>Kaart zoeken</button>');
@@ -691,7 +687,10 @@ export async function renderDeckDetail(context) {
         </header>
         <div class="panel-body">
           <div class="deck-filter-heading">
-            ${filterToggleHtml({ id: 'deck-filter-toggle', panelId: 'deck-filters-panel', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+            <div class="deck-filter-controls">
+              ${filterToggleHtml({ id: 'deck-filter-toggle', panelId: 'deck-filters-panel', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+              ${displayCards.length ? `<label id="deck-cards-per-row-control" class="deck-cards-per-row-control" for="deck-cards-per-row" ${initialView === 'cards' ? '' : 'hidden'}><span>Kaarten per rij</span><select id="deck-cards-per-row">${deckVisualColumnOptions(initialColumns)}</select></label>` : ''}
+            </div>
             <span id="deck-filter-summary" class="muted">${totalCardCount} kaarten zichtbaar</span>
           </div>
           <div id="deck-filters-panel" class="deck-filters-panel collapsible-filters" ${filterPanelExpanded ? '' : 'hidden'}>
@@ -912,6 +911,7 @@ export async function renderDeckDetail(context) {
       const deckSearch = document.getElementById('deck-card-search');
       const deckType = document.getElementById('deck-card-type');
       const deckColumns = document.getElementById('deck-cards-per-row');
+      const deckColumnsControl = document.getElementById('deck-cards-per-row-control');
       const deckFilterToggle = bindFilterToggle({
         button: document.getElementById('deck-filter-toggle'),
         panel: document.getElementById('deck-filters-panel'),
@@ -966,6 +966,7 @@ export async function renderDeckDetail(context) {
         const visual = document.getElementById('deck-card-visual-container');
         if (list) list.hidden = activeDeckView !== 'list';
         if (visual) visual.hidden = activeDeckView !== 'cards';
+        if (deckColumnsControl) deckColumnsControl.hidden = activeDeckView !== 'cards';
         document.querySelectorAll('[data-deck-view]').forEach((button) => {
           const selected = button.dataset.deckView === activeDeckView;
           button.classList.toggle('active', selected);

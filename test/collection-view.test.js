@@ -46,7 +46,9 @@ test('collectielijst toont naam, mana, kaarttekst en alle collectiegegevens zond
   const html = renderCollectionRows([collectionItem()]);
 
   assert.match(html, /class="collection-card-name-mana"/);
-  assert.match(html, /class="collection-card-name[^"]*"[\s\S]*?Mana Elf/);
+  assert.match(html, /<strong class="collection-card-name">Mana Elf<\/strong>/);
+  assert.doesNotMatch(html, /<(?:a|button)[^>]*class="[^"]*collection-card-name/);
+  assert.match(html, /<a class="card-thumb-link card-preview-trigger"[^>]+data-card-preview-id="41"/);
   assert.match(html, /class="collection-card-mana-slot">[\s\S]*?aria-label="Manakosten \{1\}\{G\}"/);
   assert.match(html, /class="collection-card-rules-text oracle-text">[\s\S]*?aria-label="Tappen"[\s\S]*?aria-label="Kleurloos mana"/);
   assert.match(html, /rarity-badge rarity-rare/);
