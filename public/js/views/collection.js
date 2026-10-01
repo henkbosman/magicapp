@@ -1,16 +1,65 @@
 import { api, apiPath, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
 import { openCardPreview } from '../card-preview.js';
-import { cardImage, cardInsightBadges, manaCost, manaSymbol, pageHeader, rarityBadge, usageBadges } from '../components.js';
+import { cardImage, cardInsightBadges, cardTextHtml, manaCost, manaSymbol, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { confirmDialog, emptyState, escapeHtml, formatEuro, formValue, openDialog, toast } from '../utils.js';
+import { applyWriteAvailability } from '../write-access.js';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near mint', excellent: 'Excellent', good: 'Good',
   light_played: 'Light played', played: 'Played', poor: 'Poor'
 };
+
+const COLLECTION_ACTION_ICONS = {
+  deck: '▤',
+  edit: '✎',
+  insights: '◇',
+  remove: '×'
+};
+
+export function collectionCardActionDescriptors() {
+  return [
+    {
+      key: 'deck',
+      label: 'Naar deck',
+      description: 'Voeg deze kaart toe aan een deck.',
+      write: true,
+      destructive: false
+    },
+    {
+      key: 'edit',
+      label: 'Bewerken',
+      description: 'Wijzig aantal, afwerking en collectiegegevens.',
+      write: true,
+      destructive: false
+    },
+    {
+      key: 'insights',
+      label: 'Kenmerken',
+      description: 'Pas functionele kaartkenmerken aan.',
+      write: true,
+      destructive: false
+    },
+    {
+      key: 'remove',
+      label: 'Verwijderen',
+      description: 'Verwijder deze regel uit de collectie.',
+      write: true,
+      destructive: true
+    }
+  ];
+}
+
+export function collectionCardActionMenuHtml() {
+  return `<div class="deck-card-action-menu collection-card-action-menu">${collectionCardActionDescriptors().map((action) => `
+    <button type="button" class="deck-card-action-choice collection-card-action-choice ${action.destructive ? 'text-danger' : ''}" data-collection-card-action="${action.key}" ${action.write ? 'data-write-action' : ''}>
+      <span class="deck-card-action-icon" aria-hidden="true">${COLLECTION_ACTION_ICONS[action.key]}</span>
+      <span><strong>${escapeHtml(action.label)}</strong><small>${escapeHtml(action.description)}</small></span>
+    </button>`).join('')}</div>`;
+}
 
 function option(value, label, current) {
   return `<option value="${escapeHtml(value)}" ${String(current || '') === String(value) ? 'selected' : ''}>${escapeHtml(label)}</option>`;
@@ -66,7 +115,7 @@ function normalizeCollectionQueryParams(values) {
   return params;
 }
 
-function renderCollectionRows(items, hasFilters = false) {
+export function renderCollectionRows(items, hasFilters = false) {
   if (!items.length) {
     return emptyState(
       'Geen kaarten gevonden',
@@ -74,25 +123,25 @@ function renderCollectionRows(items, hasFilters = false) {
       '<a class="button primary" data-write-action href="#/add">Kaart toevoegen</a>'
     );
   }
-  return `<div class="card-list">${items.map((item) => `
+  return `<div class="card-list collection-card-list">${items.map((item) => {
+    const rulesText = item.card.printedText || item.card.oracleText || '';
+    return `
     <article class="card-list-item collection-card-row">
       <a class="card-thumb-link card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}">${cardImage(item.card, { className: 'list-thumb' })}</a>
       <div class="card-list-content">
-        <div class="card-title-row collection-card-title-row">
-          <a class="card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}"><strong>${escapeHtml(item.card.name)}</strong></a>
-          <span class="collection-title-meta">${manaCost(item.card.manaCost)}${rarityBadge(item.card.rarity)}${collectionPrice(item)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></span>
+        <div class="collection-card-name-mana">
+          <a class="card-preview-trigger collection-card-name" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}"><strong>${escapeHtml(item.card.name)}</strong></a>
+          <span class="collection-card-mana-slot">${manaCost(item.card.manaCost)}</span>
         </div>
         <p class="card-meta">${escapeHtml(item.card.setName)} (${escapeHtml(item.card.setCode.toUpperCase())}) #${escapeHtml(item.card.collectorNumber)} · ${escapeHtml(item.language)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</p>
+        <div class="collection-card-stats">${rarityBadge(item.card.rarity)}${collectionPrice(item)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></div>
         ${usageBadges(item.card.usage, { compact: true })}
         ${cardInsightBadges(item.card)}
       </div>
-      <div class="card-list-actions">
-        <button class="button secondary small collection-to-deck" type="button" data-write-action data-item-id="${item.id}">Naar deck</button>
-        <button class="button secondary small edit-card-insights" type="button" data-write-action data-item-id="${item.id}">Kenmerken</button>
-        <button class="button secondary small edit-item" type="button" data-write-action data-item-id="${item.id}">Bewerken</button>
-        <button class="button ghost small delete-item text-danger" type="button" data-write-action data-item-id="${item.id}" data-name="${escapeHtml(item.card.name)}">Verwijderen</button>
-      </div>
-    </article>`).join('')}</div>`;
+      <div class="collection-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
+      <div class="card-list-actions"><button class="button secondary small open-collection-card-actions" type="button" data-write-action data-item-id="${item.id}" aria-haspopup="dialog" aria-label="Acties voor ${escapeHtml(item.card.name)}">Acties</button></div>
+    </article>`;
+  }).join('')}</div>`;
 }
 
 function resultCountText(items) {
@@ -210,35 +259,20 @@ export async function renderCollection(context) {
         liveFilters.apply();
       });
 
-      resultsElement.addEventListener('click', async (event) => {
-        const previewLink = event.target.closest('[data-card-preview-id]');
-        if (previewLink && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
-          event.preventDefault();
-          const previewItem = items.find((candidate) => candidate.id === Number(previewLink.dataset.cardPreviewId));
-          if (previewItem) openCardPreview(previewItem.card);
-          return;
-        }
+      const runCollectionCardAction = async (action, item) => {
+        if (!collectionCardActionDescriptors().some((descriptor) => descriptor.key === action)) return;
 
-        const deckButton = event.target.closest('.collection-to-deck');
-        const insightButton = event.target.closest('.edit-card-insights');
-        const editButton = event.target.closest('.edit-item');
-        const deleteButton = event.target.closest('.delete-item');
-        const action = deckButton || insightButton || editButton || deleteButton;
-        if (!action) return;
-        const item = items.find((candidate) => candidate.id === Number(action.dataset.itemId));
-        if (!item) return;
-
-        if (deckButton) {
+        if (action === 'deck') {
           addCardToDeck(item.card, { onDone: loadCurrentResults });
           return;
         }
 
-        if (insightButton) {
+        if (action === 'insights') {
           openCardInsightsEditor(item.card, { onDone: loadCurrentResults });
           return;
         }
 
-        if (editButton) {
+        if (action === 'edit') {
           openDialog({
             title: `${item.card.name} bewerken`,
             submitLabel: 'Opslaan',
@@ -271,6 +305,40 @@ export async function renderCollection(context) {
         await api(`/collection/${item.id}`, { method: 'DELETE' });
         toast(`${item.card.name} is verwijderd.`);
         await loadCurrentResults();
+      };
+
+      const openCollectionCardActions = (item) => {
+        const dialog = openDialog({
+          title: `Acties voor ${item.card.name}`,
+          cancelLabel: 'Sluiten',
+          initialFocus: '[data-collection-card-action]:not(:disabled)',
+          content: collectionCardActionMenuHtml()
+        });
+        applyWriteAvailability(dialog);
+        dialog.querySelector('.collection-card-action-menu')?.addEventListener('click', async (event) => {
+          const button = event.target.closest('[data-collection-card-action]');
+          if (!button) return;
+          const action = button.dataset.collectionCardAction;
+          dialog.close();
+          await runCollectionCardAction(action, item);
+        });
+        return dialog;
+      };
+
+      resultsElement.addEventListener('click', async (event) => {
+        const previewLink = event.target.closest('[data-card-preview-id]');
+        if (previewLink && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          const previewItem = items.find((candidate) => candidate.id === Number(previewLink.dataset.cardPreviewId));
+          if (previewItem) openCardPreview(previewItem.card);
+          return;
+        }
+
+        const actionButton = event.target.closest('.open-collection-card-actions');
+        if (!actionButton) return;
+        const item = items.find((candidate) => candidate.id === Number(actionButton.dataset.itemId));
+        if (!item) return;
+        openCollectionCardActions(item);
       });
     }
   };

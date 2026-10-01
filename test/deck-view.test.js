@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
@@ -85,6 +86,7 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     assert.match(view.html, /class="button secondary small open-deck-card-actions"/);
     assert.match(view.html, /aria-label="Acties voor Artifact Creature">Acties<\/button>/);
     assert.match(view.html, /class="deck-card-rules-text oracle-text">[\s\S]*?aria-label="Tappen"[\s\S]*?aria-label="Groen mana"/);
+    assert.match(view.html, /class="deck-card-name-mana">[\s\S]*?class="deck-card-name-slot">[\s\S]*?Artifact Creature[\s\S]*?class="deck-card-mana-slot">[\s\S]*?aria-label="Manakosten \{1\}"/);
     assert.doesNotMatch(view.html, /class="[^\"]*manage-deck-relations/);
     assert.doesNotMatch(view.html, /class="[^\"]*remove-deck-card/);
     assert.doesNotMatch(view.html, />Meer<\/button>/);
@@ -94,6 +96,14 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('decklijst reserveert een vast naam- en manaslot en lijnt kleurloos in kaarttekst optisch uit', () => {
+  const styles = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(styles, /\.deck-card-name-mana\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 10rem\) minmax\(0, 1fr\);/s);
+  assert.match(styles, /\.deck-card-mana-slot\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*flex-start;/s);
+  assert.match(styles, /@media \(min-width:\s*641px\) and \(max-width:\s*1279px\)[\s\S]*?#deck-card-list > \.deck-card-row/);
+  assert.match(styles, /\.oracle-text \.mana-symbol\.mana-bg-C\s*\{\s*vertical-align:\s*-\.1em;\s*\}/);
 });
 
 test('deckkolommen accepteren alleen auto of één tot en met acht', () => {

@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.9.0
+# Architectuur - Magic Collection Manager 2.10.0
 
 ## Overzicht
 
@@ -86,11 +86,15 @@ Express mount drie API-zones:
 
 De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart toevoegen, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
 
-Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
+Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer heet zichtbaar **Kaart opzoeken**, bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. Na het laden van de printings herstelt de frontend eerst een eerdere selectie; anders beperkt zij de kandidaten tot een gekozen collectornummer en kiest daarbinnen een lokaal bekende of de eerste printing, die direct in het invoerpaneel wordt getoond. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
 
-De deckdetailpagina gebruikt één centraal actiemodel voor het compacte **Acties**-menu in de lijst en het contextmenu in de visuele kaartweergave. Voor een normale kaart kan het lijstmenu Naar Wanted, Bewerken, Kenmerken, Combo's/synergieën en Verwijderen aanbieden; samengevoegde basic lands krijgen alleen groepsveilige acties. De lijst toont kaartafbeeldingen op 92 pixels breed en plaatst naam en manakosten links, met de kaarttekst en gerenderde symbolen vóór de actieknop. In de kaartweergave staan geen zichtbare overflowknoppen; het contextmenu blijft bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`. De kaartweergave bewaart de keuze voor een automatisch raster of 1 tot en met 8 kaarten per rij in de hashroute en begrenst het raster responsief.
+De deckdetailpagina gebruikt één centraal actiemodel voor het compacte **Acties**-menu in de lijst en het contextmenu in de visuele kaartweergave. Voor een normale kaart kan het lijstmenu Naar Wanted, Bewerken, Kenmerken, Combo's/synergieën en Verwijderen aanbieden; samengevoegde basic lands krijgen alleen groepsveilige acties. De lijst toont kaartafbeeldingen op 92 pixels breed en reserveert afzonderlijke vaste plaatsen voor naam en manakosten, zodat de mana-uitlijning niet door de kaartnaam verschuift. De kaarttekst en gerenderde symbolen staan vóór de actieknop; het kleurloze manasymbool heeft binnen die tekst een eigen optische verticale correctie. In de kaartweergave staan geen zichtbare overflowknoppen; het contextmenu blijft bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`. De kaartweergave bewaart de keuze voor een automatisch raster of 1 tot en met 8 kaarten per rij in de hashroute en begrenst het raster responsief.
 
-Versie 2.9 voegt hiervoor geen endpointpaden of databasetabellen toe. De bestaande `ability`-parameter van de collectie accepteert aanvullend de synthetische waarden `Tutor land` en `Tutor creature`.
+De collectie rendert haar regels in dezelfde basisopbouw als de decklijst: kaartafbeelding, vaste naam-/manaplaats, printingmetadata en statistieken, gerenderde kaarttekst en één **Acties**-knop. Die knop opent een dialoog voor Naar deck, Bewerken, Kenmerken en Verwijderen en past daarin dezelfde alleen-lezenbeveiliging toe als andere muterende frontendacties. Het deckoverzicht gebruikt voor commanders thumbnails van 104 × 146 pixels, tweemaal de eerdere afmetingen.
+
+De in versie 2.9 toegevoegde tutorfilters veranderden geen endpointpaden of databasetabellen. De bestaande `ability`-parameter van de collectie accepteert daarvoor de synthetische waarden `Tutor land` en `Tutor creature`.
+
+Versie 2.10 voegt geen endpoints toe en wijzigt geen bestaande endpointpaden of het databaseschema.
 
 ## Caching
 

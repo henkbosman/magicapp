@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.10.0 - 2026-10-01
+
+### Deck- en collectielijsten
+
+- Naam en manakosten hebben in de decklijst afzonderlijke vaste plaatsen, zodat de manasymbolen bij iedere kaart op dezelfde horizontale positie beginnen.
+- Het kleurloze manasymbool sluit in gerenderde kaarttekst optisch beter aan op de tekstregel.
+- De collectie gebruikt nu dezelfde leesbare rijopbouw als de decklijst, met een grotere kaartafbeelding, kaarttekst en afzonderlijk gegroepeerde printingmetadata, rarity, prijs, aantal en afwerking.
+- De collectieacties **Naar deck**, **Bewerken**, **Kenmerken** en **Verwijderen** staan samen in één compact **Acties**-menu.
+- Commander-thumbnails in het deckoverzicht zijn verdubbeld van 52 × 73 naar 104 × 146 pixels.
+
+### Kaart opzoeken
+
+- De zichtbare paginatitel **Kaart toevoegen** heet nu, net als de navigatielink, **Kaart opzoeken**.
+- Na het kiezen van een kaartnaam wordt automatisch een passende printing gekozen en direct in het invoerpaneel getoond. Een herstelde keuze of passend kaartnummer krijgt voorrang, daarna een lokaal bekende printing en anders de eerste passende printing; handmatig wijzigen blijft mogelijk.
+
+### API en database
+
+- Geen nieuwe of gewijzigde endpointpaden.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.9.0 - 2026-10-01
 
 ### Decklijst en kaartacties

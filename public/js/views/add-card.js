@@ -27,6 +27,35 @@ const PRICE_ROWS = [
   ['eur_etched', 'Etched']
 ];
 
+function printingContainsScryfallId(printing, scryfallId) {
+  if (!scryfallId) return false;
+  return printing?.scryfallId === scryfallId
+    || printing?.variants?.some((variant) => variant.scryfallId === scryfallId);
+}
+
+function isLocallyKnownPrinting(printing) {
+  return Boolean(printing?.cached
+    || printing?.cardId
+    || printing?.variants?.some((variant) => variant.cached || variant.cardId));
+}
+
+export function preferredPrintingIndex(printings, { scryfallId = '', collectorNumber = '' } = {}) {
+  const available = Array.isArray(printings) ? printings : [];
+  if (!available.length) return -1;
+
+  const restoredIndex = available.findIndex((printing) => printingContainsScryfallId(printing, scryfallId));
+  if (restoredIndex >= 0) return restoredIndex;
+
+  const normalizedCollectorNumber = String(collectorNumber || '').trim();
+  const candidates = available
+    .map((printing, index) => ({ printing, index }))
+    .filter(({ printing }) => !normalizedCollectorNumber
+      || String(printing.collectorNumber || '') === normalizedCollectorNumber);
+  if (!candidates.length) return -1;
+
+  return (candidates.find(({ printing }) => isLocallyKnownPrinting(printing)) || candidates[0]).index;
+}
+
 function formatPrice(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '—';
@@ -184,7 +213,7 @@ export async function renderAddCard(context) {
     html: `
       ${pageHeader({
         eyebrow: 'Snelle invoer',
-        title: 'Kaart toevoegen',
+        title: 'Kaart opzoeken',
         description: 'Zoek op naam, kies de juiste set en selecteer daarna taal en afwerking.',
         actions: '<button id="import-collection-list" class="button secondary" type="button" data-write-action>Importeren</button>'
       })}
@@ -219,6 +248,9 @@ export async function renderAddCard(context) {
       const status = document.getElementById('printing-status');
       const list = document.getElementById('printing-list');
       const panel = document.getElementById('selected-card-panel');
+      let printingLoadSequence = 0;
+      let printingSelectionSequence = 0;
+      let suggestionSequence = 0;
 
       const setAddActionsLocked = (locked) => {
         actionsLocked = Boolean(locked);
@@ -244,15 +276,18 @@ export async function renderAddCard(context) {
         window.history.replaceState(null, '', nextHash);
       };
 
-      const currentCollectionPayload = (form) => {
+      const currentCollectionPayload = (form, {
+        card = selectedCard,
+        printing = selectedPrinting
+      } = {}) => {
         const data = new FormData(form);
         const language = formValue(data, 'language', 'en');
-        const variant = variantForLanguage(selectedPrinting, language, selectedCard);
+        const variant = variantForLanguage(printing, language, card);
         const identifier = variant?.cardId
           ? { cardId: Number(variant.cardId) }
           : variant?.scryfallId
             ? { scryfallId: variant.scryfallId }
-            : { setCode: selectedPrinting.setCode, collectorNumber: selectedPrinting.collectorNumber, language };
+            : { setCode: printing.setCode, collectorNumber: printing.collectorNumber, language };
         return {
           ...identifier,
           quantity: Number(formValue(data, 'quantity', '1')),
@@ -265,6 +300,13 @@ export async function renderAddCard(context) {
           reconcileWanted: data.has('reconcileWanted')
         };
       };
+
+      const selectionIsCurrent = (form, printingKey) => Boolean(
+        form
+        && document.body.contains(form)
+        && form === document.getElementById('add-collection-form')
+        && selectedPrinting?.printingKey === printingKey
+      );
 
       const refreshSelectedUsage = async (knownCard = null) => {
         if (knownCard) selectedCard = knownCard;
@@ -391,15 +433,15 @@ export async function renderAddCard(context) {
         });
       };
 
-      const openCollectionDeckDialog = async (form) => {
+      const openCollectionDeckDialog = async ({ form, card, printingKey, collectionPayload }) => {
         const decks = await api('/decks');
+        if (!selectionIsCurrent(form, printingKey)) return;
         if (!decks.length) {
           toast('Maak eerst een deck aan.', 'warning', { position: 'top' });
           return;
         }
-        const collectionPayload = currentCollectionPayload(form);
         openDialog({
-          title: `${selectedCard.name} aan collectie en deck toevoegen`,
+          title: `${card.name} aan collectie en deck toevoegen`,
           submitLabel: 'Collectie + Deck',
           content: `<div class="form-grid">
             <div class="field full"><label>Deck</label><select name="deckId">${decks.map((deck) => `<option value="${deck.id}">${escapeHtml(deck.name)}</option>`).join('')}</select></div>
@@ -432,10 +474,12 @@ export async function renderAddCard(context) {
             if (!result?.collectionItem?.id || !result?.deckCard?.id) {
               throw new Error('De server bevestigde de gecombineerde toevoeging niet. Herstart de Node.js-server en probeer het opnieuw.');
             }
-            await refreshSelectedUsage(result.collectionItem.card || result.deckCard.card || null);
+            if (selectionIsCurrent(form, printingKey)) {
+              await refreshSelectedUsage(result.collectionItem.card || result.deckCard.card || null);
+              setAddActionsLocked(true);
+            }
             const deckName = decks.find((deck) => deck.id === deckId)?.name || 'het deck';
-            toast(`${selectedCard.name} is toegevoegd aan je collectie en aan ${deckName}.`, 'success', { position: 'top' });
-            setAddActionsLocked(true);
+            toast(`${card.name} is toegevoegd aan je collectie en aan ${deckName}.`, 'success', { position: 'top' });
             return true;
           }
         });
@@ -468,6 +512,7 @@ export async function renderAddCard(context) {
         const form = document.getElementById('add-collection-form');
         if (!form || !selectedCard || !selectedPrinting) return;
 
+        const boundPrintingKey = selectedPrinting.printingKey;
         const languageSelect = form.querySelector('[name="language"]');
         const finishSelect = form.querySelector('[name="finish"]');
         let languagePreviewSequence = 0;
@@ -489,7 +534,10 @@ export async function renderAddCard(context) {
           const currentSequence = ++languagePreviewSequence;
           try {
             const exactVariant = await api(`/cards/preview/${encodeURIComponent(variant.scryfallId)}`);
-            if (currentSequence !== languagePreviewSequence || languageSelect.value !== selectedLanguage) return;
+            if (currentSequence !== languagePreviewSequence
+              || languageSelect.value !== selectedLanguage
+              || selectedPrinting?.printingKey !== boundPrintingKey
+              || form !== document.getElementById('add-collection-form')) return;
             selectedCard = exactVariant;
             panel.querySelectorAll('[data-card-detail-link]').forEach((link) => link.setAttribute('href', `#/cards/${Number(exactVariant.id)}`));
           } catch {
@@ -501,14 +549,24 @@ export async function renderAddCard(context) {
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
           if (actionsLocked) return;
+          const submittedCard = selectedCard;
+          const submittedPrinting = selectedPrinting;
+          const submittedPrintingKey = submittedPrinting?.printingKey;
+          if (!submittedCard || !submittedPrintingKey) return;
+          const payload = currentCollectionPayload(form, {
+            card: submittedCard,
+            printing: submittedPrinting
+          });
           const button = form.querySelector('[type="submit"]');
           setAddActionsLocked(true);
           button.textContent = 'Toevoegen…';
           let succeeded = false;
           try {
-            const added = await api('/collection', { method: 'POST', body: currentCollectionPayload(form) });
-            await refreshSelectedUsage(added.card || null);
-            toast(`${selectedCard.name} is aan je collectie toegevoegd.`, 'success', { position: 'top' });
+            const added = await api('/collection', { method: 'POST', body: payload });
+            if (selectionIsCurrent(form, submittedPrintingKey)) {
+              await refreshSelectedUsage(added.card || null);
+            }
+            toast(`${submittedCard.name} is aan je collectie toegevoegd.`, 'success', { position: 'top' });
             succeeded = true;
           } catch (error) {
             toast(error.message, 'error', { position: 'top' });
@@ -521,11 +579,15 @@ export async function renderAddCard(context) {
         });
 
         document.getElementById('selected-to-wanted')?.addEventListener('click', () => {
+          const wantedCard = selectedCard;
+          const wantedPrintingKey = selectedPrinting?.printingKey;
+          if (!wantedCard || !wantedPrintingKey) return;
           const data = new FormData(form);
-          addCardToWanted(selectedCard, {
+          addCardToWanted(wantedCard, {
             quantity: Number(formValue(data, 'quantity', '1')),
             toastOptions: { position: 'top' },
             onDone: async () => {
+              if (!selectionIsCurrent(form, wantedPrintingKey)) return;
               await refreshSelectedUsage();
               setAddActionsLocked(true);
             }
@@ -533,7 +595,20 @@ export async function renderAddCard(context) {
         });
 
         document.getElementById('selected-to-collection-deck')?.addEventListener('click', () => {
-          openCollectionDeckDialog(form).catch((error) => toast(error.message, 'error', { position: 'top' }));
+          const deckCard = selectedCard;
+          const deckPrinting = selectedPrinting;
+          const deckPrintingKey = deckPrinting?.printingKey;
+          if (!deckCard || !deckPrintingKey) return;
+          const collectionPayload = currentCollectionPayload(form, {
+            card: deckCard,
+            printing: deckPrinting
+          });
+          openCollectionDeckDialog({
+            form,
+            card: deckCard,
+            printingKey: deckPrintingKey,
+            collectionPayload
+          }).catch((error) => toast(error.message, 'error', { position: 'top' }));
         });
       };
 
@@ -569,7 +644,12 @@ export async function renderAddCard(context) {
         collectorSelect.value = validSelected;
       };
 
-      const choosePrinting = async (button, { updateRoute = true, scrollToActions = true } = {}) => {
+      const choosePrinting = async (button, {
+        updateRoute = true,
+        scrollToActions = true,
+        loadSequence = printingLoadSequence
+      } = {}) => {
+        if (loadSequence !== printingLoadSequence) return;
         const index = Number(button.dataset.printingIndex);
         const nextPrinting = loadedPrintings[index];
         if (!nextPrinting) return;
@@ -579,6 +659,7 @@ export async function renderAddCard(context) {
           if (scrollToActions) scrollActionsIntoView();
           return;
         }
+        const selectionSequence = ++printingSelectionSequence;
         selectedPrinting = nextPrinting;
         list.querySelectorAll('.printing-card').forEach((item) => {
           item.disabled = true;
@@ -587,19 +668,26 @@ export async function renderAddCard(context) {
         if (updateRoute) updateAddRoute({ name: search.value.trim(), printing: selectedPrinting.scryfallId });
         panel.innerHTML = '<div class="panel"><div class="page-loading"><span class="spinner"></span><p>Printinginformatie laden…</p></div></div>';
         try {
-          selectedCard = await api(`/cards/preview/${encodeURIComponent(selectedPrinting.scryfallId)}`);
+          const previewCard = await api(`/cards/preview/${encodeURIComponent(nextPrinting.scryfallId)}`);
+          if (loadSequence !== printingLoadSequence
+            || selectionSequence !== printingSelectionSequence
+            || selectedPrinting?.printingKey !== nextPrinting.printingKey) return;
+          selectedCard = previewCard;
           panel.innerHTML = selectedPanel(selectedCard, selectedPrinting);
           bindSelectedActions();
           setAddActionsLocked(false);
           if (scrollToActions) scrollActionsIntoView();
         } catch (error) {
+          if (loadSequence !== printingLoadSequence || selectionSequence !== printingSelectionSequence) return;
           toast(error.message, 'error', { position: 'top' });
           selectedPrinting = null;
           list.querySelectorAll('.printing-card').forEach((item) => item.classList.remove('selected'));
           panel.innerHTML = selectedPanel(null, null);
           if (updateRoute) updateAddRoute({ name: search.value.trim(), printing: '' });
         } finally {
-          list.querySelectorAll('button').forEach((item) => { item.disabled = false; });
+          if (loadSequence === printingLoadSequence && selectionSequence === printingSelectionSequence) {
+            list.querySelectorAll('button').forEach((item) => { item.disabled = false; });
+          }
         }
       };
 
@@ -611,6 +699,9 @@ export async function renderAddCard(context) {
       };
 
       const loadPrintings = async (name, { restorePrinting = '', restoreCollectorNumber = '' } = {}) => {
+        const loadSequence = ++printingLoadSequence;
+        printingSelectionSequence += 1;
+        suggestionSequence += 1;
         search.value = name;
         resetSelection();
         loadedPrintings = [];
@@ -623,25 +714,38 @@ export async function renderAddCard(context) {
         list.innerHTML = '';
         try {
           const response = await api(`/cards/printings${queryString({ name })}`);
+          if (loadSequence !== printingLoadSequence) return;
           loadedPrintings = response.data || response;
           populateCollectorNumbers(restoreCollectorNumber);
           renderPrintingList();
 
-          if (restorePrinting) {
-            const restoreIndex = loadedPrintings.findIndex((printing) => printing.scryfallId === restorePrinting
-              || printing.variants?.some((variant) => variant.scryfallId === restorePrinting));
-            if (restoreIndex >= 0) {
-              const printing = loadedPrintings[restoreIndex];
-              if (collectorSelect.value && String(printing.collectorNumber) !== collectorSelect.value) {
-                populateCollectorNumbers(printing.collectorNumber);
-                renderPrintingList();
-              }
-              const restoreButton = list.querySelector(`[data-printing-index="${restoreIndex}"]`);
-              if (restoreButton) await choosePrinting(restoreButton, { updateRoute: false, scrollToActions: false });
+          const preferredIndex = preferredPrintingIndex(loadedPrintings, {
+            scryfallId: restorePrinting,
+            collectorNumber: collectorSelect.value
+          });
+          if (preferredIndex >= 0) {
+            const printing = loadedPrintings[preferredIndex];
+            const restoresDifferentCollectorNumber = restorePrinting
+              && printingContainsScryfallId(printing, restorePrinting)
+              && collectorSelect.value
+              && String(printing.collectorNumber) !== collectorSelect.value;
+            if (restoresDifferentCollectorNumber) {
+              populateCollectorNumbers(printing.collectorNumber);
+              renderPrintingList();
+            }
+            const preferredButton = list.querySelector(`[data-printing-index="${preferredIndex}"]`);
+            if (preferredButton) {
+              await choosePrinting(preferredButton, {
+                updateRoute: false,
+                scrollToActions: false,
+                loadSequence
+              });
             }
           }
-          updateAddRoute({ name, printing: restorePrinting && selectedPrinting ? selectedPrinting.scryfallId : '' });
+          if (loadSequence !== printingLoadSequence) return;
+          updateAddRoute({ name, printing: selectedPrinting?.scryfallId || '' });
         } catch (error) {
+          if (loadSequence !== printingLoadSequence) return;
           status.hidden = false;
           status.textContent = error.message;
         }
@@ -650,27 +754,74 @@ export async function renderAddCard(context) {
       const suggest = debounce(async () => {
         const query = search.value.trim();
         if (query.length < 2) {
+          suggestionSequence += 1;
           suggestions.hidden = true;
           return;
         }
+        const currentSuggestionSequence = ++suggestionSequence;
         try {
           const response = await api(`/cards/autocomplete${queryString({ q: query })}`);
+          if (currentSuggestionSequence !== suggestionSequence || search.value.trim() !== query) return;
           const names = response.data || response;
           suggestions.innerHTML = names.map((name) => `<button type="button" data-name="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
           suggestions.hidden = !names.length;
           suggestions.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => loadPrintings(button.dataset.name)));
         } catch (error) {
+          if (currentSuggestionSequence !== suggestionSequence || search.value.trim() !== query) return;
           suggestions.innerHTML = `<div class="picker-status">${escapeHtml(error.message)}</div>`;
           suggestions.hidden = false;
         }
       }, 220);
 
-      collectorSelect.addEventListener('change', () => {
+      collectorSelect.addEventListener('change', async () => {
+        const collectorNumber = collectorSelect.value;
+        const selectedRemainsVisible = selectedPrinting
+          && (!collectorNumber || String(selectedPrinting.collectorNumber || '') === collectorNumber);
+
+        if (selectedRemainsVisible) {
+          renderPrintingList();
+          updateAddRoute();
+          return;
+        }
+
+        // Een kaartnummerfilter mag geen eerder gekozen, nu verborgen printing
+        // in het rechterpaneel laten staan. Annuleer een eventueel lopende
+        // preview en kies binnen het nieuwe filter opnieuw zonder te scrollen.
+        printingSelectionSequence += 1;
+        resetSelection();
         renderPrintingList();
-        updateAddRoute();
+        const preferredIndex = preferredPrintingIndex(loadedPrintings, { collectorNumber });
+        const preferredButton = preferredIndex >= 0
+          ? list.querySelector(`[data-printing-index="${preferredIndex}"]`)
+          : null;
+        if (preferredButton) {
+          await choosePrinting(preferredButton, { scrollToActions: false });
+          return;
+        }
+        updateAddRoute({ printing: '' });
       });
       document.getElementById('import-collection-list')?.addEventListener('click', openCollectionImportDialog);
-      search.addEventListener('input', suggest);
+      search.addEventListener('input', () => {
+        // Verberg resultaten van de vorige zoekterm direct. Zo kan Enter niet
+        // in het debouncevenster per ongeluk nog een oude suggestie kiezen en
+        // kan een eerder gestart printingverzoek de nieuwe zoekterm niet winnen.
+        printingLoadSequence += 1;
+        printingSelectionSequence += 1;
+        suggestionSequence += 1;
+        resetSelection();
+        loadedPrintings = [];
+        collectorSelect.disabled = true;
+        collectorSelect.innerHTML = '<option value="">Alle kaartnummers</option>';
+        list.innerHTML = '';
+        status.hidden = false;
+        status.textContent = search.value.trim().length >= 2
+          ? 'Kies een kaartnaam uit de zoeksuggesties.'
+          : 'Typ minimaal twee letters om een kaart te zoeken.';
+        suggestions.hidden = true;
+        suggestions.innerHTML = '';
+        updateAddRoute({ name: '', printing: '', collectorNumber: '' });
+        suggest();
+      });
       search.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
