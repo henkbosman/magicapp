@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.6.0
+MAGIC COLLECTION MANAGER READ API 2.7.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.6.0"}
+{"status":"ok","version":"2.7.0"}
 
 GET /api/read/dashboard
 
@@ -218,7 +218,7 @@ OUTPUT JSON
 
 GET /api/read/collection/options
 
-Geeft lokaal beschikbare sets, abilities en decks voor collectiefilters.
+Geeft lokaal beschikbare sets, abilities en decks voor collectiefilters. abilities bevat exacte kaartkeywords en kan daarnaast de synthetische waarde Mana produceren bevatten wanneer minstens één kaart in de collectie effectief mana produceert.
 
 INPUT JSON
 
@@ -229,7 +229,7 @@ OUTPUT JSON
 {
   "data": {
     "sets": [{"code":"mh1","name":"Modern Horizons","quantity":4}],
-    "abilities": [{"name":"Trample","cardCount":12}],
+    "abilities": [{"name":"Mana produceren","cardCount":8},{"name":"Trample","cardCount":12}],
     "decks": [{"id":4,"name":"Yedora"}]
   }
 }
@@ -246,9 +246,9 @@ OUTPUT JSON
 
 Niet van toepassing. Responsebody is text/csv met kolommen name,setcode,setname,collectornumber,quantity,finish,language,condition,location,notes,purchaseprice,scryfall_id.
 
-GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&colorMode={and|or}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}
+GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&colorMode={and|or}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword|Mana produceren}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}
 
-Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. colorMode=and is standaard en vereist exact de gekozen kleuridentiteit: color=G toont mono-groen en color=G,W exact groen-wit. colorMode=or toont kaarten die minimaal één gekozen kleur gebruiken; C neemt kleurloze kaarten als alternatief mee. Herhaalde color-parameters worden ook geaccepteerd.
+Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. ability accepteert een exact kaartkeyword of de synthetische waarde Mana produceren. colorMode=and is standaard en vereist exact de gekozen kleuridentiteit: color=G toont mono-groen en color=G,W exact groen-wit. colorMode=or toont kaarten die minimaal één gekozen kleur gebruiken; C neemt kleurloze kaarten als alternatief mee. Herhaalde color-parameters worden ook geaccepteerd.
 
 INPUT JSON
 
@@ -565,7 +565,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.6.0",
+    "applicationVersion": "2.7.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

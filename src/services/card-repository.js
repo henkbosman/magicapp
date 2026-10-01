@@ -1,9 +1,9 @@
 import { db, transaction } from '../db/database.js';
 import { HttpError, assert } from '../lib/http-error.js';
 import { isBasicLand } from '../lib/card-rules.js';
-import { normalizeSearchText } from '../lib/text.js';
+import { normalizeSearchText, safeJsonParse } from '../lib/text.js';
 import { cardRowToApi, mapScryfallCard } from './card-mapper.js';
-import { enrichCardWithInsights, enrichCardsWithInsights } from './card-insight-service.js';
+import { enrichCardWithInsights, enrichCardsWithInsights, hasEffectiveManaProduction } from './card-insight-service.js';
 import { alignDeckPrintingsAfterAcquisition } from './deck-printing-service.js';
 
 const CARD_COLUMNS = [
@@ -291,6 +291,30 @@ export function searchCards(query, limit = 20) {
 }
 
 const COLLECTION_COLOR_CODES = new Set(['W', 'U', 'B', 'R', 'G', 'C', 'M']);
+const COLLECTION_MANA_PRODUCTION_ABILITY = 'Mana produceren';
+const COLLECTION_MANA_PRODUCTION_SQL_FUNCTION = 'collection_card_produces_mana';
+
+db.function(COLLECTION_MANA_PRODUCTION_SQL_FUNCTION, { deterministic: true }, (
+  oracleText,
+  producedManaJson,
+  storedManaJson
+) => (hasEffectiveManaProduction({
+  oracleText: String(oracleText || ''),
+  producedMana: safeJsonParse(producedManaJson, [])
+}, storedManaJson) ? 1 : 0));
+
+function collectionManaProductionCondition(cardAlias = 'c') {
+  const cardKey = `COALESCE(${cardAlias}.oracle_id, ${cardAlias}.scryfall_id)`;
+  return `${COLLECTION_MANA_PRODUCTION_SQL_FUNCTION}(
+    ${cardAlias}.oracle_text,
+    ${cardAlias}.produced_mana_json,
+    (
+      SELECT mana_metadata.mana_production_json
+      FROM card_user_metadata mana_metadata
+      WHERE mana_metadata.card_key = ${cardKey}
+    )
+  ) = 1`;
+}
 
 function flattenQueryValues(value) {
   if (Array.isArray(value)) return value.flatMap(flattenQueryValues);
@@ -376,11 +400,16 @@ export function listCollection(filters = {}) {
     }
   }
   if (filters.ability) {
-    conditions.push(`EXISTS (
-      SELECT 1 FROM json_each(c.keywords_json) AS keyword
-      WHERE LOWER(CAST(keyword.value AS TEXT)) = LOWER(?)
-    )`);
-    params.push(String(filters.ability));
+    const ability = String(filters.ability).trim();
+    if (ability.toLocaleLowerCase('nl-NL') === COLLECTION_MANA_PRODUCTION_ABILITY.toLocaleLowerCase('nl-NL')) {
+      conditions.push(collectionManaProductionCondition('c'));
+    } else {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM json_each(c.keywords_json) AS keyword
+        WHERE LOWER(CAST(keyword.value AS TEXT)) = LOWER(?)
+      )`);
+      params.push(ability);
+    }
   }
   // Commander-legaliteit blijft voor bestaande API-koppelingen ondersteund,
   // maar wordt niet meer als filter in de collectie-interface aangeboden.
@@ -481,21 +510,33 @@ export function listCollection(filters = {}) {
 }
 
 export function collectionFilterOptions() {
+  const abilities = db.prepare(`
+    SELECT keyword.value AS name, COUNT(DISTINCT COALESCE(c.oracle_id, c.scryfall_id)) AS card_count
+    FROM collection_items ci
+    JOIN cards c ON c.id = ci.card_id
+    JOIN json_each(c.keywords_json) AS keyword
+    WHERE keyword.type = 'text' AND TRIM(CAST(keyword.value AS TEXT)) <> ''
+    GROUP BY LOWER(CAST(keyword.value AS TEXT))
+    ORDER BY CAST(keyword.value AS TEXT) COLLATE NOCASE
+  `).all().map((row) => ({ name: String(row.name), cardCount: Number(row.card_count) }));
+  const manaProductionCount = Number(db.prepare(`
+    SELECT COUNT(DISTINCT COALESCE(c.oracle_id, c.scryfall_id)) AS card_count
+    FROM collection_items ci
+    JOIN cards c ON c.id = ci.card_id
+    WHERE ${collectionManaProductionCondition('c')}
+  `).get().card_count || 0);
+  if (manaProductionCount > 0) {
+    abilities.push({ name: COLLECTION_MANA_PRODUCTION_ABILITY, cardCount: manaProductionCount });
+    abilities.sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
+  }
+
   return {
     sets: db.prepare(`
       SELECT c.set_code AS code, c.set_name AS name, SUM(ci.quantity) AS quantity
       FROM collection_items ci JOIN cards c ON c.id = ci.card_id
       GROUP BY c.set_code, c.set_name ORDER BY c.set_name COLLATE NOCASE
     `).all().map((row) => ({ ...row, quantity: Number(row.quantity) })),
-    abilities: db.prepare(`
-      SELECT keyword.value AS name, COUNT(DISTINCT COALESCE(c.oracle_id, c.scryfall_id)) AS card_count
-      FROM collection_items ci
-      JOIN cards c ON c.id = ci.card_id
-      JOIN json_each(c.keywords_json) AS keyword
-      WHERE keyword.type = 'text' AND TRIM(CAST(keyword.value AS TEXT)) <> ''
-      GROUP BY LOWER(CAST(keyword.value AS TEXT))
-      ORDER BY CAST(keyword.value AS TEXT) COLLATE NOCASE
-    `).all().map((row) => ({ name: String(row.name), cardCount: Number(row.card_count) })),
+    abilities,
     decks: db.prepare('SELECT id, name FROM decks ORDER BY name COLLATE NOCASE').all().map((row) => ({ id: Number(row.id), name: row.name }))
   };
 }

@@ -1,5 +1,6 @@
 import { api, apiPath, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
+import { openCardPreview } from '../card-preview.js';
 import { cardImage, cardInsightBadges, manaCost, manaSymbol, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
@@ -74,11 +75,11 @@ function renderCollectionRows(items, hasFilters = false) {
     );
   }
   return `<div class="card-list">${items.map((item) => `
-    <article class="card-list-item">
-      <a class="card-thumb-link" data-card-detail-link href="#/cards/${item.card.id}">${cardImage(item.card, { className: 'list-thumb' })}</a>
+    <article class="card-list-item collection-card-row">
+      <a class="card-thumb-link card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}">${cardImage(item.card, { className: 'list-thumb' })}</a>
       <div class="card-list-content">
         <div class="card-title-row collection-card-title-row">
-          <a data-card-detail-link href="#/cards/${item.card.id}"><strong>${escapeHtml(item.card.name)}</strong></a>
+          <a class="card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}"><strong>${escapeHtml(item.card.name)}</strong></a>
           <span class="collection-title-meta">${manaCost(item.card.manaCost)}${rarityBadge(item.card.rarity)}${collectionPrice(item)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></span>
         </div>
         <p class="card-meta">${escapeHtml(item.card.setName)} (${escapeHtml(item.card.setCode.toUpperCase())}) #${escapeHtml(item.card.collectorNumber)} · ${escapeHtml(item.language)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</p>
@@ -210,6 +211,14 @@ export async function renderCollection(context) {
       });
 
       resultsElement.addEventListener('click', async (event) => {
+        const previewLink = event.target.closest('[data-card-preview-id]');
+        if (previewLink && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          const previewItem = items.find((candidate) => candidate.id === Number(previewLink.dataset.cardPreviewId));
+          if (previewItem) openCardPreview(previewItem.card);
+          return;
+        }
+
         const deckButton = event.target.closest('.collection-to-deck');
         const insightButton = event.target.closest('.edit-card-insights');
         const editButton = event.target.closest('.edit-item');

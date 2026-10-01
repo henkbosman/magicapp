@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.6.0
+# Magic Collection Manager 2.7.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.6.0** voegt een gecontroleerde, atomaire kaartenlijstimport toe en toont mana- en tapsymbolen ook in kaartteksten als iconen. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.7.0** voegt kaartpreviews, een grote gegroepeerde deckweergave en een filter voor mana-producerende kaarten toe. De gecontroleerde kaartenlijstimport en de mana- en tapsymbolen uit 2.6 blijven onderdeel van deze release. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -145,9 +145,11 @@ Externe resultaten worden tijdelijk in SQLite gecachet. Kaartafbeeldingen worden
 
 Via **Instellingen en onderhoud** kan de externe responsecache worden geleegd of lokaal opgeslagen kaartmetadata opnieuw met Scryfall worden gesynchroniseerd. Gebruikersgegevens zoals aantallen, decks, wanted-status, notities en aankoopprijzen worden daarbij niet overschreven.
 
-## Kaart toevoegen
+## Kaart opzoeken en toevoegen
 
 Na het kiezen van een kaartnaam worden alle papieren printings getoond. Een keuzelijst met collectornummers kan de lijst beperken tot één kaartnummer. Na selectie springt de pagina naar de invoer en toont zij uitsluitend de beschikbare EUR-prijzen van die printing.
+
+De link **Kaart opzoeken** in het linkermenu blijft altijd beschikbaar, ook wanneer de write-API is uitgeschakeld. Alleen de acties die gegevens wijzigen worden dan verborgen of geblokkeerd.
 
 Het opmerkingenveld is uit deze snelle invoer verwijderd. Aantal, taal, afwerking, conditie, locatie, aankoopprijs en de wanted-afstemming blijven staan nadat een actie is uitgevoerd. Na een geslaagde actie worden de drie actieknoppen geblokkeerd om dubbel toevoegen te voorkomen; een nieuwe printingselectie activeert ze weer.
 
@@ -169,6 +171,7 @@ De collectie ondersteunt onder andere filters op:
 - subtype;
 - mana value;
 - ability/keyword;
+- mana produceren;
 - set;
 - rarity;
 - afwerking;
@@ -177,13 +180,15 @@ De collectie ondersteunt onder andere filters op:
 
 Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Met **Filters tonen** kunnen ze worden geopend; met **Filters resetten** worden alle collectiecriteria in één keer gewist. Kleuridentiteit gebruikt compacte, aanklikbare manasymbolen. Een geselecteerd symbool krijgt een dikke rand. De zevende knop wisselt tussen **AND** en **OR**. AND vereist exact de gekozen identiteit; OR toont kaarten die minimaal één gekozen kleur gebruiken. Kleurloos is in OR-modus een afzonderlijk alternatief. Iedere collectieregel toont daarnaast de Scryfall-prijs voor de concrete printing en afwerking. De detailpagina herstelt bij teruggaan de eerdere filters en scrollpositie.
 
+Een klik op de kaartafbeelding of kaartnaam opent eerst een grote preview. Via **Details** wordt daarna de volledige kaartpagina geopend. De manakosten gebruiken een vaste kolom en verschuiven niet door een kortere of langere rarity-tag.
+
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 
 ## Decks
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels. Via het printingoverzicht van zo'n samengevoegde regel blijven de afzonderlijke printings beheerbaar.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Met **Lijst** en **Kaarten** kan worden gewisseld tussen de beheerlijst en een grote visuele weergave per hoofdkaarttype. Beide weergaven gebruiken dezelfde filters; de kaartweergave en filters worden in de URL bewaard. Een klik op een kaart opent eerst de grote preview. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. De optie om ontbrekende exemplaren ook aan Wanted toe te voegen staat standaard uit. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels. Via het printingoverzicht van zo'n samengevoegde regel blijven de afzonderlijke printings beheerbaar.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven. De tekstexport bundelt gelijke Oracle-kaarten over verschillende printings en exporteert bijvoorbeeld één regel `24 Forest` in plaats van meerdere losse Forest-regels.
 
@@ -227,6 +232,8 @@ De wanted-list gebruikt een standaard ingeklapte filtersectie, heeft een knop **
 
 Heeft een kaart aantoonbaar precies één papieren printing, dan kan deze automatisch worden gekozen. Bij aankoop kan de werkelijk gekochte printing aan de betreffende deckregel worden gekoppeld. Bij het toevoegen van een nieuw wanted-item opent na het aanklikken van de kaartnaam direct het formulier voor aantal, prioriteit, maximumprijs en opmerkingen; er is geen tussenstap meer waarin eerst één representatieve printing gekozen moet worden. De knop **Printing** blijft in alleen-lezenmodus beschikbaar om alle uitvoeringen en prijzen te bekijken, terwijl het wijzigen van de keuze uitgeschakeld blijft.
 
+In de wanted-lijst opent een klik op de kaartafbeelding of kaartnaam eerst de grote kaartpreview. De knop **Details** opent vervolgens de volledige kaartpagina.
+
 ## Database
 
 Een nieuwe 2.0-installatie maakt rechtstreeks `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts.
@@ -265,9 +272,9 @@ Voor een snelle syntaxcontrole:
 npm run check
 ```
 
-De applicatie bevat bewust geen automatische unit-, integratie- of end-to-endtests, conform de projectspecificatie.
+De applicatie bevat gerichte regressietests voor kritieke repositorylogica en weergavecontracten. Voer ze uit met `npm test`.
 
 
-## Read-only kaart toevoegen
+## Read-only kaart opzoeken
 
-Ook wanneer `/api/write` door de reverse proxy is geblokkeerd, blijven de globale zoekactie en de printinglijst onder **Kaart toevoegen** bruikbaar. Een printing kan worden bekeken en de kaartdetailpagina kan worden geopend. De invoervelden en knoppen waarmee collectie-, deck- of wantedgegevens worden gewijzigd, worden in read-only mode verborgen.
+Ook wanneer `/api/write` door de reverse proxy is geblokkeerd, blijven de globale zoekactie en de printinglijst onder **Kaart opzoeken** bruikbaar. Een printing kan worden bekeken en de kaartdetailpagina kan worden geopend. De invoervelden en knoppen waarmee collectie-, deck- of wantedgegevens worden gewijzigd, worden in read-only mode verborgen.

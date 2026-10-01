@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.7.0 - 2026-09-30
+
+### Navigatie en kaartpreview
+
+- **Kaart toevoegen** in het linkermenu heet nu **Kaart opzoeken** en blijft ook in alleen-lezenmodus beschikbaar.
+- In Collectie, Wanted en de decklijst opent een klik op de kaartafbeelding of kaartnaam eerst een grote preview met **Sluiten** en **Details**. Dubbelzijdige kaarten tonen beide zijden; **Details** bewaart de terugkeer- en scrollcontext.
+- Bij het toevoegen van een kaart aan een deck staat **Ontbrekende exemplaren ook aan Wanted toevoegen** standaard uit.
+
+### Decks
+
+- De deckpagina kan naast de beheerlijst een visuele kaartweergave tonen. Kaarten worden groot en per hoofdkaarttype gegroepeerd, met het aantal exemplaren als overlay.
+- Zoek-, rol- en kaarttypefilters werken in beide weergaven. De gekozen kaartweergave wordt in de URL bewaard.
+- De manakosten hebben in de lijst een vaste horizontale positie, onafhankelijk van de aanwezigheid van een Wanted-knop.
+- De drie knoppen in **Deckacties** gebruiken dezelfde uitlijning.
+
+### Collectie
+
+- Manakosten blijven op één positie staan, onafhankelijk van de breedte van de rarity-tag.
+- De abilityfilter bevat **Mana produceren**. Deze optie herkent onder meer Llanowar Elves en respecteert zowel kaarttekst/Scryfall-gegevens als handmatige mana-correcties.
+
+### API en database
+
+- Er zijn geen nieuwe endpointpaden. De bestaande collectie-endpoints ondersteunen de synthetische abilitywaarde `Mana produceren`.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.6.0 - 2026-09-20
 
 ### Interface

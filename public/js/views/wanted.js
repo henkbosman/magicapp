@@ -1,6 +1,7 @@
 import { api, apiPath, queryString } from '../api.js';
 import { addCardToCollection, addCardToWanted } from '../card-actions.js';
 import { pickCard } from '../card-picker.js';
+import { openCardPreview } from '../card-preview.js';
 import { cachedCardImageUrl, cardImage, pageHeader, usageBadges } from '../components.js';
 import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
@@ -200,10 +201,10 @@ function renderWantedRows(items, hasFilters = false) {
     const displayCard = item.printing || item.card;
     const availableSets = item.printingCatalog?.sets?.length || 0;
     return `<article class="card-list-item wanted-row">
-      <a class="card-thumb-link" data-card-detail-link href="#/cards/${displayCard.id || item.card.id}">${cardImage(displayCard, { className: 'list-thumb' })}</a>
+      <a class="card-thumb-link card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${displayCard.id || item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(displayCard.name || item.card.name)}">${cardImage(displayCard, { className: 'list-thumb' })}</a>
       <div class="card-list-content">
         <div class="card-title-row">
-          <a data-card-detail-link href="#/cards/${item.card.id}"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></a>
+          <a class="card-preview-trigger" data-card-detail-link data-card-preview-id="${item.id}" href="#/cards/${displayCard.id || item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${item.quantity}× ${escapeHtml(displayCard.name || item.card.name)}"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></a>
           <span class="wanted-title-meta">${rarityBadges(item)}${stars(item.priority)}</span>
         </div>
         <p class="card-meta wanted-printing-meta">${selectedPrintingText(item)}</p>
@@ -359,6 +360,17 @@ export async function renderWanted(context) {
 
       document.getElementById('add-wanted')?.addEventListener('click', addWanted);
       resultsElement.addEventListener('click', async (event) => {
+        const previewLink = event.target.closest('[data-card-preview-id]');
+        if (previewLink && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          const previewItem = items.find((candidate) => candidate.id === Number(previewLink.dataset.cardPreviewId));
+          if (previewItem) {
+            const displayCard = previewItem.printing || previewItem.card;
+            openCardPreview(displayCard, { detailCardId: displayCard.id || previewItem.card.id });
+          }
+          return;
+        }
+
         const emptyButton = event.target.closest('#empty-add-wanted');
         if (emptyButton) {
           addWanted();

@@ -47,7 +47,7 @@ function token() {
 
 function sourceLabel(hash = '') {
   if (hash.startsWith('#/collection')) return 'Terug naar collectie';
-  if (hash.startsWith('#/add')) return 'Terug naar kaart toevoegen';
+  if (hash.startsWith('#/add')) return 'Terug naar kaart opzoeken';
   if (hash.startsWith('#/wanted')) return 'Terug naar Wanted';
   if (/^#\/decks\/\d+\/stats/.test(hash)) return 'Terug naar deckstatistieken';
   if (/^#\/decks\/\d+\/simulate/.test(hash)) return 'Terug naar simulator';

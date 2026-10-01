@@ -155,7 +155,7 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
       <div class="field full"><label>Notitie</label><textarea name="note"></textarea></div>
       ${basicLand
         ? '<p class="form-note full">Basic lands worden automatisch als beschikbaar behandeld en niet aan Wanted toegevoegd.</p>'
-        : '<label class="checkbox-field full"><input name="addMissingWanted" type="checkbox" checked> Ontbrekende exemplaren ook aan Wanted toevoegen</label>'}
+        : '<label class="checkbox-field full"><input name="addMissingWanted" type="checkbox"> Ontbrekende exemplaren ook aan Wanted toevoegen</label>'}
     </div>`,
     onSubmit: async (data) => {
       const selectedDeckId = Number(formValue(data, 'deckId'));

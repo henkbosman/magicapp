@@ -1364,6 +1364,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .selected-printing-detail-link { display: inline-block; border-radius: 10px; }
 .selected-printing-detail-link:focus-visible { outline: 3px solid var(--focus, #4f7f5a); outline-offset: 3px; }
 .selected-printing-detail-link .card-image { cursor: zoom-in; }
+.card-preview-trigger { cursor: zoom-in; }
 
 /* Release 2.1.0: grotere deckkaartkiezer, filterreset en verfijnde detailopmaak */
 .modal-card-picker {
@@ -1635,4 +1636,187 @@ html.write-unavailable [data-write-only] { display: none !important; }
   .basic-land-printing-row { grid-template-columns: 42px minmax(0, 1fr); align-items: start; }
   .basic-land-printing-actions { grid-column: 1 / -1; justify-content: stretch; }
   .basic-land-printing-actions .button { flex: 1 1 auto; }
+}
+
+/* Release 2.7.0: vaste metadata- en manakolommen in kaartlijsten */
+@media (min-width: 641px) {
+  .collection-title-meta {
+    display: grid;
+    grid-template-columns: max-content 5.25rem 5.75rem 4.25rem;
+    align-items: center;
+    gap: 7px;
+  }
+  .collection-title-meta > .mana-cost { justify-self: end; flex-wrap: nowrap; }
+  .collection-title-meta > .rarity-badge { width: 100%; text-align: center; }
+  .collection-title-meta > .collection-market-price { width: 100%; min-width: 0; }
+  .collection-title-meta > .collection-quantity { width: 100%; min-width: 0; text-align: center; }
+}
+
+@media (min-width: 641px) and (max-width: 1279px) {
+  .collection-card-row { grid-template-columns: 58px minmax(0, 1fr); }
+  .collection-card-row > .card-list-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  #deck-card-list > .deck-card-row { grid-template-columns: 46px minmax(0, 1fr); }
+  #deck-card-list > .deck-card-row > .card-list-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (min-width: 1280px) {
+  #deck-card-list {
+    grid-template-columns: 46px minmax(0, 1fr) minmax(360px, 42%);
+    column-gap: 14px;
+  }
+  #deck-card-list > .deck-card-row {
+    grid-column: 1 / -1;
+    grid-template-columns: 46px minmax(0, 1fr) minmax(360px, 42%);
+  }
+  @supports (grid-template-columns: subgrid) {
+    #deck-card-list > .deck-card-row { grid-template-columns: subgrid; }
+  }
+}
+
+/* Deckweergave: wisselen tussen een beheerlijst en grote kaarten per hoofdtype. */
+.deck-panel-heading,
+.deck-panel-actions,
+.deck-view-toggle {
+  display: flex;
+  align-items: center;
+}
+.deck-panel-heading { min-width: 0; gap: 14px; }
+.deck-panel-heading h2 { margin: 0; }
+.deck-panel-actions { justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
+.deck-view-toggle {
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+.deck-view-button {
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+.deck-view-button:hover { color: var(--ink); }
+.deck-view-button.active {
+  background: var(--surface);
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+.deck-view-button:focus-visible,
+.deck-card-preview-trigger:focus-visible,
+.deck-card-name-preview:focus-visible,
+.deck-visual-card-trigger:focus-visible {
+  outline: 3px solid rgba(40, 99, 62, .22);
+  outline-offset: 2px;
+}
+.deck-card-preview-trigger,
+.deck-card-name-preview,
+.deck-visual-card-trigger {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.deck-card-preview-trigger,
+.deck-visual-card-trigger { cursor: zoom-in; }
+.deck-card-preview-trigger { align-self: center; display: block; border-radius: 6px; }
+.deck-card-name-preview { text-align: left; cursor: zoom-in; }
+.deck-card-name-preview:hover { color: var(--primary); }
+
+.deck-visual-groups { display: grid; gap: 28px; }
+.deck-visual-group { min-width: 0; }
+.deck-visual-group-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid var(--line);
+}
+.deck-visual-group-header h3 { margin: 0; }
+.deck-visual-group-count {
+  min-width: 28px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: .72rem;
+  font-weight: 820;
+  text-align: center;
+}
+.deck-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 320px));
+  align-items: start;
+  gap: 20px;
+}
+.deck-visual-card { min-width: 0; }
+.deck-visual-card-trigger {
+  width: 100%;
+  position: relative;
+  display: block;
+  border-radius: 15px;
+  transition: transform .16s ease, filter .16s ease;
+}
+.deck-visual-card-trigger:hover { transform: translateY(-3px); filter: brightness(1.025); }
+.deck-visual-card-image,
+.card-image-placeholder.deck-visual-card-image {
+  width: 100%;
+  aspect-ratio: 488 / 680;
+  display: grid;
+  object-fit: cover;
+  border-radius: 15px;
+  box-shadow: 0 14px 30px rgba(16, 26, 19, .2);
+}
+.deck-visual-card-quantity {
+  min-width: 42px;
+  height: 34px;
+  padding: 0 10px;
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, .82);
+  border-radius: 999px;
+  background: rgba(17, 29, 21, .9);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .28);
+  font-size: .82rem;
+  font-weight: 850;
+}
+
+.deck-quick-actions > .quick-action {
+  align-items: stretch;
+}
+.deck-quick-actions > .quick-action,
+.deck-quick-actions > .quick-action > div,
+.deck-quick-actions > .quick-action > span {
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .deck-panel-header { align-items: stretch; flex-direction: column; }
+  .deck-panel-heading { justify-content: space-between; }
+  .deck-panel-actions { justify-content: flex-start; }
+  .deck-panel-actions .button { flex: 1 1 auto; }
+  .deck-visual-grid { grid-template-columns: minmax(0, 320px); justify-content: center; }
 }

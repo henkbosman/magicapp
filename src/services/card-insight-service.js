@@ -116,6 +116,25 @@ function deriveManaFromText(card) {
   return { source: entries.length ? 'oracle' : 'none', entries, detectedText };
 }
 
+function resolvedManaProduction(card, storedMana = null) {
+  const automatic = deriveManaFromText(card);
+  const hasManual = storedMana !== null && storedMana !== undefined;
+  const manual = hasManual
+    ? (typeof storedMana === 'string' ? safeJsonParse(storedMana, []) : storedMana)
+    : null;
+  return {
+    source: hasManual ? 'manual' : automatic.source,
+    automaticSource: automatic.source,
+    entries: hasManual ? normalizeStoredMana(manual) : automatic.entries,
+    detectedText: hasManual ? [] : automatic.detectedText,
+    automaticEntries: automatic.entries
+  };
+}
+
+export function hasEffectiveManaProduction(card, storedMana = null) {
+  return resolvedManaProduction(card, storedMana).entries.length > 0;
+}
+
 function deriveLibrarySearchFromText(card) {
   const text = String(card.oracleText || '');
   if (!/search your library/i.test(text)) return { source: 'none', targets: [], detectedText: [] };
@@ -163,21 +182,15 @@ export function metadataMapForKeys(keys) {
 }
 
 function insightsForCard(card, metadataRow = null) {
-  const autoMana = deriveManaFromText(card);
+  const manaProduction = resolvedManaProduction(card, metadataRow?.mana_production_json);
   const autoSearch = deriveLibrarySearchFromText(card);
-  const hasManualMana = metadataRow?.mana_production_json !== null && metadataRow?.mana_production_json !== undefined;
   const hasManualSearch = metadataRow?.library_search_targets_json !== null && metadataRow?.library_search_targets_json !== undefined;
-  const manualMana = hasManualMana ? safeJsonParse(metadataRow.mana_production_json, []) : null;
   const manualSearch = hasManualSearch ? safeJsonParse(metadataRow.library_search_targets_json, []) : null;
 
   return {
     manaProduction: {
-      source: hasManualMana ? 'manual' : autoMana.source,
-      automaticSource: autoMana.source,
-      entries: hasManualMana ? normalizeStoredMana(manualMana) : autoMana.entries,
+      ...manaProduction,
       note: metadataRow?.mana_production_note || '',
-      detectedText: hasManualMana ? [] : autoMana.detectedText,
-      automaticEntries: autoMana.entries
     },
     librarySearch: {
       source: hasManualSearch ? 'manual' : autoSearch.source,
@@ -254,4 +267,3 @@ export function updateCardUserMetadata(cardId, input = {}) {
 
   return enrichCardWithInsights(card);
 }
-
