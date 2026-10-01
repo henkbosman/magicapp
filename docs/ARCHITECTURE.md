@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.7.0
+# Architectuur - Magic Collection Manager 2.8.0
 
 ## Overzicht
 
@@ -87,6 +87,8 @@ Express mount drie API-zones:
 De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart toevoegen, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
 
 Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
+
+De deckdetailpagina gebruikt één centraal actiemodel voor het compacte **Meer**-menu in de lijst en het contextmenu in de visuele kaartweergave. Dat contextmenu is beschikbaar via rechtsklikken, `Shift+F10` en een zichtbare overflowknop. De kaartweergave bewaart de keuze voor een automatisch raster of 1 tot en met 8 kaarten per rij in de hashroute en begrenst het raster responsief. Dit is uitsluitend frontendgedrag: versie 2.8 voegt hiervoor geen API-endpoints of databasetabellen toe.
 
 ## Caching
 

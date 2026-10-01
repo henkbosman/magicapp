@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.7.0
+MAGIC COLLECTION MANAGER READ API 2.8.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.7.0"}
+{"status":"ok","version":"2.8.0"}
 
 GET /api/read/dashboard
 
@@ -565,7 +565,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.7.0",
+    "applicationVersion": "2.8.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

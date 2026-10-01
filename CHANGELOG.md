@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.8.0 - 2026-10-01
+
+### Deckacties
+
+- In de decklijst staan **Naar Wanted**, **Kenmerken** en **Bewerken** achter de nieuwe knop **Meer**. Daardoor blijven **Verwijderen** en de andere directe acties op dezelfde regel staan.
+- De visuele kaartweergave biedt dezelfde beschikbare kaartacties via rechtsklikken, `Shift+F10` en een zichtbare overflowknop. De regels voor samengevoegde basic lands blijven daarbij behouden.
+
+### Kaartweergave
+
+- Het aantal kaarten per rij kan op **Automatisch** of expliciet op 1 tot en met 8 worden ingesteld. Het raster schaalt de kaarten mee en begrenst het aantal responsief op kleinere schermen.
+- De gekozen rasterinstelling blijft samen met de weergave en filters in de URL bewaard.
+- Kaartafbeeldingen worden volledig weergegeven en niet meer aan de linker- en rechterkant afgesneden.
+
+### API en database
+
+- Geen API-endpointwijzigingen.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.7.0 - 2026-09-30
 
 ### Navigatie en kaartpreview
