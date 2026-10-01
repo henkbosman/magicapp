@@ -1,7 +1,7 @@
 import { api, apiPath } from '../api.js';
 import { addCardToDeck, addCardToWanted } from '../card-actions.js';
 import { pickCard } from '../card-picker.js';
-import { cardImage, cardInsightBadges, manaCost, pageHeader, tagPills } from '../components.js';
+import { cardImage, cardInsightBadges, cardTextHtml, manaCost, pageHeader, tagPills } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, parseTags, refreshView, toast } from '../utils.js';
 import { prepareDeckSimulatorNavigation, prepareDeckStatsNavigation, preserveCurrentScrollForNextRender } from '../navigation-state.js';
@@ -30,7 +30,6 @@ const CARD_TYPE_GROUP_LABELS = {
   Overig: 'Overig'
 };
 const DECK_VISUAL_COLUMN_OPTIONS = ['auto', '1', '2', '3', '4', '5', '6', '7', '8'];
-const LIST_MORE_ACTIONS = new Set(['wanted', 'insights', 'edit']);
 
 const DECK_CARD_ACTION_ICONS = {
   wanted: '☆',
@@ -413,9 +412,9 @@ export function deckCardActionDescriptors(item) {
       destructive: false
     }] : []),
     {
-      key: 'relations',
-      label: `Combo’s/synergieën${item.relations?.length ? ` (${item.relations.length})` : ''}`,
-      description: 'Beheer relaties met andere kaarten in dit deck.',
+      key: 'edit',
+      label: 'Bewerken',
+      description: 'Wijzig aantal, rol, tags en notitie.',
       write: true,
       destructive: false
     },
@@ -427,9 +426,9 @@ export function deckCardActionDescriptors(item) {
       destructive: false
     },
     {
-      key: 'edit',
-      label: 'Bewerken',
-      description: 'Wijzig aantal, rol, tags en notitie.',
+      key: 'relations',
+      label: `Combo’s/synergieën${item.relations?.length ? ` (${item.relations.length})` : ''}`,
+      description: 'Beheer relaties met andere kaarten in dit deck.',
       write: true,
       destructive: false
     },
@@ -443,12 +442,12 @@ export function deckCardActionDescriptors(item) {
   ];
 }
 
-export function deckCardListMoreActionDescriptors(item) {
-  return deckCardActionDescriptors(item).filter((action) => LIST_MORE_ACTIONS.has(action.key));
+export function deckCardListActionDescriptors(item) {
+  return deckCardActionDescriptors(item);
 }
 
-function deckCardActionMenuHtml(item, { listMore = false, contextMenu = false } = {}) {
-  const actions = listMore ? deckCardListMoreActionDescriptors(item) : deckCardActionDescriptors(item);
+function deckCardActionMenuHtml(item, { contextMenu = false } = {}) {
+  const actions = deckCardActionDescriptors(item);
   const menuAttributes = contextMenu ? ' role="menu" tabindex="-1"' : '';
   const itemAttributes = contextMenu ? ' role="menuitem" tabindex="-1"' : '';
   return `<div class="deck-card-action-menu"${menuAttributes}>${actions.map((action) => `
@@ -574,7 +573,6 @@ function deckVisualCardHtml(item) {
       ${cardImage(item.card, { className: 'deck-visual-card-image card-preview-image' })}
       <span class="deck-visual-card-quantity" aria-hidden="true">${item.quantity}&times;</span>
     </button>
-    <button type="button" class="deck-visual-actions-trigger" data-deck-card-context-actions data-display-id="${item.id}" aria-haspopup="menu" aria-expanded="false" aria-label="Acties voor ${escapeHtml(item.card.name)}" title="Kaartacties">•••</button>
   </article>`;
 }
 
@@ -607,14 +605,13 @@ function deckCardHtml(item) {
   const meta = groupedPrintings
     ? `${escapeHtml(item.card.typeLine)} · ${members.length} printings`
     : `${escapeHtml(item.card.typeLine)} · ${escapeHtml(item.card.setCode.toUpperCase())} #${escapeHtml(item.card.collectorNumber)}`;
-  const moreAction = `<button type="button" class="button secondary small open-deck-card-actions" data-write-action data-display-id="${item.id}" aria-haspopup="dialog" aria-label="Meer acties voor ${escapeHtml(item.card.name)}">Meer</button>`;
-  const actions = groupedPrintings
-    ? `<button class="button secondary small manage-basic-land-printings" data-id="${item.id}">Printings (${members.length})</button>${moreAction}`
-    : `<button class="button secondary small manage-deck-relations" data-write-action data-id="${item.id}">Combo’s/synergieën${item.relations?.length ? ` (${item.relations.length})` : ''}</button>${moreAction}<button class="button ghost small remove-deck-card text-danger" data-write-action data-id="${item.id}" data-name="${escapeHtml(item.card.name)}">Verwijderen</button>`;
+  const rulesText = item.card.printedText || item.card.oracleText || '';
+  const hasReadOnlyAction = deckCardActionDescriptors(item).some((action) => !action.write);
+  const actions = `<button type="button" class="button secondary small open-deck-card-actions" ${hasReadOnlyAction ? '' : 'data-write-action '}data-display-id="${item.id}" aria-haspopup="dialog" aria-label="Acties voor ${escapeHtml(item.card.name)}">Acties</button>`;
   return `<article class="card-list-item deck-card-row" ${deckCardFilterAttributes(item)}>
     <button type="button" class="card-thumb-link deck-card-preview-trigger" data-card-preview-id="${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}">${cardImage(item.card, { className: 'list-thumb' })}</button>
     <div class="card-list-content">
-      <div class="card-title-row"><div><span class="role-label">${escapeHtml(ROLE_LABELS[item.role] || item.role)}</span><br><button type="button" class="deck-card-name-preview" data-card-preview-id="${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${item.quantity}× ${escapeHtml(item.card.name)}"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></button></div>${manaCost(item.card.manaCost)}</div>
+      <div class="card-title-row deck-card-title-row"><div><span class="role-label">${escapeHtml(ROLE_LABELS[item.role] || item.role)}</span><div class="deck-card-name-mana"><button type="button" class="deck-card-name-preview" data-card-preview-id="${item.card.id}" aria-haspopup="dialog" aria-label="Toon grotere versie van ${item.quantity}× ${escapeHtml(item.card.name)}"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></button>${manaCost(item.card.manaCost)}</div></div></div>
       <p class="card-meta">${meta}</p>
       <div class="usage-badges compact">${status}${item.coverage.onWanted ? '<span class="badge wanted">Wanted</span>' : ''}<span class="badge neutral">Totaal bezit ${item.card.usage.owned}</span><span class="badge used">Alle decks ${item.card.usage.needed}</span></div>
       ${tagPills(item.tags)}
@@ -622,6 +619,7 @@ function deckCardHtml(item) {
       ${relationPills(item.relations, members.map((member) => member.id))}
       ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}
     </div>
+    <div class="deck-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
     <div class="card-list-actions">${actions}</div>
   </article>`;
 }
@@ -775,12 +773,12 @@ export async function renderDeckDetail(context) {
       };
 
       const openDeckCardActionsDialog = (displayItem) => {
-        const allowedActions = new Set(deckCardListMoreActionDescriptors(displayItem).map((action) => action.key));
+        const allowedActions = new Set(deckCardListActionDescriptors(displayItem).map((action) => action.key));
         const dialog = openDialog({
-          title: `Meer acties voor ${displayItem.card.name}`,
+          title: `Acties voor ${displayItem.card.name}`,
           cancelLabel: 'Sluiten',
-          initialFocus: '[data-deck-card-action]',
-          content: deckCardActionMenuHtml(displayItem, { listMore: true })
+          initialFocus: '[data-deck-card-action]:not(:disabled)',
+          content: deckCardActionMenuHtml(displayItem)
         });
         applyWriteAvailability(dialog);
         dialog.querySelector('.deck-card-action-menu')?.addEventListener('click', async (event) => {
@@ -798,24 +796,9 @@ export async function renderDeckDetail(context) {
         if (item) openDeckCardActionsDialog(item);
       }));
 
-      document.querySelectorAll('.manage-basic-land-printings').forEach((button) => button.addEventListener('click', () => {
-        const item = displayCardByLeadId.get(Number(button.dataset.id));
-        if (item) runDeckCardAction('printings', item);
-      }));
-
-      document.querySelectorAll('.manage-deck-relations').forEach((button) => button.addEventListener('click', () => {
-        const item = displayCardByLeadId.get(Number(button.dataset.id));
-        if (item) runDeckCardAction('relations', item);
-      }));
-
       document.querySelectorAll('.show-deck-group').forEach((button) => button.addEventListener('click', () => {
         const group = groupsById.get(Number(button.dataset.groupId));
         if (group) openGroupDetailsDialog(group, cards, deck);
-      }));
-
-      document.querySelectorAll('.remove-deck-card').forEach((button) => button.addEventListener('click', async () => {
-        const item = displayCardByLeadId.get(Number(button.dataset.id));
-        if (item) await runDeckCardAction('remove', item);
       }));
 
       let contextMenuState = null;
@@ -829,7 +812,6 @@ export async function renderDeckDetail(context) {
         window.removeEventListener('scroll', onViewportChange, true);
         window.removeEventListener('hashchange', onViewportChange);
         window.removeEventListener('app:refresh', onViewportChange);
-        if (opener?.matches?.('[data-deck-card-context-actions]')) opener.setAttribute('aria-expanded', 'false');
         element.remove();
         if (restoreFocus && opener?.isConnected) opener.focus();
       };
@@ -864,7 +846,6 @@ export async function renderDeckDetail(context) {
         element.style.left = `${left}px`;
         element.style.top = `${top}px`;
         element.style.visibility = '';
-        if (opener?.matches?.('[data-deck-card-context-actions]')) opener.setAttribute('aria-expanded', 'true');
 
         const onDocumentPointerDown = (event) => {
           if (!element.contains(event.target)) closeDeckCardContextMenu();
@@ -924,12 +905,6 @@ export async function renderDeckDetail(context) {
           if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) openActions(event);
         });
       });
-      document.querySelectorAll('[data-deck-card-context-actions]').forEach((button) => button.addEventListener('click', (event) => {
-        const item = displayCardByLeadId.get(Number(button.dataset.displayId));
-        if (!item) return;
-        event.stopPropagation();
-        openDeckCardContextMenu(item, { opener: button });
-      }));
 
       let activeDeckFilter = initialRole;
       let activeDeckView = initialView;

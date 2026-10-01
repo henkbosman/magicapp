@@ -3,7 +3,12 @@ import { HttpError, assert } from '../lib/http-error.js';
 import { isBasicLand } from '../lib/card-rules.js';
 import { normalizeSearchText, safeJsonParse } from '../lib/text.js';
 import { cardRowToApi, mapScryfallCard } from './card-mapper.js';
-import { enrichCardWithInsights, enrichCardsWithInsights, hasEffectiveManaProduction } from './card-insight-service.js';
+import {
+  enrichCardWithInsights,
+  enrichCardsWithInsights,
+  hasEffectiveLibrarySearchTarget,
+  hasEffectiveManaProduction
+} from './card-insight-service.js';
 import { alignDeckPrintingsAfterAcquisition } from './deck-printing-service.js';
 
 const CARD_COLUMNS = [
@@ -293,6 +298,11 @@ export function searchCards(query, limit = 20) {
 const COLLECTION_COLOR_CODES = new Set(['W', 'U', 'B', 'R', 'G', 'C', 'M']);
 const COLLECTION_MANA_PRODUCTION_ABILITY = 'Mana produceren';
 const COLLECTION_MANA_PRODUCTION_SQL_FUNCTION = 'collection_card_produces_mana';
+const COLLECTION_LIBRARY_SEARCH_ABILITIES = Object.freeze(new Map([
+  ['Tutor land', 'land'],
+  ['Tutor creature', 'creature']
+]));
+const COLLECTION_LIBRARY_SEARCH_SQL_FUNCTION = 'collection_card_searches_for';
 
 db.function(COLLECTION_MANA_PRODUCTION_SQL_FUNCTION, { deterministic: true }, (
   oracleText,
@@ -302,6 +312,14 @@ db.function(COLLECTION_MANA_PRODUCTION_SQL_FUNCTION, { deterministic: true }, (
   oracleText: String(oracleText || ''),
   producedMana: safeJsonParse(producedManaJson, [])
 }, storedManaJson) ? 1 : 0));
+
+db.function(COLLECTION_LIBRARY_SEARCH_SQL_FUNCTION, { deterministic: true }, (
+  oracleText,
+  storedTargetsJson,
+  requestedTarget
+) => (hasEffectiveLibrarySearchTarget({
+  oracleText: String(oracleText || '')
+}, storedTargetsJson, requestedTarget) ? 1 : 0));
 
 function collectionManaProductionCondition(cardAlias = 'c') {
   const cardKey = `COALESCE(${cardAlias}.oracle_id, ${cardAlias}.scryfall_id)`;
@@ -314,6 +332,27 @@ function collectionManaProductionCondition(cardAlias = 'c') {
       WHERE mana_metadata.card_key = ${cardKey}
     )
   ) = 1`;
+}
+
+function collectionLibrarySearchCondition(target, cardAlias = 'c') {
+  const cardKey = `COALESCE(${cardAlias}.oracle_id, ${cardAlias}.scryfall_id)`;
+  return `${COLLECTION_LIBRARY_SEARCH_SQL_FUNCTION}(
+    ${cardAlias}.oracle_text,
+    (
+      SELECT search_metadata.library_search_targets_json
+      FROM card_user_metadata search_metadata
+      WHERE search_metadata.card_key = ${cardKey}
+    ),
+    '${target}'
+  ) = 1`;
+}
+
+function syntheticLibrarySearchTarget(ability) {
+  const normalized = String(ability || '').trim().toLocaleLowerCase('nl-NL');
+  for (const [label, target] of COLLECTION_LIBRARY_SEARCH_ABILITIES) {
+    if (label.toLocaleLowerCase('nl-NL') === normalized) return target;
+  }
+  return null;
 }
 
 function flattenQueryValues(value) {
@@ -403,6 +442,8 @@ export function listCollection(filters = {}) {
     const ability = String(filters.ability).trim();
     if (ability.toLocaleLowerCase('nl-NL') === COLLECTION_MANA_PRODUCTION_ABILITY.toLocaleLowerCase('nl-NL')) {
       conditions.push(collectionManaProductionCondition('c'));
+    } else if (syntheticLibrarySearchTarget(ability)) {
+      conditions.push(collectionLibrarySearchCondition(syntheticLibrarySearchTarget(ability), 'c'));
     } else {
       conditions.push(`EXISTS (
         SELECT 1 FROM json_each(c.keywords_json) AS keyword
@@ -527,8 +568,17 @@ export function collectionFilterOptions() {
   `).get().card_count || 0);
   if (manaProductionCount > 0) {
     abilities.push({ name: COLLECTION_MANA_PRODUCTION_ABILITY, cardCount: manaProductionCount });
-    abilities.sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
   }
+  for (const [name, target] of COLLECTION_LIBRARY_SEARCH_ABILITIES) {
+    const cardCount = Number(db.prepare(`
+      SELECT COUNT(DISTINCT COALESCE(c.oracle_id, c.scryfall_id)) AS card_count
+      FROM collection_items ci
+      JOIN cards c ON c.id = ci.card_id
+      WHERE ${collectionLibrarySearchCondition(target, 'c')}
+    `).get().card_count || 0);
+    if (cardCount > 0) abilities.push({ name, cardCount });
+  }
+  abilities.sort((left, right) => left.name.localeCompare(right.name, 'nl', { sensitivity: 'base' }));
 
   return {
     sets: db.prepare(`

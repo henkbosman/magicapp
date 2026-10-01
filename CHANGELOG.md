@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.9.0 - 2026-10-01
+
+### Decklijst en kaartacties
+
+- De knop **Meer** heet nu **Acties**. **Naar Wanted**, **Bewerken**, **Kenmerken**, **Combo's/synergieën** en **Verwijderen** staan voor normale kaartregels samen in deze popup.
+- Samengevoegde basic lands behouden een beperkte, veilige set acties; de onderliggende printings blijven afzonderlijk beheerbaar via het printingoverzicht.
+- Kaartafbeeldingen in de lijst zijn verdubbeld naar 92 pixels breed. Naam en manakosten staan samen links en de kaarttekst, inclusief gerenderde mana- en tapsymbolen, staat tussen de samenvatting en **Acties**.
+- De visuele deckweergave toont geen zichtbare ellipsis-knoppen meer. Het kaartmenu blijft bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`.
+
+### Navigatie en collectiefilters
+
+- **Kaart opzoeken** gebruikt in het linkermenu een vergrootglas in plaats van een plus.
+- De collectie kan filteren op de synthetische abilities **Tutor land** en **Tutor creature**. Een optie verschijnt alleen wanneer minstens één collectiekaart matcht.
+- Tutorfilters combineren automatische herkenning in de volledige Oracle-tekst met Oracle-brede handmatige correcties. **Tutor land** omvat `land` en `basic_land`; **Tutor creature** omvat `creature`. De algemene categorie `any` en restcategorie `other` zijn uitgesloten.
+
+### API en database
+
+- Geen nieuwe of gewijzigde endpointpaden. De bestaande `ability`-parameter accepteert aanvullend `Tutor land` en `Tutor creature`.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.8.0 - 2026-10-01
 
 ### Deckacties

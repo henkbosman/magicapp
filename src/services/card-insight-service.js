@@ -145,18 +145,22 @@ function deriveLibrarySearchFromText(card) {
   for (const match of clauses) {
     const clause = match[0].trim();
     const descriptor = String(match[1] || '').toLowerCase();
+    const cardWordIndex = descriptor.search(/\bcards?\b/);
+    const searchedTypePhrase = cardWordIndex >= 0
+      ? descriptor.slice(0, cardWordIndex)
+      : descriptor;
     detectedText.push(clause);
 
     const clauseTargets = [];
-    if (/basic land|\bplains\b|\bisland\b|\bswamp\b|\bmountain\b|\bforest\b/.test(descriptor)) clauseTargets.push('basic_land');
-    else if (/\bland\b/.test(descriptor)) clauseTargets.push('land');
-    if (/\bcreature\b/.test(descriptor)) clauseTargets.push('creature');
-    if (/\bartifact\b|\bequipment\b|\bvehicle\b/.test(descriptor)) clauseTargets.push('artifact');
-    if (/\benchantment\b|\baura\b|\bbackground\b/.test(descriptor)) clauseTargets.push('enchantment');
-    if (/\binstant\b/.test(descriptor)) clauseTargets.push('instant');
-    if (/\bsorcery\b/.test(descriptor)) clauseTargets.push('sorcery');
-    if (/\bplaneswalker\b/.test(descriptor)) clauseTargets.push('planeswalker');
-    if (/\bbattle\b/.test(descriptor)) clauseTargets.push('battle');
+    if (/basic land|\bplains\b|\bisland\b|\bswamp\b|\bmountain\b|\bforest\b/.test(searchedTypePhrase)) clauseTargets.push('basic_land');
+    else if (/\bland\b/.test(searchedTypePhrase)) clauseTargets.push('land');
+    if (/\bcreature\b/.test(searchedTypePhrase)) clauseTargets.push('creature');
+    if (/\bartifact\b|\bequipment\b|\bvehicle\b/.test(searchedTypePhrase)) clauseTargets.push('artifact');
+    if (/\benchantment\b|\baura\b|\bbackground\b/.test(searchedTypePhrase)) clauseTargets.push('enchantment');
+    if (/\binstant\b/.test(searchedTypePhrase)) clauseTargets.push('instant');
+    if (/\bsorcery\b/.test(searchedTypePhrase)) clauseTargets.push('sorcery');
+    if (/\bplaneswalker\b/.test(searchedTypePhrase)) clauseTargets.push('planeswalker');
+    if (/\bbattle\b/.test(searchedTypePhrase)) clauseTargets.push('battle');
 
     if (!clauseTargets.length) {
       const namedOrQualified = /card named|cards? with|cards? that|with the same name|named |from outside|of your choice/.test(descriptor);
@@ -167,6 +171,28 @@ function deriveLibrarySearchFromText(card) {
   }
   if (!targets.length) targets.push('other');
   return { source: 'oracle', targets: unique(targets), detectedText };
+}
+
+function resolvedLibrarySearchTargets(card, storedTargets = null) {
+  if (storedTargets !== null && storedTargets !== undefined) {
+    const manual = typeof storedTargets === 'string'
+      ? safeJsonParse(storedTargets, [])
+      : storedTargets;
+    return normalizeStoredTargets(manual);
+  }
+  return deriveLibrarySearchFromText(card).targets;
+}
+
+export function hasEffectiveLibrarySearchTarget(card, storedTargets = null, requestedTarget = '') {
+  const targets = resolvedLibrarySearchTargets(card, storedTargets);
+  const target = String(requestedTarget || '').trim().toLowerCase();
+
+  // De collectiefilters tonen bewust specifieke functionele tutors. `any` en
+  // `other` horen niet in beide categorieën thuis: dat zou algemene tutors en
+  // anderszins beperkte zoekopdrachten als land- én creaturetutor tonen.
+  if (target === 'land') return targets.some((value) => ['land', 'basic_land'].includes(value));
+  if (target === 'creature') return targets.includes('creature');
+  return targets.includes(target);
 }
 
 export function metadataMapForKeys(keys) {

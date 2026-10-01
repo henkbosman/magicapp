@@ -3,13 +3,13 @@ import { test } from 'node:test';
 
 import {
   deckCardActionDescriptors,
-  deckCardListMoreActionDescriptors,
+  deckCardListActionDescriptors,
   deckDetailQueryString,
   normalizeDeckVisualColumns,
   renderDeckDetail
 } from '../public/js/views/deck-detail.js';
 
-function deckCard({ deckCardId, cardId, name, cardTypes, typeLine, quantity = 1, role = 'main', wantedGap = 0, supertypes = [] }) {
+function deckCard({ deckCardId, cardId, name, cardTypes, typeLine, oracleText = '', printedText = '', quantity = 1, role = 'main', wantedGap = 0, supertypes = [] }) {
   return {
     id: deckCardId,
     role,
@@ -36,6 +36,8 @@ function deckCard({ deckCardId, cardId, name, cardTypes, typeLine, quantity = 1,
       cardTypes,
       supertypes,
       manaCost: '{1}',
+      oracleText,
+      printedText,
       images: { small: 'https://example.invalid/small.jpg', normal: 'https://example.invalid/normal.jpg' },
       usage: { owned: quantity, needed: quantity }
     }
@@ -53,7 +55,7 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     secondCommander: null
   };
   const cards = [
-    deckCard({ deckCardId: 51, cardId: 11, name: 'Artifact Creature', cardTypes: ['Artifact', 'Creature'], typeLine: 'Artifact Creature', quantity: 2 }),
+    deckCard({ deckCardId: 51, cardId: 11, name: 'Artifact Creature', cardTypes: ['Artifact', 'Creature'], typeLine: 'Artifact Creature', oracleText: '{T}: Add {G}.', quantity: 2 }),
     deckCard({ deckCardId: 52, cardId: 12, name: 'Test Instant', cardTypes: ['Instant'], typeLine: 'Instant' }),
     deckCard({ deckCardId: 53, cardId: 11, name: 'Artifact Creature', cardTypes: ['Artifact', 'Creature'], typeLine: 'Artifact Creature', role: 'sideboard' })
   ];
@@ -75,14 +77,17 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     assert.match(view.html, /id="deck-cards-per-row"[\s\S]*?<option value="5" selected>5<\/option>/);
     assert.match(view.html, /id="deck-card-visual" class="deck-visual-groups" data-columns="5"/);
     assert.match(view.html, /data-card-preview-id="11"/);
-    assert.match(view.html, /data-deck-card-context-actions data-display-id="51"/);
-    assert.match(view.html, /data-deck-card-context-actions data-display-id="53"/);
+    assert.doesNotMatch(view.html, /data-deck-card-context-actions/);
+    assert.doesNotMatch(view.html, /•••/);
     assert.match(view.html, /aria-keyshortcuts="Shift\+F10"/);
     assert.match(view.html, /aria-label="Toon grotere versie van Artifact Creature, 2 exemplaren"/);
     assert.match(view.html, /class="deck-visual-card-quantity" aria-hidden="true">2&times;<\/span>/);
-    assert.match(view.html, /class="button secondary small manage-deck-relations"/);
     assert.match(view.html, /class="button secondary small open-deck-card-actions"/);
-    assert.match(view.html, /class="button ghost small remove-deck-card text-danger"/);
+    assert.match(view.html, /aria-label="Acties voor Artifact Creature">Acties<\/button>/);
+    assert.match(view.html, /class="deck-card-rules-text oracle-text">[\s\S]*?aria-label="Tappen"[\s\S]*?aria-label="Groen mana"/);
+    assert.doesNotMatch(view.html, /class="[^\"]*manage-deck-relations/);
+    assert.doesNotMatch(view.html, /class="[^\"]*remove-deck-card/);
+    assert.doesNotMatch(view.html, />Meer<\/button>/);
     assert.doesNotMatch(view.html, /class="[^"]*deck-card-to-wanted/);
     assert.doesNotMatch(view.html, /class="[^"]*edit-deck-card-insights/);
     assert.doesNotMatch(view.html, /class="[^"]*edit-deck-card(?:\s|")/);
@@ -121,12 +126,12 @@ test('kaartacties verschillen correct voor Wanted en gegroepeerde basic lands', 
     wantedGap: 2
   });
   assert.deepEqual(deckCardActionDescriptors(regular).map((action) => action.key), [
-    'wanted', 'relations', 'insights', 'edit', 'remove'
+    'wanted', 'edit', 'insights', 'relations', 'remove'
   ]);
   assert.equal(deckCardActionDescriptors(regular)[0].label, '2 naar Wanted');
   assert.equal(deckCardActionDescriptors(regular).at(-1).destructive, true);
-  assert.deepEqual(deckCardListMoreActionDescriptors(regular).map((action) => action.key), [
-    'wanted', 'insights', 'edit'
+  assert.deepEqual(deckCardListActionDescriptors(regular).map((action) => action.key), [
+    'wanted', 'edit', 'insights', 'relations', 'remove'
   ]);
 
   const forestA = deckCard({
@@ -152,10 +157,10 @@ test('kaartacties verschillen correct voor Wanted en gegroepeerde basic lands', 
   };
   assert.deepEqual(deckCardActionDescriptors(groupedForest).map((action) => action.key), ['printings', 'insights']);
   assert.equal(deckCardActionDescriptors(groupedForest)[0].write, false);
-  assert.deepEqual(deckCardListMoreActionDescriptors(groupedForest).map((action) => action.key), ['insights']);
+  assert.deepEqual(deckCardListActionDescriptors(groupedForest).map((action) => action.key), ['printings', 'insights']);
 
   const singleForest = { ...forestA, groupedBasicLand: true, displayMembers: [forestA] };
   assert.deepEqual(deckCardActionDescriptors(singleForest).map((action) => action.key), [
-    'relations', 'insights', 'edit', 'remove'
+    'edit', 'insights', 'relations', 'remove'
   ]);
 });

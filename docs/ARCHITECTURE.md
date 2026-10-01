@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.8.0
+# Architectuur - Magic Collection Manager 2.9.0
 
 ## Overzicht
 
@@ -88,7 +88,9 @@ De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de has
 
 Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
 
-De deckdetailpagina gebruikt één centraal actiemodel voor het compacte **Meer**-menu in de lijst en het contextmenu in de visuele kaartweergave. Dat contextmenu is beschikbaar via rechtsklikken, `Shift+F10` en een zichtbare overflowknop. De kaartweergave bewaart de keuze voor een automatisch raster of 1 tot en met 8 kaarten per rij in de hashroute en begrenst het raster responsief. Dit is uitsluitend frontendgedrag: versie 2.8 voegt hiervoor geen API-endpoints of databasetabellen toe.
+De deckdetailpagina gebruikt één centraal actiemodel voor het compacte **Acties**-menu in de lijst en het contextmenu in de visuele kaartweergave. Voor een normale kaart kan het lijstmenu Naar Wanted, Bewerken, Kenmerken, Combo's/synergieën en Verwijderen aanbieden; samengevoegde basic lands krijgen alleen groepsveilige acties. De lijst toont kaartafbeeldingen op 92 pixels breed en plaatst naam en manakosten links, met de kaarttekst en gerenderde symbolen vóór de actieknop. In de kaartweergave staan geen zichtbare overflowknoppen; het contextmenu blijft bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`. De kaartweergave bewaart de keuze voor een automatisch raster of 1 tot en met 8 kaarten per rij in de hashroute en begrenst het raster responsief.
+
+Versie 2.9 voegt hiervoor geen endpointpaden of databasetabellen toe. De bestaande `ability`-parameter van de collectie accepteert aanvullend de synthetische waarden `Tutor land` en `Tutor creature`.
 
 ## Caching
 
@@ -107,6 +109,8 @@ Kaartafbeeldingen worden standaard onder `data/images/` gecachet. Cachebestanden
 ## Collectiefiltering
 
 De kleuridentiteitsfilter verzendt de gekozen kleuren als één canonieke `color`-waarde, bijvoorbeeld `color=G,W`, en de modus via `colorMode=and|or`; de backend accepteert daarnaast herhaalde kleurparameters. AND is standaard en vereist exact de gekozen identiteit: `G` toont mono-groen en `G,W` exact groen-wit. OR toont kaarten die minimaal één gekozen kleur bevatten. In OR-modus neemt `C` kleurloze kaarten als afzonderlijk alternatief mee. Filtering vindt vóór paginering in SQLite plaats. De AI-collectie houdt bewust zijn compacte exacte kleurfilter.
+
+De abilityfilter combineert exacte kaartkeywords met synthetische inzichten. Naast **Mana produceren** kunnen **Tutor land** en **Tutor creature** worden getoond wanneer minstens één collectiekaart matcht. De tutorfilters werken met effectieve library-searchinzichten: Oracle-brede handmatige correcties hebben voorrang op automatische herkenning in de volledige Oracle-tekst. `Tutor land` omvat de doelen `land` en `basic_land`; `Tutor creature` omvat `creature`. De algemene categorie `any` en de restcategorie `other` tellen niet mee voor deze specifieke filters.
 
 ## Deckstatistieken
 

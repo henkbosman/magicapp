@@ -1,8 +1,8 @@
-# Magic Collection Manager 2.8.0
+# Magic Collection Manager 2.9.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.8.0** verfijnt de deckpagina met compacte kaartacties, een contextmenu in de visuele kaartweergave, een instelbaar aantal kaarten per rij en volledig zichtbare kaartafbeeldingen. De kaartpreviews, gegroepeerde deckweergave en mana-producerfilter uit 2.7 en de gecontroleerde kaartenlijstimport en mana- en tapsymbolen uit 2.6 blijven onderdeel van deze release. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.9.0** bundelt alle decklijstacties in één menu, vergroot en herschikt de kaartinformatie in die lijst, houdt de visuele deckweergave vrij van zichtbare actieknoppen en voegt doelgerichte tutorfilters aan de collectie toe. De instelbare kaartweergave uit 2.8, de kaartpreviews, gegroepeerde deckweergave en mana-producerfilter uit 2.7 en de gecontroleerde kaartenlijstimport en mana- en tapsymbolen uit 2.6 blijven onderdeel van deze release. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
 
 ## Belangrijkste mogelijkheden
 
@@ -172,6 +172,8 @@ De collectie ondersteunt onder andere filters op:
 - mana value;
 - ability/keyword;
 - mana produceren;
+- Tutor land;
+- Tutor creature;
 - set;
 - rarity;
 - afwerking;
@@ -182,6 +184,8 @@ Filters reageren direct zonder aparte filterknop en zijn standaard ingeklapt. Me
 
 Een klik op de kaartafbeelding of kaartnaam opent eerst een grote preview. Via **Details** wordt daarna de volledige kaartpagina geopend. De manakosten gebruiken een vaste kolom en verschuiven niet door een kortere of langere rarity-tag.
 
+De synthetische abilityfilters **Tutor land** en **Tutor creature** verschijnen alleen wanneer de collectie daadwerkelijk een passende kaart bevat. Ze gebruiken de effectieve library-searchinzichten: automatische herkenning uit de volledige Oracle-tekst en Oracle-brede handmatige correcties. **Tutor land** omvat zowel `land` als `basic_land`; **Tutor creature** omvat `creature`. Algemene tutors (`any`) en overige beperkte zoekdoelen (`other`) worden niet ten onrechte aan een van deze twee specifieke filters toegewezen.
+
 Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaande fysieke regel, worden de twee regels automatisch veilig samengevoegd in plaats van een databasefout te geven.
 
 ## Decks
@@ -190,7 +194,9 @@ Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit
 
 De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Met **Lijst** en **Kaarten** kan worden gewisseld tussen de beheerlijst en een grote visuele weergave per hoofdkaarttype. Beide weergaven gebruiken dezelfde filters; de kaartweergave, het gekozen aantal kaarten per rij en de filters worden in de URL bewaard. In de kaartweergave kan het raster automatisch schalen of expliciet 1 tot en met 8 kaarten per rij tonen. Op kleinere schermen wordt het aantal responsief begrensd en blijven kaartafbeeldingen volledig zichtbaar zonder aan de zijkanten te worden afgesneden.
 
-In de lijst staan **Naar Wanted**, **Kenmerken** en **Bewerken** achter de compacte knop **Meer**, zodat de overige acties op één regel blijven staan. In de kaartweergave zijn de beschikbare kaartacties bereikbaar via rechtsklikken, `Shift+F10` of de zichtbare overflowknop. Een normale klik op een kaart opent eerst de grote preview. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. De optie om ontbrekende exemplaren ook aan Wanted toe te voegen staat standaard uit. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels. Via het printingoverzicht van zo'n samengevoegde regel blijven de afzonderlijke printings beheerbaar.
+In de lijst opent de compacte knop **Acties** één menu met de beschikbare acties **Naar Wanted**, **Bewerken**, **Kenmerken**, **Combo's/synergieën** en **Verwijderen**. Bij samengevoegde basic lands worden alleen acties aangeboden die veilig op de groep kunnen worden uitgevoerd; via het printingoverzicht blijven de afzonderlijke printings beheerbaar. De kaartafbeelding is in deze lijst 92 pixels breed. Naam en manakosten staan bij elkaar aan de linkerkant, waarna de kaarttekst met gerenderde symbolen tussen de kaartsamenvatting en **Acties** staat.
+
+In de kaartweergave staan geen zichtbare ellipsis- of actieknoppen op de kaarten. De beschikbare kaartacties blijven bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`; een normale klik opent eerst de grote preview. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. De optie om ontbrekende exemplaren ook aan Wanted toe te voegen staat standaard uit. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven. De tekstexport bundelt gelijke Oracle-kaarten over verschillende printings en exporteert bijvoorbeeld één regel `24 Forest` in plaats van meerdere losse Forest-regels.
 
