@@ -381,11 +381,12 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .deck-card-row .list-thumb { width: 92px; height: auto; aspect-ratio: 488 / 680; object-fit: contain; }
 .deck-card-row .card-image-placeholder.list-thumb { width: 92px; height: auto; aspect-ratio: 488 / 680; }
 .deck-card-title-row { justify-content: flex-start; }
-.deck-card-title-row > div { min-width: 0; }
+.deck-card-title-row > div { width: 100%; min-width: 0; }
 .deck-card-name-mana {
+  width: 100%;
   margin-top: 3px;
   display: grid;
-  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 8px;
 }
@@ -393,8 +394,8 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .deck-card-mana-slot { min-width: 0; }
 .deck-card-name-slot { display: block; }
 .deck-card-name-preview { max-width: 100%; overflow-wrap: anywhere; }
-.deck-card-mana-slot { min-height: 24px; display: flex; align-items: center; justify-content: flex-start; }
-.deck-card-mana-slot .mana-cost { flex-wrap: nowrap; justify-content: flex-start; }
+.deck-card-mana-slot { min-height: 24px; display: flex; align-items: center; justify-content: flex-end; }
+.deck-card-mana-slot .mana-cost { flex-wrap: nowrap; justify-content: flex-end; }
 .deck-card-rules-text { min-width: 0; color: var(--ink-soft); font-size: .78rem; overflow-wrap: anywhere; }
 .role-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--primary); font-weight: 800; }
 .section-tabs { display: flex; gap: 5px; margin: 0 0 14px; overflow-x: auto; }
@@ -1957,7 +1958,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
   }
   #deck-card-list > .deck-card-row > .card-list-actions { justify-content: flex-end; }
   #deck-card-list > .deck-card-row > .card-list-actions .button { flex: 0 1 auto; min-width: 104px; }
-  #deck-card-list .deck-card-name-mana { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  #deck-card-list .deck-card-name-mana { grid-template-columns: minmax(0, 1fr) max-content; }
   .deck-panel-header { align-items: stretch; flex-direction: column; }
   .deck-panel-heading { justify-content: space-between; }
   .deck-panel-actions { justify-content: flex-start; }
@@ -2000,8 +2001,9 @@ html.write-unavailable [data-write-only] { display: none !important; }
   object-fit: contain;
 }
 .collection-card-name-mana {
+  width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 8px;
 }
@@ -2012,9 +2014,9 @@ html.write-unavailable [data-write-only] { display: none !important; }
   min-height: 24px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
-.collection-card-mana-slot .mana-cost { flex-wrap: nowrap; justify-content: flex-start; }
+.collection-card-mana-slot .mana-cost { flex-wrap: nowrap; justify-content: flex-end; }
 .collection-card-stats {
   margin: 7px 0;
   display: flex;
@@ -2053,7 +2055,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
   }
   .collection-card-row .list-thumb,
   .collection-card-row .card-image-placeholder.list-thumb { width: 92px; height: auto; }
-  .collection-card-name-mana { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .collection-card-name-mana { grid-template-columns: minmax(0, 1fr) max-content; }
   .collection-card-row > .collection-card-rules-text {
     padding-top: 9px;
     border-top: 1px solid var(--line);

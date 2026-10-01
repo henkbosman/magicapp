@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.10.1 - 2026-10-01
+
+### Collectie- en decklijsten
+
+- Binnen `.card-list-content` krijgt de kaartnaam flexibel de beschikbare ruimte en staan de manakosten rechts uitgelijnd. Daardoor lopen langere kaartnamen minder snel over twee regels, terwijl mana in de collectie- en decklijst netjes op één lijn blijft.
+- De functionele badges **Produceert** en **Zoekt** worden niet meer in collectieregels getoond. De onderliggende kaartkenmerken, de actie **Kenmerken** en de bijbehorende collectiefilters blijven beschikbaar.
+
+### API en database
+
+- Geen nieuwe of gewijzigde endpointpaden.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.10.0 - 2026-10-01
 
 ### Deck- en collectielijsten

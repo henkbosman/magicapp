@@ -98,10 +98,12 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
   }
 });
 
-test('decklijst reserveert een vast naam- en manaslot en lijnt kleurloos in kaarttekst optisch uit', () => {
+test('decklijst geeft de naam flexibele ruimte en lijnt mana aan de rechterrand uit', () => {
   const styles = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
-  assert.match(styles, /\.deck-card-name-mana\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 10rem\) minmax\(0, 1fr\);/s);
-  assert.match(styles, /\.deck-card-mana-slot\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*flex-start;/s);
+  assert.match(styles, /\.deck-card-title-row > div\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s);
+  assert.match(styles, /\.deck-card-name-mana\s*\{[^}]*width:\s*100%;[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) max-content;/s);
+  assert.match(styles, /\.deck-card-mana-slot\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*flex-end;/s);
+  assert.match(styles, /\.deck-card-mana-slot \.mana-cost\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*justify-content:\s*flex-end;/s);
   assert.match(styles, /@media \(min-width:\s*641px\) and \(max-width:\s*1279px\)[\s\S]*?#deck-card-list > \.deck-card-row/);
   assert.match(styles, /\.oracle-text \.mana-symbol\.mana-bg-C\s*\{\s*vertical-align:\s*-\.1em;\s*\}/);
 });

@@ -1,7 +1,7 @@
 import { api, apiPath, queryString } from '../api.js';
 import { addCardToDeck } from '../card-actions.js';
 import { openCardPreview } from '../card-preview.js';
-import { cardImage, cardInsightBadges, cardTextHtml, manaCost, manaSymbol, pageHeader, rarityBadge, usageBadges } from '../components.js';
+import { cardImage, cardTextHtml, manaCost, manaSymbol, pageHeader, rarityBadge, usageBadges } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
 import { bindLiveFilters, resetFilterForm } from '../live-filters.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
@@ -136,7 +136,6 @@ export function renderCollectionRows(items, hasFilters = false) {
         <p class="card-meta">${escapeHtml(item.card.setName)} (${escapeHtml(item.card.setCode.toUpperCase())}) #${escapeHtml(item.card.collectorNumber)} · ${escapeHtml(item.language)} · ${escapeHtml(CONDITION_LABELS[item.condition] || item.condition)}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</p>
         <div class="collection-card-stats">${rarityBadge(item.card.rarity)}${collectionPrice(item)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></div>
         ${usageBadges(item.card.usage, { compact: true })}
-        ${cardInsightBadges(item.card)}
       </div>
       <div class="collection-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
       <div class="card-list-actions"><button class="button secondary small open-collection-card-actions" type="button" data-write-action data-item-id="${item.id}" aria-haspopup="dialog" aria-label="Acties voor ${escapeHtml(item.card.name)}">Acties</button></div>
