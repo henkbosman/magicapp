@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.10.4 - 2026-10-01
+
+### Kaarttekst
+
+- Alleen de exacte tekst van een herkende abilitynaam of een herkend kaartkeyword wordt gemarkeerd; de overige Oracle-tekst behoudt zijn normale achtergrond en leesbare grootte.
+- De bestaande leesbaarheid en consistente verticale uitlijning van mana- en tapsymbolen blijven behouden.
+
+### Deck sorteren en groeperen
+
+- Naast **Filters tonen** kan een deck op **Mana kosten** of **Naam kaart** worden gesorteerd. **Mana kosten** is de standaard.
+- Een deck kan op **Type** of **Ability** worden gegroepeerd. **Type** is de standaard.
+- De gekozen sortering en groepering gelden voor zowel de lijst- als kaartenweergave en worden in de URL bewaard.
+- Abilitygroepering gebruikt het primaire herkende kaartkeyword, met de bestaande functionele kaartinzichten voor mana produceren, land zoeken en creature zoeken als vaste fallback; kaarten zonder herkende ability staan onder **Geen ability**.
+
+### API en database
+
+- Geen nieuwe of gewijzigde endpointpaden of API-contracten.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.10.3 - 2026-10-01
 
 ### Kaarttekst en symbolen

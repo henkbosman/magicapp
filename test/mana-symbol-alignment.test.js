@@ -15,14 +15,37 @@ test('alle symbolen in kaarttekst gebruiken dezelfde leesbare grootte en baselin
   assert.match(styles, /\.oracle-text \.mana-symbol-text\s*\{\s*font-size:\s*\.68em;/);
 });
 
-test('kaarttekst markeert elke ability afzonderlijk en bewaart lege regels en escaping', () => {
-  const html = cardTextHtml('{T}: Add {G}.\r\n\r\nPay {2}: <strong>Draw</strong>.');
+test('kaarttekst markeert alleen het exacte keyword en behoudt manasymbolen en lege regels', () => {
+  const html = cardTextHtml('Morph {2}{G} (You may cast this face down using morph.)\r\n\r\nMegamorph is andere tekst.', ['Morph']);
 
-  assert.equal((html.match(/class="oracle-ability-block"/g) || []).length, 2);
-  assert.equal((html.match(/class="oracle-text-gap"/g) || []).length, 1);
-  assert.match(html, /<p class="oracle-ability-block">[\s\S]*aria-label="Tappen"[\s\S]*aria-label="Groen mana"[\s\S]*<\/p>/);
-  assert.match(html, /<p class="oracle-ability-block">Pay [\s\S]*aria-label="2 generieke mana"[\s\S]*&lt;strong&gt;Draw&lt;\/strong&gt;\.<\/p>/);
-  assert.doesNotMatch(html, /<strong>Draw<\/strong>/);
+  assert.equal((html.match(/class="oracle-keyword"/g) || []).length, 1);
+  assert.match(html, /^<mark class="oracle-keyword">Morph<\/mark>/);
+  assert.match(html, /aria-label="2 generieke mana"/);
+  assert.match(html, /aria-label="Groen mana"/);
+  assert.match(html, /\(You may cast this face down using morph\.\)/);
+  assert.match(html, /<br><br>Megamorph is andere tekst\.$/);
+  assert.doesNotMatch(html, /oracle-ability-block|oracle-text-gap/);
+});
+
+test('keywords in remindertekst worden niet gemarkeerd', () => {
+  const html = cardTextHtml('Flying (This creature can only be blocked by creatures with\nflying or reach.)', ['Flying']);
+
+  assert.equal((html.match(/class="oracle-keyword"/g) || []).length, 1);
+  assert.match(html, /^<mark class="oracle-keyword">Flying<\/mark> \(This creature can only be blocked by creatures with<br>flying or reach\.\)$/);
+});
+
+test('multiword-keywords zijn case-insensitive en krijgen voorrang boven deelkeywords', () => {
+  const html = cardTextHtml('DOUBLE STRIKE, then strike again.', ['Strike', 'Double strike']);
+
+  assert.match(html, /^<mark class="oracle-keyword">DOUBLE STRIKE<\/mark>, then <mark class="oracle-keyword">strike<\/mark> again\.$/);
+  assert.equal((html.match(/class="oracle-keyword"/g) || []).length, 2);
+});
+
+test('keywordmarkering blijft HTML escapen', () => {
+  const html = cardTextHtml('<img src=x> Morph & "test" {UNKNOWN}', ['Morph']);
+
+  assert.match(html, /^&lt;img src=x&gt; <mark class="oracle-keyword">Morph<\/mark> &amp; &quot;test&quot; \{UNKNOWN\}$/);
+  assert.doesNotMatch(html, /<img|<script/);
 });
 
 test('kaarttekst in collectie- en decklijsten blijft op een leesbare grootte', () => {
@@ -30,6 +53,6 @@ test('kaarttekst in collectie- en decklijsten blijft op een leesbare grootte', (
 
   assert.match(styles, /\.deck-card-rules-text\s*\{[^}]*color:\s*var\(--ink\);[^}]*font-size:\s*\.9rem;/s);
   assert.match(styles, /\.collection-card-rules-text\s*\{[^}]*color:\s*var\(--ink\);[^}]*font-size:\s*\.9rem;/s);
-  assert.match(styles, /\.oracle-text\s*\{[^}]*gap:\s*\.2em;/s);
-  assert.match(styles, /\.oracle-ability-block\s*\{[^}]*padding:\s*\.22em \.45em;[^}]*border-left:\s*3px solid var\(--primary\);[^}]*background:\s*var\(--primary-soft\);/s);
+  assert.match(styles, /\.oracle-keyword\s*\{[^}]*background:\s*var\(--primary-soft\);[^}]*font-weight:\s*750;/s);
+  assert.doesNotMatch(styles, /\.oracle-(?:ability-block|text-gap)\b/);
 });

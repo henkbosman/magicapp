@@ -7,9 +7,9 @@ import { getCardReturnLabel, returnToCardSource } from '../navigation-state.js';
 
 function faceText(card) {
   if (card.cardFaces?.length) {
-    return card.cardFaces.map((face) => `<div class="face-block"><h3>${escapeHtml(face.name || card.name)} ${manaCost(face.mana_cost || '')}</h3><p class="card-meta">${escapeHtml(face.type_line || '')}</p><div class="oracle-text">${cardTextHtml(face.oracle_text || face.printed_text || '')}</div>${face.power !== undefined && face.power !== null ? `<p><strong>${escapeHtml(face.power)} / ${escapeHtml(face.toughness)}</strong></p>` : ''}</div>`).join('');
+    return card.cardFaces.map((face) => `<div class="face-block"><h3>${escapeHtml(face.name || card.name)} ${manaCost(face.mana_cost || '')}</h3><p class="card-meta">${escapeHtml(face.type_line || '')}</p><div class="oracle-text">${cardTextHtml(face.oracle_text || face.printed_text || '', [...(card.keywords || []), ...(face.keywords || [])])}</div>${face.power !== undefined && face.power !== null ? `<p><strong>${escapeHtml(face.power)} / ${escapeHtml(face.toughness)}</strong></p>` : ''}</div>`).join('');
   }
-  return `<div class="oracle-text">${cardTextHtml(card.oracleText || 'Geen kaarttekst beschikbaar.')}</div>${card.power !== null ? `<p><strong>${escapeHtml(card.power)} / ${escapeHtml(card.toughness)}</strong></p>` : ''}`;
+  return `<div class="oracle-text">${cardTextHtml(card.oracleText || 'Geen kaarttekst beschikbaar.', card.keywords)}</div>${card.power !== null ? `<p><strong>${escapeHtml(card.power)} / ${escapeHtml(card.toughness)}</strong></p>` : ''}`;
 }
 
 function legalityGrid(card) {

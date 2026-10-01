@@ -30,6 +30,10 @@ const CARD_TYPE_GROUP_LABELS = {
   Overig: 'Overig'
 };
 const DECK_VISUAL_COLUMN_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+const DECK_CARD_SORT_OPTIONS = ['mana', 'name'];
+const DECK_CARD_GROUP_OPTIONS = ['type', 'ability'];
+const NO_ABILITY_GROUP = 'Geen ability';
+const DECK_CARD_COLLATOR = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
 
 const DECK_CARD_ACTION_ICONS = {
   wanted: '☆',
@@ -45,15 +49,37 @@ export function normalizeDeckVisualColumns(value) {
   return DECK_VISUAL_COLUMN_OPTIONS.includes(normalized) ? normalized : '5';
 }
 
-export function deckDetailQueryString({ cardSearch = '', role = 'all', cardType = '', view = 'list', cardColumns = '5' } = {}) {
+export function normalizeDeckCardSort(value) {
+  const normalized = String(value || 'mana');
+  return DECK_CARD_SORT_OPTIONS.includes(normalized) ? normalized : 'mana';
+}
+
+export function normalizeDeckCardGroup(value) {
+  const normalized = String(value || 'type');
+  return DECK_CARD_GROUP_OPTIONS.includes(normalized) ? normalized : 'type';
+}
+
+export function deckDetailQueryString({
+  cardSearch = '',
+  role = 'all',
+  cardType = '',
+  view = 'list',
+  cardColumns = '5',
+  cardSort = 'mana',
+  cardGroup = 'type'
+} = {}) {
   const params = new URLSearchParams();
   const search = String(cardSearch || '').trim();
   const columns = normalizeDeckVisualColumns(cardColumns);
+  const sort = normalizeDeckCardSort(cardSort);
+  const group = normalizeDeckCardGroup(cardGroup);
   if (search) params.set('cardSearch', search);
   if (role !== 'all') params.set('role', role);
   if (cardType) params.set('cardType', cardType);
   if (view === 'cards') params.set('view', 'cards');
   if (columns !== '5') params.set('cardColumns', columns);
+  if (sort !== 'mana') params.set('cardSort', sort);
+  if (group !== 'type') params.set('cardGroup', group);
   return params.toString();
 }
 
@@ -61,6 +87,14 @@ function deckVisualColumnOptions(current) {
   return DECK_VISUAL_COLUMN_OPTIONS.map((value) => {
     return `<option value="${value}" ${value === current ? 'selected' : ''}>${value}</option>`;
   }).join('');
+}
+
+function deckCardSortOptions(current) {
+  return `<option value="mana" ${current === 'mana' ? 'selected' : ''}>Mana kosten</option><option value="name" ${current === 'name' ? 'selected' : ''}>Naam kaart</option>`;
+}
+
+function deckCardGroupOptions(current) {
+  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option>`;
 }
 
 
@@ -561,9 +595,122 @@ function deckCardFilterAttributes(item) {
   return `data-deck-filter-card data-display-id="${item.id}" data-role="${escapeHtml(item.role)}" data-types="${escapeHtml((item.card.cardTypes || []).join('|'))}" data-search="${escapeHtml(deckCardSearchText(item))}" data-quantity="${item.quantity}"`;
 }
 
-function primaryDeckCardType(card) {
+export function primaryDeckCardType(card) {
   const types = card.cardTypes || [];
   return CARD_TYPE_ORDER.find((type) => types.includes(type)) || 'Overig';
+}
+
+function deckCardManaValue(item) {
+  const value = Number(item?.card?.manaValue);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function compareDeckCardRoles(left, right) {
+  return DECK_CARD_COLLATOR.compare(String(left?.role || ''), String(right?.role || ''));
+}
+
+function compareDeckCardIds(left, right) {
+  const leftId = Number(left?.id);
+  const rightId = Number(right?.id);
+  if (Number.isFinite(leftId) && Number.isFinite(rightId)) return leftId - rightId;
+  return DECK_CARD_COLLATOR.compare(String(left?.id || ''), String(right?.id || ''));
+}
+
+function compareDeckCardNames(left, right) {
+  return DECK_CARD_COLLATOR.compare(String(left?.card?.name || ''), String(right?.card?.name || ''));
+}
+
+export function compareDeckCards(left, right, sortBy = 'mana') {
+  const normalizedSort = normalizeDeckCardSort(sortBy);
+  const manaDifference = deckCardManaValue(left) - deckCardManaValue(right);
+  const nameDifference = compareDeckCardNames(left, right);
+  const roleDifference = compareDeckCardRoles(left, right);
+  const idDifference = compareDeckCardIds(left, right);
+
+  if (normalizedSort === 'name') {
+    return nameDifference || manaDifference || roleDifference || idDifference;
+  }
+  return manaDifference || nameDifference || roleDifference || idDifference;
+}
+
+export function primaryDeckCardAbility(card = {}) {
+  const keywordsByName = new Map();
+  for (const value of Array.isArray(card.keywords) ? card.keywords : []) {
+    const keyword = String(value || '').trim();
+    if (!keyword) continue;
+    const normalized = keyword.toLocaleLowerCase('nl');
+    if (!keywordsByName.has(normalized)) keywordsByName.set(normalized, keyword);
+  }
+
+  const keywords = [...keywordsByName.values()].sort((left, right) => DECK_CARD_COLLATOR.compare(left, right));
+  if (keywords.length) {
+    const oracleText = String(card.oracleText || '').toLocaleLowerCase('nl');
+    let firstKeyword = null;
+    let firstIndex = Number.MAX_SAFE_INTEGER;
+    for (const keyword of keywords) {
+      const index = oracleText.indexOf(keyword.toLocaleLowerCase('nl'));
+      if (index !== -1 && index < firstIndex) {
+        firstKeyword = keyword;
+        firstIndex = index;
+      }
+    }
+    return firstKeyword || keywords[0];
+  }
+
+  const manaEntries = card?.insights?.manaProduction?.entries;
+  if (Array.isArray(manaEntries) && manaEntries.length) return 'Mana produceren';
+
+  const searchTargets = new Set((Array.isArray(card?.insights?.librarySearch?.targets)
+    ? card.insights.librarySearch.targets
+    : [])
+    .map((value) => String(value || '').trim().toLocaleLowerCase('nl'))
+    .filter(Boolean));
+  if (searchTargets.has('land') || searchTargets.has('basic_land')) return 'Tutor land';
+  if (searchTargets.has('creature')) return 'Tutor creature';
+  return NO_ABILITY_GROUP;
+}
+
+export function groupDeckCards(items = [], { groupBy = 'type', sortBy = 'mana' } = {}) {
+  const normalizedGroup = normalizeDeckCardGroup(groupBy);
+  const normalizedSort = normalizeDeckCardSort(sortBy);
+
+  if (normalizedGroup === 'ability') {
+    const groupsByAbility = new Map();
+    for (const item of items) {
+      const ability = primaryDeckCardAbility(item.card);
+      const noAbility = ability === NO_ABILITY_GROUP;
+      const key = noAbility ? 'ability:none' : `ability:${ability.toLocaleLowerCase('nl')}`;
+      if (!groupsByAbility.has(key)) {
+        groupsByAbility.set(key, { key, kind: 'ability', value: ability, label: ability, noAbility, items: [] });
+      }
+      groupsByAbility.get(key).items.push(item);
+    }
+    return [...groupsByAbility.values()]
+      .sort((left, right) => {
+        if (left.noAbility !== right.noAbility) return left.noAbility ? 1 : -1;
+        return DECK_CARD_COLLATOR.compare(left.label, right.label);
+      })
+      .map((group) => ({
+        ...group,
+        items: [...group.items].sort((left, right) => compareDeckCards(left, right, normalizedSort))
+      }));
+  }
+
+  const groupsByType = new Map([...CARD_TYPE_ORDER, 'Overig'].map((type) => [type, {
+    key: `type:${type.toLocaleLowerCase('nl')}`,
+    kind: 'type',
+    value: type,
+    label: CARD_TYPE_GROUP_LABELS[type] || type,
+    noAbility: false,
+    items: []
+  }]));
+  for (const item of items) groupsByType.get(primaryDeckCardType(item.card)).items.push(item);
+  return [...groupsByType.values()]
+    .filter((group) => group.items.length)
+    .map((group) => ({
+      ...group,
+      items: [...group.items].sort((left, right) => compareDeckCards(left, right, normalizedSort))
+    }));
 }
 
 function deckVisualCardHtml(item) {
@@ -575,18 +722,31 @@ function deckVisualCardHtml(item) {
   </article>`;
 }
 
-function deckVisualGroupsHtml(items, columns) {
-  const groups = new Map([...CARD_TYPE_ORDER, 'Overig'].map((type) => [type, []]));
-  for (const item of items) groups.get(primaryDeckCardType(item.card)).push(item);
+function deckGroupAttributes(group) {
+  const specificAttribute = group.kind === 'type'
+    ? ` data-deck-type-group="${escapeHtml(group.value)}"`
+    : ` data-deck-ability-group="${escapeHtml(group.value)}"`;
+  return `data-deck-card-group data-deck-group-key="${escapeHtml(group.key)}" data-deck-group-kind="${group.kind}"${specificAttribute}`;
+}
 
-  return `<div id="deck-card-visual" class="deck-visual-groups" data-columns="${columns}">${[...groups.entries()]
-    .filter(([, groupItems]) => groupItems.length)
-    .map(([type, groupItems]) => `<section class="deck-visual-group" data-deck-type-group="${escapeHtml(type)}">
-      <header class="deck-visual-group-header">
-        <h3>${escapeHtml(CARD_TYPE_GROUP_LABELS[type] || type)}</h3>
-        <span class="deck-visual-group-count" data-deck-group-count>${deckCardQuantity(groupItems)}</span>
+function deckListGroupsHtml(groups, hidden = false) {
+  return `<div id="deck-card-list" class="card-list" ${hidden ? 'hidden' : ''}>${groups.map((group) => `<section class="deck-list-group" ${deckGroupAttributes(group)}>
+      <header class="deck-list-group-header">
+        <h3>${escapeHtml(group.label)}</h3>
+        <span class="deck-visual-group-count" data-deck-group-count>${deckCardQuantity(group.items)}</span>
       </header>
-      <div class="deck-visual-grid">${groupItems.map(deckVisualCardHtml).join('')}</div>
+      <div class="deck-list-group-items">${group.items.map(deckCardHtml).join('')}</div>
+    </section>`).join('')}</div>`;
+}
+
+function deckVisualGroupsHtml(groups, columns) {
+  return `<div id="deck-card-visual" class="deck-visual-groups" data-columns="${columns}">${groups
+    .map((group) => `<section class="deck-visual-group" ${deckGroupAttributes(group)}>
+      <header class="deck-visual-group-header">
+        <h3>${escapeHtml(group.label)}</h3>
+        <span class="deck-visual-group-count" data-deck-group-count>${deckCardQuantity(group.items)}</span>
+      </header>
+      <div class="deck-visual-grid">${group.items.map(deckVisualCardHtml).join('')}</div>
     </section>`).join('')}</div>`;
 }
 
@@ -618,7 +778,7 @@ function deckCardHtml(item) {
       ${relationPills(item.relations, members.map((member) => member.id))}
       ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}
     </div>
-    <div class="deck-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
+    <div class="deck-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText, item.card.keywords) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
     <div class="card-list-actions">${actions}</div>
   </article>`;
 }
@@ -631,6 +791,8 @@ export async function renderDeckDetail(context) {
   const initialType = context.query.get('cardType') || '';
   const initialView = context.query.get('view') === 'cards' ? 'cards' : 'list';
   const initialColumns = normalizeDeckVisualColumns(context.query.get('cardColumns'));
+  const initialSort = normalizeDeckCardSort(context.query.get('cardSort'));
+  const initialGroup = normalizeDeckCardGroup(context.query.get('cardGroup'));
   const [deck, cards] = await Promise.all([
     api(`/decks/${deckId}`),
     api(`/decks/${deckId}/cards`)
@@ -640,6 +802,7 @@ export async function renderDeckDetail(context) {
   const groupsById = new Map();
   cards.flatMap((item) => item.relations || []).forEach((group) => groupsById.set(group.id, group));
   const displayCards = groupDeckCardsForDisplay(cards);
+  const displayGroups = groupDeckCards(displayCards, { groupBy: initialGroup, sortBy: initialSort });
   const displayCardByLeadId = new Map(displayCards.map((item) => [item.id, item]));
   const displayCardByCardId = new Map(displayCards.map((item) => [Number(item.card.id), item]));
   const deckCardById = new Map(cards.map((item) => [Number(item.id), item]));
@@ -651,9 +814,9 @@ export async function renderDeckDetail(context) {
   const activeFilterCount = Number(Boolean(initialSearch)) + Number(initialRole !== 'all') + Number(Boolean(selectedType));
 
   const cardList = displayCards.length
-    ? `<div id="deck-card-list" class="card-list" ${initialView === 'list' ? '' : 'hidden'}>${displayCards.map(deckCardHtml).join('')}</div>
+    ? `${deckListGroupsHtml(displayGroups, initialView !== 'list')}
       <div id="deck-card-visual-container" ${initialView === 'cards' ? '' : 'hidden'}>
-        ${deckVisualGroupsHtml(displayCards, initialColumns)}
+        ${deckVisualGroupsHtml(displayGroups, initialColumns)}
       </div>`
     : emptyState('Nog geen kaarten in dit deck', 'Voeg een commander of eerste kaart toe.', '<button id="empty-add-card" class="button primary" data-write-action>Kaart zoeken</button>');
 
@@ -688,6 +851,8 @@ export async function renderDeckDetail(context) {
           <div class="deck-filter-heading">
             <div class="deck-filter-controls">
               ${filterToggleHtml({ id: 'deck-filter-toggle', panelId: 'deck-filters-panel', expanded: filterPanelExpanded, activeCount: activeFilterCount })}
+              <label class="deck-list-order-control" for="deck-card-sort"><span>Sorteren</span><select id="deck-card-sort">${deckCardSortOptions(initialSort)}</select></label>
+              <label class="deck-list-order-control" for="deck-card-group"><span>Groeperen</span><select id="deck-card-group">${deckCardGroupOptions(initialGroup)}</select></label>
               ${displayCards.length ? `<label id="deck-cards-per-row-control" class="deck-cards-per-row-control" for="deck-cards-per-row" ${initialView === 'cards' ? '' : 'hidden'}><span>Kaarten per rij</span><select id="deck-cards-per-row">${deckVisualColumnOptions(initialColumns)}</select></label>` : ''}
             </div>
             <span id="deck-filter-summary" class="muted">${totalCardCount} kaarten zichtbaar</span>
@@ -907,10 +1072,14 @@ export async function renderDeckDetail(context) {
       let activeDeckFilter = initialRole;
       let activeDeckView = initialView;
       let activeDeckColumns = initialColumns;
+      let activeDeckSort = initialSort;
+      let activeDeckGroup = initialGroup;
       const deckSearch = document.getElementById('deck-card-search');
       const deckType = document.getElementById('deck-card-type');
       const deckColumns = document.getElementById('deck-cards-per-row');
       const deckColumnsControl = document.getElementById('deck-cards-per-row-control');
+      const deckSort = document.getElementById('deck-card-sort');
+      const deckGroup = document.getElementById('deck-card-group');
       const deckFilterToggle = bindFilterToggle({
         button: document.getElementById('deck-filter-toggle'),
         panel: document.getElementById('deck-filters-panel'),
@@ -925,7 +1094,9 @@ export async function renderDeckDetail(context) {
           role: activeDeckFilter,
           cardType: deckType?.value,
           view: activeDeckView,
-          cardColumns: activeDeckColumns
+          cardColumns: activeDeckColumns,
+          cardSort: activeDeckSort,
+          cardGroup: activeDeckGroup
         });
         const hash = `#/decks/${deck.id}${query ? `?${query}` : ''}`;
         history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${hash}`);
@@ -941,14 +1112,14 @@ export async function renderDeckDetail(context) {
         const query = String(deckSearch?.value || '').trim().toLocaleLowerCase('nl');
         const selectedCardType = String(deckType?.value || '');
         let visible = 0;
-        document.querySelectorAll('#deck-card-list > [data-deck-filter-card]').forEach((row) => {
+        document.querySelectorAll('#deck-card-list [data-deck-filter-card]').forEach((row) => {
           row.hidden = !matchesDeckFilters(row, query, selectedCardType);
           if (!row.hidden) visible += Number(row.dataset.quantity || 0);
         });
         document.querySelectorAll('#deck-card-visual [data-deck-filter-card]').forEach((card) => {
           card.hidden = !matchesDeckFilters(card, query, selectedCardType);
         });
-        document.querySelectorAll('[data-deck-type-group]').forEach((group) => {
+        document.querySelectorAll('#deck-card-list [data-deck-card-group], #deck-card-visual [data-deck-card-group]').forEach((group) => {
           const visibleCards = [...group.querySelectorAll('[data-deck-filter-card]')].filter((card) => !card.hidden);
           const visibleInGroup = visibleCards.reduce((total, card) => total + Number(card.dataset.quantity || 0), 0);
           group.hidden = visibleInGroup === 0;
@@ -989,6 +1160,15 @@ export async function renderDeckDetail(context) {
         applyDeckColumns();
         replaceDeckFilterQuery();
       });
+      const refreshDeckOrder = () => {
+        closeDeckCardContextMenu();
+        activeDeckSort = normalizeDeckCardSort(deckSort?.value);
+        activeDeckGroup = normalizeDeckCardGroup(deckGroup?.value);
+        replaceDeckFilterQuery();
+        refreshDeckView();
+      };
+      deckSort?.addEventListener('change', refreshDeckOrder);
+      deckGroup?.addEventListener('change', refreshDeckOrder);
       document.querySelectorAll('#deck-tabs button').forEach((button) => button.addEventListener('click', () => {
         document.querySelectorAll('#deck-tabs button').forEach((tab) => tab.classList.remove('active'));
         button.classList.add('active');

@@ -137,7 +137,7 @@ export function renderCollectionRows(items, hasFilters = false) {
         <div class="collection-card-stats">${rarityBadge(item.card.rarity)}${collectionPrice(item)}<span class="collection-quantity"><strong>${item.quantity}×</strong><small>${escapeHtml(item.finish)}</small></span></div>
         ${usageBadges(item.card.usage, { compact: true })}
       </div>
-      <div class="collection-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
+      <div class="collection-card-rules-text oracle-text">${rulesText ? cardTextHtml(rulesText, item.card.keywords) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
       <div class="card-list-actions"><button class="button secondary small open-collection-card-actions" type="button" data-write-action data-item-id="${item.id}" aria-haspopup="dialog" aria-label="Acties voor ${escapeHtml(item.card.name)}">Acties</button></div>
     </article>`;
   }).join('')}</div>`;

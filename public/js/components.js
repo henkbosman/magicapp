@@ -91,27 +91,93 @@ function isKnownCardTextSymbol(value) {
     && parts.slice(0, 2).every((part) => ['W', 'U', 'B', 'R', 'G'].includes(part));
 }
 
-function cardTextLineHtml(value) {
+// Only highlight trusted card keywords. Inferring text before an em dash also
+// catches modal instructions such as “Choose one”, which are not abilities.
+function cardTextKeywordPattern(keywords) {
+  const values = [...new Map((Array.isArray(keywords) ? keywords : [])
+    .map((keyword) => String(keyword || '').trim())
+    .filter(Boolean)
+    .map((keyword) => [keyword.toLowerCase(), keyword])).values()]
+    .sort((left, right) => right.length - left.length);
+  if (!values.length) return null;
+
+  const alternatives = values
+    .map((keyword) => keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+  return new RegExp(`(^|[^\\p{L}\\p{M}\\p{N}_])(${alternatives})(?=$|[^\\p{L}\\p{M}\\p{N}_])`, 'giu');
+}
+
+function highlightedCardTextHtml(value, keywordPattern) {
   const text = String(value ?? '');
-  const symbolPattern = /\{([^{}\r\n]+)\}/g;
+  if (!keywordPattern) return escapeHtml(text);
+
   let html = '';
   let cursor = 0;
-  for (const match of text.matchAll(symbolPattern)) {
-    html += escapeHtml(text.slice(cursor, match.index));
-    const token = match[1].trim();
-    html += isKnownCardTextSymbol(token) ? manaSymbol(token) : escapeHtml(match[0]);
-    cursor = Number(match.index) + match[0].length;
+  keywordPattern.lastIndex = 0;
+  for (const match of text.matchAll(keywordPattern)) {
+    const prefix = match[1] || '';
+    const keyword = match[2] || '';
+    const keywordStart = Number(match.index) + prefix.length;
+    html += escapeHtml(text.slice(cursor, keywordStart));
+    html += `<mark class="oracle-keyword">${escapeHtml(keyword)}</mark>`;
+    cursor = keywordStart + keyword.length;
   }
   return html + escapeHtml(text.slice(cursor));
 }
 
-export function cardTextHtml(value) {
+function cardTextLineHtml(value, keywordPattern, state) {
+  const text = String(value ?? '');
+  const symbolPattern = /\{([^{}\r\n]+)\}/y;
+  let html = '';
+  let buffer = '';
+
+  const flush = () => {
+    html += state.reminderDepth > 0
+      ? escapeHtml(buffer)
+      : highlightedCardTextHtml(buffer, keywordPattern);
+    buffer = '';
+  };
+
+  for (let cursor = 0; cursor < text.length;) {
+    if (text[cursor] === '{') {
+      symbolPattern.lastIndex = cursor;
+      const match = symbolPattern.exec(text);
+      if (match) {
+        const token = match[1].trim();
+        if (isKnownCardTextSymbol(token)) {
+          flush();
+          html += manaSymbol(token);
+          cursor += match[0].length;
+          continue;
+        }
+      }
+    }
+
+    const character = text[cursor];
+    if (character === '(') {
+      flush();
+      html += escapeHtml(character);
+      state.reminderDepth += 1;
+    } else if (character === ')' && state.reminderDepth > 0) {
+      flush();
+      html += escapeHtml(character);
+      state.reminderDepth -= 1;
+    } else {
+      buffer += character;
+    }
+    cursor += 1;
+  }
+  flush();
+  return html;
+}
+
+export function cardTextHtml(value, keywords = []) {
   const text = String(value ?? '').replace(/\r\n?/g, '\n');
   if (!text) return '';
 
-  return text.split('\n').map((line) => line.trim()
-    ? `<p class="oracle-ability-block">${cardTextLineHtml(line)}</p>`
-    : '<span class="oracle-text-gap" aria-hidden="true"></span>').join('\n');
+  const keywordPattern = cardTextKeywordPattern(keywords);
+  const state = { reminderDepth: 0 };
+  return text.split('\n').map((line) => cardTextLineHtml(line, keywordPattern, state)).join('<br>');
 }
 
 export function manaLabel(value, label = '') {

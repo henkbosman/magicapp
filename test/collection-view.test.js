@@ -23,7 +23,8 @@ function collectionItem() {
       name: 'Mana Elf',
       manaCost: '{1}{G}',
       printedText: '',
-      oracleText: '{T}: Add {C}.',
+      oracleText: 'Flying\n{T}: Add {C}.',
+      keywords: ['Flying'],
       setName: 'Test Set',
       setCode: 'tst',
       collectorNumber: '12',
@@ -51,6 +52,7 @@ test('collectielijst toont naam, mana, kaarttekst en alle collectiegegevens zond
   assert.match(html, /<a class="card-thumb-link card-preview-trigger"[^>]+data-card-preview-id="41"/);
   assert.match(html, /class="collection-card-mana-slot">[\s\S]*?aria-label="Manakosten \{1\}\{G\}"/);
   assert.match(html, /class="collection-card-rules-text oracle-text">[\s\S]*?aria-label="Tappen"[\s\S]*?aria-label="Kleurloos mana"/);
+  assert.match(html, /<mark class="oracle-keyword">Flying<\/mark>/);
   assert.match(html, /rarity-badge rarity-rare/);
   assert.match(html, /€ 1,25/);
   assert.match(html, /<strong>3×<\/strong><small>nonfoil<\/small>/);
