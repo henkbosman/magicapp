@@ -308,18 +308,32 @@ input[type="checkbox"] { width: 18px; height: 18px; }
 .selected-card-preview { display: grid; grid-template-columns: 170px minmax(0,1fr); gap: 18px; }
 .selected-card-preview .preview-image { width: 170px; aspect-ratio: 5 / 7; object-fit: cover; border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,.18); }
 .selected-card-preview .card-image-placeholder { width: 170px; aspect-ratio: 5 / 7; }
-.oracle-text { white-space: pre-wrap; line-height: 1.46; }
-.oracle-text .mana-symbol {
-  width: 1.15em;
-  height: 1.15em;
-  flex-basis: 1.15em;
-  margin: 0 .06em;
-  border-width: 1px;
-  vertical-align: -.16em;
+.oracle-text {
+  display: grid;
+  gap: .2em;
+  line-height: 1.5;
 }
-.oracle-text .mana-symbol.mana-bg-C { vertical-align: -.1em; }
-.oracle-text .mana-symbol.mana-bg-generic { vertical-align: -.1em; }
-.oracle-text .mana-symbol-text { font-size: .57em; }
+.oracle-ability-block {
+  margin: 0;
+  padding: .22em .45em;
+  border-left: 3px solid var(--primary);
+  border-radius: 6px;
+  background: var(--primary-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.oracle-text-gap { display: block; height: .34em; }
+.oracle-text .mana-symbol {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  flex-basis: 1.2em;
+  margin: 0 .07em;
+  border-width: 1px;
+  line-height: 1;
+  vertical-align: -.2em;
+}
+.oracle-text .mana-symbol-text { font-size: .68em; }
 .mana-symbol-text.compact { font-size: .48rem; letter-spacing: -.08em; }
 
 .deck-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -396,7 +410,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .deck-card-name-slot { display: block; overflow-wrap: anywhere; }
 .deck-card-mana-slot { min-height: 24px; display: flex; align-items: center; justify-content: flex-end; }
 .deck-card-mana-slot .mana-cost { flex-wrap: nowrap; justify-content: flex-end; }
-.deck-card-rules-text { min-width: 0; color: var(--ink-soft); font-size: .78rem; overflow-wrap: anywhere; }
+.deck-card-rules-text { min-width: 0; color: var(--ink); font-size: .9rem; overflow-wrap: anywhere; }
 .role-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--primary); font-weight: 800; }
 .section-tabs { display: flex; gap: 5px; margin: 0 0 14px; overflow-x: auto; }
 .section-tabs button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
@@ -2022,8 +2036,8 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .collection-card-stats > .collection-quantity { min-width: 58px; text-align: center; }
 .collection-card-rules-text {
   min-width: 0;
-  color: var(--ink-soft);
-  font-size: .78rem;
+  color: var(--ink);
+  font-size: .9rem;
   overflow-wrap: anywhere;
 }
 

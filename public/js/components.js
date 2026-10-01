@@ -91,7 +91,7 @@ function isKnownCardTextSymbol(value) {
     && parts.slice(0, 2).every((part) => ['W', 'U', 'B', 'R', 'G'].includes(part));
 }
 
-export function cardTextHtml(value) {
+function cardTextLineHtml(value) {
   const text = String(value ?? '');
   const symbolPattern = /\{([^{}\r\n]+)\}/g;
   let html = '';
@@ -103,6 +103,15 @@ export function cardTextHtml(value) {
     cursor = Number(match.index) + match[0].length;
   }
   return html + escapeHtml(text.slice(cursor));
+}
+
+export function cardTextHtml(value) {
+  const text = String(value ?? '').replace(/\r\n?/g, '\n');
+  if (!text) return '';
+
+  return text.split('\n').map((line) => line.trim()
+    ? `<p class="oracle-ability-block">${cardTextLineHtml(line)}</p>`
+    : '<span class="oracle-text-gap" aria-hidden="true"></span>').join('\n');
 }
 
 export function manaLabel(value, label = '') {

@@ -77,6 +77,7 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     assert.match(view.html, /data-deck-type-group="Instant"[\s\S]*?<h3>Instants<\/h3>/);
     assert.match(view.html, /<div class="deck-filter-controls">[\s\S]*?id="deck-filter-toggle"[\s\S]*?<label id="deck-cards-per-row-control"[\s\S]*?<select id="deck-cards-per-row"[\s\S]*?<\/label>\s*<\/div>\s*<span id="deck-filter-summary"/);
     assert.match(view.html, /id="deck-cards-per-row"[\s\S]*?<option value="5" selected>5<\/option>/);
+    assert.doesNotMatch(view.html, /<option value="auto"|>Automatisch<\/option>/);
     assert.match(view.html, /id="deck-card-visual" class="deck-visual-groups" data-columns="5"/);
     assert.doesNotMatch(view.html, /deck-visual-toolbar/);
     assert.match(view.html, /data-card-preview-id="11"/);
@@ -123,16 +124,20 @@ test('decklijst geeft de naam flexibele ruimte en lijnt mana aan de rechterrand 
   assert.match(styles, /\.deck-card-mana-slot\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*flex-end;/s);
   assert.match(styles, /\.deck-card-mana-slot \.mana-cost\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*justify-content:\s*flex-end;/s);
   assert.match(styles, /@media \(min-width:\s*641px\) and \(max-width:\s*1279px\)[\s\S]*?#deck-card-list > \.deck-card-row/);
-  assert.match(styles, /\.oracle-text \.mana-symbol\.mana-bg-C\s*\{\s*vertical-align:\s*-\.1em;\s*\}/);
+  assert.match(styles, /\.oracle-text \.mana-symbol\s*\{[^}]*vertical-align:\s*-\.2em;/s);
+  assert.doesNotMatch(styles, /\.oracle-text \.mana-symbol\.mana-bg-(?:C|generic)\s*\{/);
 });
 
-test('deckkolommen accepteren alleen auto of één tot en met acht', () => {
-  assert.equal(normalizeDeckVisualColumns('auto'), 'auto');
+test('deckkolommen gebruiken standaard vijf en accepteren één tot en met acht', () => {
+  assert.equal(normalizeDeckVisualColumns(), '5');
+  assert.equal(normalizeDeckVisualColumns(null), '5');
+  assert.equal(normalizeDeckVisualColumns('auto'), '5');
   assert.equal(normalizeDeckVisualColumns('1'), '1');
+  assert.equal(normalizeDeckVisualColumns('5'), '5');
   assert.equal(normalizeDeckVisualColumns('8'), '8');
-  assert.equal(normalizeDeckVisualColumns('0'), 'auto');
-  assert.equal(normalizeDeckVisualColumns('9'), 'auto');
-  assert.equal(normalizeDeckVisualColumns('vier'), 'auto');
+  assert.equal(normalizeDeckVisualColumns('0'), '5');
+  assert.equal(normalizeDeckVisualColumns('9'), '5');
+  assert.equal(normalizeDeckVisualColumns('vier'), '5');
 });
 
 test('deckquery bewaart filters, kaartview en kolomkeuze samen', () => {
@@ -143,6 +148,8 @@ test('deckquery bewaart filters, kaartview en kolomkeuze samen', () => {
     view: 'cards',
     cardColumns: '7'
   }), 'cardSearch=Llanowar+Elves&role=sideboard&cardType=Creature&view=cards&cardColumns=7');
+  assert.equal(deckDetailQueryString({ view: 'cards' }), 'view=cards');
+  assert.equal(deckDetailQueryString({ cardColumns: '5' }), '');
   assert.equal(deckDetailQueryString({ cardColumns: '9' }), '');
 });
 

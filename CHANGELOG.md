@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.10.3 - 2026-10-01
+
+### Kaarttekst en symbolen
+
+- Kaarttekst en de mana- en tapsymbolen daarin zijn weer duidelijk en op een goed leesbare grootte weergegeven.
+- Generieke, numerieke, gekleurde, kleurloze en tapsymbolen gebruiken in kaarttekst dezelfde consistente verticale basislijn.
+- Afzonderlijke ability- en Oracle-tekstregels krijgen een subtiele arcering, zodat abilities sneller van elkaar te onderscheiden zijn.
+
+### Deckweergave
+
+- De keuzelijst **Kaarten per rij** bevat niet langer **Automatisch** en gebruikt standaard **5** kaarten per rij. De expliciete keuzes 1 tot en met 8 blijven beschikbaar.
+
+### API en database
+
+- Geen nieuwe of gewijzigde endpointpaden.
+- Geen schemawijziging. Bestaande 2.x-productiedata blijft rechtstreeks bruikbaar.
+
 ## 2.10.2 - 2026-10-01
 
 ### Kaartlijsten en kaartweergave

@@ -29,7 +29,7 @@ const CARD_TYPE_GROUP_LABELS = {
   Kindred: 'Kindred',
   Overig: 'Overig'
 };
-const DECK_VISUAL_COLUMN_OPTIONS = ['auto', '1', '2', '3', '4', '5', '6', '7', '8'];
+const DECK_VISUAL_COLUMN_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
 const DECK_CARD_ACTION_ICONS = {
   wanted: '☆',
@@ -41,11 +41,11 @@ const DECK_CARD_ACTION_ICONS = {
 };
 
 export function normalizeDeckVisualColumns(value) {
-  const normalized = String(value || 'auto');
-  return DECK_VISUAL_COLUMN_OPTIONS.includes(normalized) ? normalized : 'auto';
+  const normalized = String(value || '5');
+  return DECK_VISUAL_COLUMN_OPTIONS.includes(normalized) ? normalized : '5';
 }
 
-export function deckDetailQueryString({ cardSearch = '', role = 'all', cardType = '', view = 'list', cardColumns = 'auto' } = {}) {
+export function deckDetailQueryString({ cardSearch = '', role = 'all', cardType = '', view = 'list', cardColumns = '5' } = {}) {
   const params = new URLSearchParams();
   const search = String(cardSearch || '').trim();
   const columns = normalizeDeckVisualColumns(cardColumns);
@@ -53,14 +53,13 @@ export function deckDetailQueryString({ cardSearch = '', role = 'all', cardType 
   if (role !== 'all') params.set('role', role);
   if (cardType) params.set('cardType', cardType);
   if (view === 'cards') params.set('view', 'cards');
-  if (columns !== 'auto') params.set('cardColumns', columns);
+  if (columns !== '5') params.set('cardColumns', columns);
   return params.toString();
 }
 
 function deckVisualColumnOptions(current) {
   return DECK_VISUAL_COLUMN_OPTIONS.map((value) => {
-    const label = value === 'auto' ? 'Automatisch' : value;
-    return `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`;
+    return `<option value="${value}" ${value === current ? 'selected' : ''}>${value}</option>`;
   }).join('');
 }
 
