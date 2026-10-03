@@ -6,6 +6,7 @@ import {
   catalogImportActive,
   discoveryFiltersFromQuery,
   discoverySearchParams,
+  hasDiscoveryFilters,
   normalizeCatalogStatus,
   paginationHtml,
   renderCardDiscovery,
@@ -60,6 +61,15 @@ test('ontdekquery normaliseert kleuridentiteit, pagina en effectafhankelijke fil
   assert.equal(colorsWithColorless.get('colorIdentity'), 'G');
 });
 
+test('alleen inhoudelijke filters starten een zoekopdracht', () => {
+  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land']) {
+    assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), false, query);
+  }
+  for (const query of ['text=draw', 'type=Instant', 'manaMin=0', 'colorIdentity=C', 'effect=token&tokenPower=2']) {
+    assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), true, query);
+  }
+});
+
 test('catalogusstatus ondersteunt importvoortgang zonder hoofd-databasekaart-id', () => {
   const status = normalizeCatalogStatus({
     available: false,
@@ -108,8 +118,40 @@ test('ontdekresultaten tonen mana, kaarttekst, matchredenen en alleen een veilig
   assert.match(html, /aria-label="Manakosten \{3\}\{G\}\{G\}"/);
   assert.match(html, /<mark class="oracle-keyword">Landfall<\/mark>/);
   assert.match(html, /Maakt een 2\/2 creature token/);
-  assert.match(html, /href="#\/add\?q=Zendikar's%20Roil"[^>]*>Kaart opzoeken<\/a>/);
+  assert.match(html, /href="#\/add\?name=Zendikar's%20Roil"[^>]*>Kaart opzoeken<\/a>/);
+  assert.match(html, /data-discovery-preview="0" aria-label="Afbeelding van Zendikar&#039;s Roil bekijken"/);
+  assert.match(html, /data-discovery-lookup/);
   assert.doesNotMatch(html, /#\/cards\/catalog-901|\/cards\/catalog-901\/image/);
+});
+
+test('ontdekresultaten arceren de letterlijke kaarttekstzoekopdracht en behouden keyword- en manamarkup', () => {
+  const html = renderDiscoveryResults({ items: [{ name: 'Landfall card', oracleText: 'Landfall — Add {G}. Landfall triggers.', keywords: ['Landfall'] }] }, { text: 'landfall' });
+  assert.equal((html.match(/class="oracle-search-match"/g) || []).length, 2);
+  assert.match(html, /oracle-keyword/);
+  assert.match(html, /mana-symbol/);
+  assert.doesNotMatch(renderDiscoveryResults({ items: [{ name: 'Test', oracleText: 'No query.' }] }), /oracle-search-match/);
+});
+
+test('een nieuwe ontdekpagina toont nog geen kaarten en vraagt alleen filteropties op', async () => {
+  const originalFetch = globalThis.fetch;
+  const requested = [];
+  globalThis.fetch = async (url) => {
+    requested.push(String(url));
+    return jsonResponse(String(url).includes('/status') ? { available: true, cardCount: 1200 } : {});
+  };
+  try {
+    const view = await renderCardDiscovery({ query: new URLSearchParams('sort=mana') });
+    assert.match(view.html, /Zoek kaarten voor je deck/);
+    assert.match(view.html, /Nog geen zoekopdracht/);
+    assert.doesNotMatch(view.html, /class="discovery-card"|Geen kaarten gevonden/);
+    assert.equal(requested.filter((url) => url.includes('/search')).length, 0);
+    assert.equal(requested.filter((url) => url.includes('/options')).length, 1);
+    assert.match(view.html, /<details class="panel discovery-secondary-filters">/);
+    assert.doesNotMatch(view.html, /<details[^>]+\bopen\b|discovery-filter-note|Effectfilters zijn afgeleid/);
+    const sidebar = view.html.slice(view.html.indexOf('<aside'), view.html.indexOf('</aside>'));
+    assert.doesNotMatch(sidebar, /name="colorIdentity"|name="manaMin"|name="legality"/);
+    assert.match(view.html, /<form id="discovery-filters"[\s\S]*<aside[\s\S]*<details[\s\S]*name="colorIdentity"[\s\S]*<\/form>/);
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test('ontdekpagina toont bij ontbrekende catalogus een duidelijke onderhouds-CTA', async () => {
@@ -210,7 +252,7 @@ test('lege facets blijven leeg en behouden veilige nulselecties uit een gedeelde
     assert.match(view.html, /name="manaMax"[^>]*value="99"/);
     assert.match(view.html, /<datalist id="discovery-mana-values"><\/datalist>/);
     assert.match(view.html, /Geen mana values binnen de overige filters/);
-    assert.match(view.html, /Geselecteerde opties met 0 matches blijven staan/);
+    assert.doesNotMatch(view.html, /discovery-filter-note/);
   } finally {
     globalThis.fetch = originalFetch;
   }

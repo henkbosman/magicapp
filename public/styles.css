@@ -2095,15 +2095,6 @@ html.write-unavailable [data-write-only] { display: none !important; }
 }
 
 /* Uitgebreide, lokaal geïmporteerde kaartcatalogus voor deckbouw. */
-.discovery-filter-note {
-  margin: -10px 0 14px;
-  padding: 10px 12px;
-  border: 1px solid #ead9ad;
-  border-radius: 10px;
-  background: var(--accent-soft);
-  color: #704d13;
-  font-size: .8rem;
-}
 .discovery-layout {
   display: grid;
   grid-template-columns: minmax(270px, 320px) minmax(0, 1fr);
@@ -2117,6 +2108,23 @@ html.write-unavailable [data-write-only] { display: none !important; }
   top: 18px;
 }
 .discovery-filter-form { display: grid; gap: 18px; }
+.discovery-secondary-filters { margin-bottom: 14px; }
+.discovery-secondary-filters > summary {
+  padding: 13px 16px;
+  color: var(--primary-dark);
+  font-size: .84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.discovery-secondary-filters > summary:focus-visible { outline: 3px solid rgba(40, 99, 62, .3); outline-offset: -3px; }
+.discovery-secondary-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.2fr) minmax(160px, 1fr) minmax(125px, .8fr);
+  align-items: start;
+  gap: 16px;
+  padding: 0 16px 16px;
+}
+.discovery-mana-filter { min-width: 0; display: grid; gap: 8px; }
 .discovery-filter-section {
   min-width: 0;
   display: grid;
@@ -2230,6 +2238,24 @@ html.write-unavailable [data-write-only] { display: none !important; }
   gap: 9px;
 }
 .discovery-card-title h2 { overflow-wrap: anywhere; }
+.discovery-preview-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -3px 0 -3px 3px;
+  padding: 3px;
+  vertical-align: middle;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--primary-dark);
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+.discovery-preview-button:hover { background: var(--primary-soft); border-color: var(--primary-dark); }
+.discovery-preview-button:focus-visible { outline: 3px solid rgba(40, 99, 62, .3); outline-offset: 2px; }
+.oracle-search-match { padding: 0; border-radius: 2px; color: inherit; background: #ffe58a; box-shadow: 0 0 0 1px #f4cd65; }
 .discovery-card-title .mana-cost { flex-wrap: nowrap; }
 .discovery-card-heading .card-meta { margin-bottom: 0; white-space: normal; }
 .discovery-card-rules {
@@ -2296,6 +2322,11 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .catalog-import-progress.complete { border-color: #b9d5bf; background: var(--primary-soft); }
 .catalog-import-progress.failed { border-color: #e7b9b5; background: var(--danger-soft); }
 
+@media (max-width: 1300px) {
+  .discovery-secondary-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .discovery-secondary-filter-grid > .discovery-color-filter { grid-column: 1 / -1; }
+}
+
 @media (max-width: 1100px) {
   .discovery-layout { grid-template-columns: minmax(245px, 285px) minmax(0, 1fr); }
   .discovery-card {
@@ -2315,7 +2346,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 
 @media (max-width: 640px) {
   .mobile-nav a small { font-size: .62rem; }
-  .discovery-filter-note { margin-top: 0; }
+  .discovery-secondary-filter-grid { grid-template-columns: minmax(0, 1fr); }
   .discovery-results-toolbar { align-items: stretch; flex-direction: column; }
   .discovery-sort-control { justify-content: space-between; }
   .discovery-sort-control select { flex: 1 1 auto; min-width: 0; }

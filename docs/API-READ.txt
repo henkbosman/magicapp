@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.11.1
+MAGIC COLLECTION MANAGER READ API 2.11.2
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.11.1"}
+{"status":"ok","version":"2.11.2"}
 
 GET /api/read/card-catalog/status
 
@@ -51,6 +51,21 @@ OUTPUT JSON
 }
 
 Zonder geïmporteerde catalogus is available=false, cardCount=0 en kunnen sourceVersion, sourceDate en importedAt leeg zijn. importJob is null zolang in het huidige serverproces nog geen import is gestart. Een actieve job heeft status=running en voortgang in phase, processed, total, downloadedBytes en totalBytes; een mislukte job heeft status=failed en daarnaast error.
+
+
+GET /api/read/card-catalog/preview?name={exacte-kaartnaam}
+
+Geeft een kaartafbeelding voor de ontdekpopup. Gebruikt de exacte naam via de vaste Scryfall named-route; accepteert geen externe URL. Dit endpoint gebruikt geen primaire database en wijzigt ook de MTGJSON-catalogus niet. Afbeeldingsmetadata wordt tijdelijk en begrensd in het procesgeheugen gecachet. De afbeelding zelf wordt door de browser vanaf cards.scryfall.io geladen.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{"data":{"name":"Llanowar Elves","faces":[{"name":"Llanowar Elves","image":"https://cards.scryfall.io/large/front/voorbeeld.jpg"}]}}
+
+faces bevat één of twee kaartzijden met een HTTPS-afbeeldings-URL. HTTP 400 bij ontbrekende/ongeldige naam, 404 bij ontbrekende kaart/afbeelding, 429 bij upstream rate limiting, 502 bij ongeldige upstreamdata, 503 bij verbindingsfout en 504 bij een time-out. De preview blijft read-only en is beschikbaar wanneer de write-API is afgeschermd.
 
 GET /api/read/card-catalog/options?type={type}&ability={ability}&keyword={keyword}&subtype={subtype}&name={name}&text={oracle-text}&colorIdentity={colors}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format}&effect={effect}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}
 
@@ -722,7 +737,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.11.1",
+    "applicationVersion": "2.11.2",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

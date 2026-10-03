@@ -2,6 +2,8 @@ import { api } from '../api.js';
 import { cardTextHtml, colorIdentity, manaCost, manaSymbol, pageHeader } from '../components.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { formFilters, replaceRouteQuery, resetFilterForm } from '../live-filters.js';
+import { openDiscoveryCardPreview } from '../discovery-preview.js';
+import { prepareDiscoveryLookupNavigation } from '../navigation-state.js';
 import { emptyState, escapeHtml, toast } from '../utils.js';
 
 const COLOR_OPTIONS = [
@@ -173,6 +175,13 @@ export function discoverySearchParams(values = {}) {
   return params;
 }
 
+export function hasDiscoveryFilters(values = {}) {
+  const params = discoverySearchParams(values);
+  return ['name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
+    'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+    .some((key) => String(params.get(key) || '').trim().length > 0);
+}
+
 function option(value, label, selected = '') {
   return `<option value="${escapeHtml(value)}" ${String(selected) === String(value) ? 'selected' : ''}>${escapeHtml(label)}</option>`;
 }
@@ -278,13 +287,13 @@ function catalogCardId(card) {
   return firstDefined(card.catalogId, card.id, card.catalogKey, '');
 }
 
-export function renderDiscoveryResults(result) {
+export function renderDiscoveryResults(result, filters = {}) {
   const normalized = normalizedResult(result);
   if (!normalized.items.length) {
     return emptyState('Geen kaarten gevonden', 'Maak de zoekopdracht iets ruimer of verwijder één of meer filters.');
   }
 
-  return `<div class="discovery-card-list">${normalized.items.map((card) => {
+  return `<div class="discovery-card-list">${normalized.items.map((card, index) => {
     const text = firstDefined(card.oracleText, card.text, '') || '';
     const typeLine = firstDefined(card.typeLine, card.type, '') || '';
     const colors = uniqueColors(firstDefined(card.colorIdentity, card.colors, []));
@@ -293,12 +302,12 @@ export function renderDiscoveryResults(result) {
     return `<article class="discovery-card" ${catalogId !== '' ? `data-catalog-id="${escapeHtml(String(catalogId))}"` : ''}>
       <div class="discovery-card-heading">
         <div class="discovery-card-title">
-          <h2>${escapeHtml(card.name || 'Naamloze kaart')}</h2>
+          <h2>${escapeHtml(card.name || 'Naamloze kaart')} <button type="button" class="discovery-preview-button" data-discovery-preview="${index}" aria-label="Afbeelding van ${escapeHtml(card.name || 'de kaart')} bekijken" title="Kaartafbeelding bekijken"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 6h8v7H8zM8 16h8M8 18.5h5"></path></svg></button></h2>
           ${manaCost(card.manaCost)}
         </div>
         <p class="card-meta">${escapeHtml(typeLine || 'Kaarttype onbekend')}</p>
       </div>
-      <div class="discovery-card-rules oracle-text">${text ? cardTextHtml(text, cardKeywords(card)) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
+      <div class="discovery-card-rules oracle-text">${text ? cardTextHtml(text, cardKeywords(card), { highlight: filters.text || '' }) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
       ${reasons.length ? `<div class="discovery-match-reasons" aria-label="Waarom deze kaart overeenkomt">${reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join('')}</div>` : ''}
       <footer class="discovery-card-footer">
         <div class="discovery-card-facts">
@@ -306,7 +315,7 @@ export function renderDiscoveryResults(result) {
           <span>Mana value <strong>${Number(card.manaValue || 0)}</strong></span>
           ${card.power !== undefined && card.power !== null && card.power !== '' ? `<span><strong>${escapeHtml(String(card.power))}/${escapeHtml(String(card.toughness ?? ''))}</strong></span>` : ''}
         </div>
-        <a class="button primary small" href="#/add?q=${encodeURIComponent(card.name || '')}">Kaart opzoeken</a>
+        <a class="button primary small" data-discovery-lookup href="#/add?name=${encodeURIComponent(card.name || '')}">Kaart opzoeken</a>
       </footer>
     </article>`;
   }).join('')}</div>`;
@@ -331,6 +340,10 @@ export function paginationHtml(result) {
 function resultCountHtml(result) {
   const normalized = normalizedResult(result);
   return `${normalized.total} kaart${normalized.total === 1 ? '' : 'en'} gevonden`;
+}
+
+function discoveryStartHtml() {
+  return emptyState('Zoek kaarten voor je deck', 'Kies een filter of vul een zoekterm in om kaarten te ontdekken.');
 }
 
 function catalogUnavailableHtml(status) {
@@ -361,14 +374,18 @@ export async function renderCardDiscovery(context) {
 
   const filters = discoveryFiltersFromQuery(context.query);
   const initialParams = discoverySearchParams(filters);
+  const initialSearch = hasDiscoveryFilters(initialParams);
   const [options, rawResult] = await Promise.all([
     api(`/card-catalog/options?${initialParams}`),
-    api(`/card-catalog/search?${initialParams}`)
+    initialSearch ? api(`/card-catalog/search?${initialParams}`) : Promise.resolve({ items: [], total: 0, page: 1 })
   ]);
   let result = normalizedResult(rawResult, filters.page);
   const filterCount = activeFilterCount(filters);
   const isCompactViewport = globalThis.window?.matchMedia?.('(max-width: 900px)')?.matches === true;
-  const filtersOpen = !isCompactViewport || filterCount > 0 || filtersExpanded('discover');
+  const filtersOpen = context.query.has('filterPanelOpen')
+    ? context.query.get('filterPanelOpen') === '1'
+    : !isCompactViewport || filterCount > 0 || filtersExpanded('discover');
+  const secondaryFiltersOpen = context.query.get('colorsOpen') === '1';
 
   return {
     html: `
@@ -377,12 +394,11 @@ export async function renderCardDiscovery(context) {
         title: 'Kaarten ontdekken',
         description: 'Combineer meerdere kenmerken om precies de kaarten te vinden die bij je deckplan passen.'
       })}
-      <p class="discovery-filter-note">Filteropties passen zich aan de overige filters aan; je kunt elk filter blijven wijzigen. Geselecteerde opties met 0 matches blijven staan totdat je ze wist. Effectfilters zijn afgeleid van de Engelse kaarttekst; controleer altijd de kaartdetails.</p>
       ${filterToggleHtml({ id: 'discovery-filter-toggle', panelId: 'discovery-filter-panel', expanded: filtersOpen, activeCount: filterCount, resetId: 'discovery-filter-reset' })}
-      <section class="discovery-layout">
+      <form id="discovery-filters" class="discovery-layout" autocomplete="off">
         <aside id="discovery-filter-panel" class="panel discovery-filter-panel" ${filtersOpen ? '' : 'hidden'}>
           <header class="panel-header"><h2>Zoekfilters</h2></header>
-          <form id="discovery-filters" class="discovery-filter-form panel-body" autocomplete="off">
+          <div class="discovery-filter-form panel-body">
             <section class="discovery-filter-section">
               <h3>Tekst en kaartsoort</h3>
               <div class="field"><label for="discovery-name">Naam</label><input id="discovery-name" name="name" type="search" value="${escapeHtml(filters.name)}" placeholder="Bijv. Zendikar"></div>
@@ -391,18 +407,6 @@ export async function renderCardDiscovery(context) {
               <div class="field"><label for="discovery-keyword">Keyword</label><select id="discovery-keyword" name="keyword">${facetOptionsHtml('keyword', options, filters.keyword)}</select></div>
               <div class="field"><label for="discovery-type">Kaarttype</label><select id="discovery-type" name="type">${facetOptionsHtml('type', options, filters.type)}</select></div>
               <div class="field"><label for="discovery-subtype">Subtype</label><select id="discovery-subtype" name="subtype">${facetOptionsHtml('subtype', options, filters.subtype)}</select></div>
-            </section>
-
-            <section class="discovery-filter-section">
-              <h3>Kleur, mana en legaliteit</h3>
-              ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode, options)}
-              <div class="discovery-mana-range">
-                <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMin)}"></div>
-                <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMax)}"></div>
-              </div>
-              <datalist id="discovery-mana-values">${manaValuesHtml(options)}</datalist>
-              <p id="discovery-mana-hint" class="discovery-facet-hint">${escapeHtml(manaHint(options))}</p>
-              <div class="field"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality">${facetOptionsHtml('legality', options, filters.legality)}</select></div>
             </section>
 
             <section class="discovery-filter-section">
@@ -419,12 +423,27 @@ export async function renderCardDiscovery(context) {
                 <div class="field"><label for="discovery-tutor-target">Zoekt naar</label><select id="discovery-tutor-target" name="tutorTarget">${facetOptionsHtml('tutorTarget', options, filters.tutorTarget)}</select></div>
               </div>
             </section>
-          </form>
+          </div>
         </aside>
 
         <div class="discovery-results-column">
+          <details class="panel discovery-secondary-filters"${secondaryFiltersOpen ? ' open' : ''}>
+            <summary>Kleur, mana en legaliteit</summary>
+            <div class="discovery-secondary-filter-grid">
+              ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode, options)}
+              <div class="discovery-mana-filter">
+                <div class="discovery-mana-range">
+                  <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMin)}"></div>
+                  <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMax)}"></div>
+                </div>
+                <datalist id="discovery-mana-values">${manaValuesHtml(options)}</datalist>
+                <p id="discovery-mana-hint" class="discovery-facet-hint">${escapeHtml(manaHint(options))}</p>
+              </div>
+              <div class="field"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality">${facetOptionsHtml('legality', options, filters.legality)}</select></div>
+            </div>
+          </details>
           <div class="discovery-results-toolbar">
-            <p id="discovery-result-count" class="result-count" aria-live="polite">${resultCountHtml(result)}</p>
+            <p id="discovery-result-count" class="result-count" aria-live="polite">${initialSearch ? resultCountHtml(result) : 'Nog geen zoekopdracht'}</p>
             <label class="discovery-sort-control" for="discovery-sort">Sorteren
               <select id="discovery-sort">
                 ${option('relevance', 'Relevantie', filters.sort)}
@@ -433,10 +452,10 @@ export async function renderCardDiscovery(context) {
               </select>
             </label>
           </div>
-          <div id="discovery-results">${renderDiscoveryResults(result)}</div>
-          <div id="discovery-pagination-wrap">${paginationHtml(result)}</div>
+          <div id="discovery-results">${initialSearch ? renderDiscoveryResults(result, filters) : discoveryStartHtml()}</div>
+          <div id="discovery-pagination-wrap">${initialSearch ? paginationHtml(result) : ''}</div>
         </div>
-      </section>`,
+      </form>`,
     mount() {
       const form = document.getElementById('discovery-filters');
       const filterPanel = document.getElementById('discovery-filter-panel');
@@ -550,13 +569,22 @@ export async function renderCardDiscovery(context) {
         const { signal } = requestController;
         const requestSequence = resultRequestSequence;
         const apiParams = discoverySearchParams(routeValues);
+        const shouldSearch = hasDiscoveryFilters(apiParams);
         const requestedPage = Number(apiParams.get('page'));
         replaceRouteQuery('/discover', routeValues);
+        if (!shouldSearch) {
+          result = normalizedResult({ items: [], total: 0, page: 1 });
+          currentPage = 1;
+          results.innerHTML = discoveryStartHtml();
+          count.textContent = 'Nog geen zoekopdracht';
+          pagination.innerHTML = '';
+          filterToggle.updateActiveCount();
+        }
         setLoading(true);
         try {
           const [nextOptions, nextResult] = await Promise.all([
             api(`/card-catalog/options?${apiParams}`, { signal }),
-            api(`/card-catalog/search?${apiParams}`, { signal })
+            shouldSearch ? api(`/card-catalog/search?${apiParams}`, { signal }) : Promise.resolve({ items: [], total: 0, page: 1 })
           ]);
           // A keystroke invalidates immediately, including while its debounce is pending.
           if (signal.aborted || requestSequence !== resultRequestSequence || form.isConnected === false
@@ -565,9 +593,9 @@ export async function renderCardDiscovery(context) {
           result = next;
           currentPage = next.page;
           updateOptions(nextOptions);
-          results.innerHTML = renderDiscoveryResults(next);
-          count.textContent = resultCountHtml(next);
-          pagination.innerHTML = paginationHtml(next);
+          results.innerHTML = shouldSearch ? renderDiscoveryResults(next, { text: apiParams.get('text') }) : discoveryStartHtml();
+          count.textContent = shouldSearch ? resultCountHtml(next) : 'Nog geen zoekopdracht';
+          pagination.innerHTML = shouldSearch ? paginationHtml(next) : '';
           filterToggle.updateActiveCount();
           return true;
         } catch (error) {
@@ -593,11 +621,34 @@ export async function renderCardDiscovery(context) {
       form.addEventListener('input', (event) => {
         if (!event.target.matches('input[type="search"], input[type="text"], input[type="number"]')) return;
         invalidateRequest();
+        currentPage = 1;
         setLoading(true);
         filterToggle.updateActiveCount();
         debounceTimer = setTimeout(applyFilters, 220);
       });
-      form.addEventListener('change', applyFilters);
+      form.addEventListener('change', (event) => {
+        if (event.target !== sort) applyFilters();
+      });
+
+      results.addEventListener('click', (event) => {
+        const preview = event.target.closest('[data-discovery-preview]');
+        if (preview) {
+          const card = result.items[Number(preview.dataset.discoveryPreview)];
+          if (card) openDiscoveryCardPreview(card);
+          return;
+        }
+        const link = event.target.closest('[data-discovery-lookup]');
+        if (!link || event.defaultPrevented || (event.button !== undefined && event.button !== 0)
+          || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        // Capture edits that are still waiting for their debounce before leaving.
+        invalidateRequest();
+        const returnParams = routeParams();
+        if (form.querySelector('.discovery-secondary-filters').open) returnParams.set('colorsOpen', '1');
+        returnParams.set('filterPanelOpen', filterPanel.hidden ? '0' : '1');
+        replaceRouteQuery('/discover', returnParams);
+        window.location.hash = prepareDiscoveryLookupNavigation(link.getAttribute('href'));
+      });
 
       sort.addEventListener('change', async () => {
         currentPage = 1;

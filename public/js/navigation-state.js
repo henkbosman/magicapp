@@ -1,7 +1,10 @@
 const CARD_RETURN_PREFIX = 'magic-collection:card-return:';
 const DECK_STATS_RETURN_PREFIX = 'magic-collection:deck-stats-return:';
+const DISCOVERY_RETURN_PREFIX = 'magic-collection:discovery-return:';
 const PENDING_SCROLL_KEY = 'magic-collection:pending-scroll';
 const MAX_STATE_AGE_MS = 12 * 60 * 60 * 1000;
+const discoveryReturnStates = new Map();
+let pendingDiscoveryScroll = null;
 
 function safeSessionGet(key) {
   try {
@@ -139,11 +142,51 @@ export function preserveCurrentScrollForNextRender() {
 }
 
 export function consumePendingScroll(hash) {
-  const state = parseState(safeSessionGet(PENDING_SCROLL_KEY));
-  if (!state || state.hash !== hash) return null;
-  safeSessionRemove(PENDING_SCROLL_KEY);
+  const storedState = parseState(safeSessionGet(PENDING_SCROLL_KEY));
+  const memoryState = parseState(pendingDiscoveryScroll);
+  const state = storedState?.hash === hash ? storedState : memoryState?.hash === hash ? memoryState : null;
+  if (!state) return null;
+  if (storedState?.hash === hash) safeSessionRemove(PENDING_SCROLL_KEY);
+  if (memoryState?.hash === hash) pendingDiscoveryScroll = null;
   const scrollY = Number(state.scrollY);
   return Number.isFinite(scrollY) ? Math.max(0, scrollY) : 0;
+}
+
+export function prepareDiscoveryLookupNavigation(href) {
+  const returnToken = token();
+  const state = JSON.stringify({
+    hash: /^#\/discover(?:\?|$)/.test(window.location.hash) ? window.location.hash : '#/discover',
+    scrollY: Math.max(0, Math.round(window.scrollY || 0)),
+    createdAt: Date.now()
+  });
+  discoveryReturnStates.set(returnToken, state);
+  safeSessionSet(`${DISCOVERY_RETURN_PREFIX}${returnToken}`, state);
+  const [path, query = ''] = String(href).split('?', 2);
+  const params = new URLSearchParams(query);
+  params.set('discoveryReturn', returnToken);
+  return `${path}?${params.toString()}`;
+}
+
+export function getDiscoveryReturnState(returnToken) {
+  if (!returnToken) return null;
+  const state = parseState(safeSessionGet(`${DISCOVERY_RETURN_PREFIX}${returnToken}`))
+    || parseState(discoveryReturnStates.get(returnToken));
+  return state && /^#\/discover(?:\?|$)/.test(state.hash) ? state : null;
+}
+
+export function returnToDiscoverySource(returnToken) {
+  const state = getDiscoveryReturnState(returnToken);
+  const destination = state?.hash || '#/discover';
+  const scrollY = Number.isFinite(Number(state?.scrollY)) ? Math.max(0, Number(state.scrollY)) : 0;
+  pendingDiscoveryScroll = JSON.stringify({ hash: destination, scrollY, createdAt: Date.now() });
+  queueScrollRestore(destination, scrollY);
+  if (returnToken) {
+    safeSessionRemove(`${DISCOVERY_RETURN_PREFIX}${returnToken}`);
+    discoveryReturnStates.delete(returnToken);
+  }
+  // The lookup route can change printing/name several times. Returning directly
+  // avoids relying on which intermediate route happens to be in browser history.
+  window.location.hash = destination;
 }
 
 

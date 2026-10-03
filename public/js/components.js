@@ -107,9 +107,31 @@ function cardTextKeywordPattern(keywords) {
   return new RegExp(`(^|[^\\p{L}\\p{M}\\p{N}_])(${alternatives})(?=$|[^\\p{L}\\p{M}\\p{N}_])`, 'giu');
 }
 
-function highlightedCardTextHtml(value, keywordPattern) {
+function searchMatchRanges(text, highlight) {
+  const query = String(highlight ?? '').trim().replace(/\r\n?/g, '\n');
+  if (!query) return [];
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu');
+  return [...text.matchAll(pattern)].map((match) => [match.index, match.index + match[0].length]);
+}
+
+function matchedCardTextHtml(value, offset, ranges) {
   const text = String(value ?? '');
-  if (!keywordPattern) return escapeHtml(text);
+  let html = '';
+  let cursor = 0;
+  for (const [start, end] of ranges) {
+    const from = Math.max(0, start - offset);
+    const to = Math.min(text.length, end - offset);
+    if (from >= to) continue;
+    html += escapeHtml(text.slice(cursor, from));
+    html += `<mark class="oracle-search-match">${escapeHtml(text.slice(from, to))}</mark>`;
+    cursor = to;
+  }
+  return html + escapeHtml(text.slice(cursor));
+}
+
+function highlightedCardTextHtml(value, keywordPattern, offset, ranges) {
+  const text = String(value ?? '');
+  if (!keywordPattern) return matchedCardTextHtml(text, offset, ranges);
 
   let html = '';
   let cursor = 0;
@@ -118,23 +140,24 @@ function highlightedCardTextHtml(value, keywordPattern) {
     const prefix = match[1] || '';
     const keyword = match[2] || '';
     const keywordStart = Number(match.index) + prefix.length;
-    html += escapeHtml(text.slice(cursor, keywordStart));
-    html += `<mark class="oracle-keyword">${escapeHtml(keyword)}</mark>`;
+    html += matchedCardTextHtml(text.slice(cursor, keywordStart), offset + cursor, ranges);
+    html += `<mark class="oracle-keyword">${matchedCardTextHtml(keyword, offset + keywordStart, ranges)}</mark>`;
     cursor = keywordStart + keyword.length;
   }
-  return html + escapeHtml(text.slice(cursor));
+  return html + matchedCardTextHtml(text.slice(cursor), offset + cursor, ranges);
 }
 
-function cardTextLineHtml(value, keywordPattern, state) {
+function cardTextLineHtml(value, keywordPattern, state, offset, ranges) {
   const text = String(value ?? '');
   const symbolPattern = /\{([^{}\r\n]+)\}/y;
   let html = '';
   let buffer = '';
+  let bufferStart = 0;
 
   const flush = () => {
     html += state.reminderDepth > 0
-      ? escapeHtml(buffer)
-      : highlightedCardTextHtml(buffer, keywordPattern);
+      ? matchedCardTextHtml(buffer, offset + bufferStart, ranges)
+      : highlightedCardTextHtml(buffer, keywordPattern, offset + bufferStart, ranges);
     buffer = '';
   };
 
@@ -146,7 +169,9 @@ function cardTextLineHtml(value, keywordPattern, state) {
         const token = match[1].trim();
         if (isKnownCardTextSymbol(token)) {
           flush();
-          html += manaSymbol(token);
+          const symbol = manaSymbol(token);
+          const matched = ranges.some(([start, end]) => start < offset + cursor + match[0].length && end > offset + cursor);
+          html += matched ? `<mark class="oracle-search-match">${symbol}</mark>` : symbol;
           cursor += match[0].length;
           continue;
         }
@@ -156,13 +181,14 @@ function cardTextLineHtml(value, keywordPattern, state) {
     const character = text[cursor];
     if (character === '(') {
       flush();
-      html += escapeHtml(character);
+      html += matchedCardTextHtml(character, offset + cursor, ranges);
       state.reminderDepth += 1;
     } else if (character === ')' && state.reminderDepth > 0) {
       flush();
-      html += escapeHtml(character);
+      html += matchedCardTextHtml(character, offset + cursor, ranges);
       state.reminderDepth -= 1;
     } else {
+      if (!buffer) bufferStart = cursor;
       buffer += character;
     }
     cursor += 1;
@@ -171,13 +197,19 @@ function cardTextLineHtml(value, keywordPattern, state) {
   return html;
 }
 
-export function cardTextHtml(value, keywords = []) {
+export function cardTextHtml(value, keywords = [], { highlight = '' } = {}) {
   const text = String(value ?? '').replace(/\r\n?/g, '\n');
   if (!text) return '';
 
   const keywordPattern = cardTextKeywordPattern(keywords);
   const state = { reminderDepth: 0 };
-  return text.split('\n').map((line) => cardTextLineHtml(line, keywordPattern, state)).join('<br>');
+  const ranges = searchMatchRanges(text, highlight);
+  let offset = 0;
+  return text.split('\n').map((line) => {
+    const html = cardTextLineHtml(line, keywordPattern, state, offset, ranges);
+    offset += line.length + 1;
+    return html;
+  }).join('<br>');
 }
 
 export function manaLabel(value, label = '') {

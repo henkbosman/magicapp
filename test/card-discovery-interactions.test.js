@@ -148,7 +148,7 @@ const result = (name, total = 1, page = 1) => ({
 const response = (data) => new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } });
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-async function mount(t, query = '') {
+async function mount(t, query = 'type=Creature') {
   const keys = ['fetch', 'document', 'window', 'history', 'FormData'];
   const original = keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
   t.after(() => {
@@ -173,9 +173,16 @@ async function mount(t, query = '') {
       }));
     });
   };
-  globalThis.window = { location: { pathname: '/', search: '' } };
+  const session = new Map();
+  globalThis.window = {
+    location: { pathname: '/', search: '', hash: `#/discover${query ? `?${query}` : ''}` }, scrollY: 640,
+    sessionStorage: { getItem: (key) => session.get(key) ?? null, setItem: (key, value) => session.set(key, value), removeItem: (key) => session.delete(key) }
+  };
   const routes = [];
-  globalThis.history = { replaceState: (_state, _title, path) => routes.push(path) };
+  globalThis.history = { replaceState: (_state, _title, path) => {
+    routes.push(path);
+    globalThis.window.location.hash = path.slice(path.indexOf('#'));
+  } };
   const view = await renderCardDiscovery({ query: new URLSearchParams(query) });
   const document = parseHtml(view.html);
   document.getElementById = (id) => document.querySelector(`#${id}`);
@@ -185,7 +192,7 @@ async function mount(t, query = '') {
   view.mount();
   const form = document.getElementById('discovery-filters');
   return {
-    document, requests, routes, form,
+    document, requests, routes, form, session,
     control: (name) => form.querySelector(`[name="${name}"]`),
     get: (id) => document.getElementById(id),
     edit(name, value, event = 'change') {
@@ -283,16 +290,77 @@ test('effect wisselen sluit verborgen velden uit en reset herstelt de beschikbar
   await ui.finish(tutor, { ...instantOptions, effects: entries('tutor') }, result('Tutor match'));
   assert.equal(ui.control('keyword').options.length, 1);
   ui.get('discovery-filter-reset').dispatch('click');
-  const reset = ui.pair();
-  assert.equal(reset.options.params.has('effect'), false);
-  assert.equal(reset.options.params.has('tokenPower'), false);
-  assert.equal(reset.options.params.get('page'), '1');
-  await ui.finish(reset, allOptions, result('Restored cards', 60));
+  const reset = ui.requests.at(-1);
+  assert.equal(reset.kind, 'options');
+  assert.equal(reset.params.has('effect'), false);
+  assert.equal(reset.params.has('tokenPower'), false);
+  assert.equal(reset.params.get('page'), '1');
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Tutor match/);
+  reset.resolve(allOptions);
+  await flush();
   assert.ok(ui.control('keyword').options.some((option) => option.value === 'Flying'));
   assert.equal(ui.control('effect').value, '');
   assert.equal(ui.get('discovery-sort').value, 'relevance');
   assert.equal(ui.get('discovery-token-fields').hidden, true);
   assert.equal(ui.get('discovery-tutor-fields').hidden, true);
+  assert.equal(ui.get('discovery-result-count').textContent, 'Nog geen zoekopdracht');
+  assert.equal(ui.get('discovery-pagination-wrap').textContent, '');
+});
+
+test('lege opening, sorteren en reset tonen geen kaarten; een horizontaal filter start wel zoeken', async (t) => {
+  const ui = await mount(t, '');
+  assert.deepEqual(ui.requests.map((request) => request.kind), ['options']);
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+  assert.equal(ui.form.querySelector('.discovery-secondary-filters').getAttribute('open'), null);
+  const sort = ui.get('discovery-sort');
+  sort.value = 'mana';
+  sort.dispatch('change');
+  assert.deepEqual(ui.requests.map((request) => request.kind), ['options', 'options']);
+  ui.requests.at(-1).resolve(allOptions);
+  await flush();
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+  ui.edit('legality', 'modern');
+  assert.equal(ui.pair().search.params.get('legality'), 'modern');
+  await ui.finish(ui.pair(), instantOptions, result('Legal card'));
+  assert.match(ui.get('discovery-results').textContent, /Legal card/);
+  ui.get('discovery-filter-reset').dispatch('click');
+  ui.requests.at(-1).resolve(allOptions);
+  await flush();
+  assert.deepEqual(ui.requests.map((request) => request.kind), ['options', 'options', 'options', 'search', 'options']);
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+});
+
+test('opzoeken bewaart filters en scroll voordat nog geplande zoekinvoer kan navigatie overschrijven', async (t) => {
+  const ui = await mount(t, 'type=Instant&page=3');
+  ui.form.querySelector('.discovery-secondary-filters').open = true;
+  ui.get('discovery-filter-panel').hidden = true;
+  ui.edit('text', 'draw', 'input');
+  const requestCount = ui.requests.length;
+  ui.get('discovery-results').querySelector('[data-discovery-lookup]').dispatch('click');
+  assert.match(globalThis.window.location.hash, /^#\/add\?name=Initial\+card&discoveryReturn=/);
+  const lookupHash = globalThis.window.location.hash;
+  const saved = [...ui.session.values()].map((value) => JSON.parse(value)).find((value) => value.hash?.startsWith('#/discover'));
+  assert.ok(saved);
+  assert.equal(new URLSearchParams(saved.hash.split('?')[1]).get('text'), 'draw');
+  assert.equal(new URLSearchParams(saved.hash.split('?')[1]).get('type'), 'Instant');
+  assert.equal(new URLSearchParams(saved.hash.split('?')[1]).has('page'), false);
+  assert.equal(new URLSearchParams(saved.hash.split('?')[1]).get('colorsOpen'), '1');
+  assert.equal(new URLSearchParams(saved.hash.split('?')[1]).get('filterPanelOpen'), '0');
+  assert.equal(saved.scrollY, 640);
+  await ui.tick();
+  assert.equal(ui.requests.length, requestCount);
+  assert.equal(globalThis.window.location.hash, lookupHash);
+});
+
+test('terugkeer herstelt filterpanelen terwijl een nieuw bezoek ingeklapt blijft', async (t) => {
+  const ui = await mount(t, 'type=Instant&colorsOpen=1&filterPanelOpen=0');
+  assert.equal(ui.form.querySelector('.discovery-secondary-filters').getAttribute('open'), '');
+  assert.equal(ui.get('discovery-filter-panel').hidden, true);
+  assert.equal(ui.get('discovery-filter-toggle').getAttribute('aria-expanded'), 'false');
+  assert.match(ui.get('discovery-results').textContent, /Initial card/);
+  assert.equal(ui.pair().search.params.has('colorsOpen'), false);
+  assert.equal(ui.pair().search.params.has('filterPanelOpen'), false);
 });
 
 test('sorteren en pagineren mogen nieuwe invoer niet overschrijven', async (t) => {

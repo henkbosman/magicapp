@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.11.2 - 2026-10-03
+
+### Ontdekken en opzoeken
+
+- De ontdekpagina toont bij een eerste opening zonder filters nog geen kaarten. Invullen van een filter start de zoekopdracht; resetten maakt de resultaten leeg. Opgeslagen filterlinks blijven direct werken.
+- Kleur, mana en legaliteit staan horizontaal boven de resultaten, standaard ingeklapt. De algemene toelichtende tekst boven de filters is verwijderd.
+- Elk ontdekresultaat heeft een klein icoon voor een popup met de kaartafbeelding. De preview gebruikt Scryfall en schrijft niets naar de primaire database.
+- De zoektekst uit **Kaarttekst bevat** wordt in de Oracle-tekst gemarkeerd, met behoud van mana-iconen, bestaande keywordmarkering en veilige HTML-weergave.
+- Bij precies één naamsuggestie op **Kaart opzoeken** worden automatisch de printings geladen. Verouderde antwoorden worden genegeerd als je ondertussen verder typt.
+- Na navigatie vanuit **Kaarten ontdekken** toont de opzoekpagina **Terug**, met herstel van de gekozen filters, resultaatpagina en scrollpositie.
+
+### API en database
+
+- Nieuw read-only endpoint `GET /api/read/card-catalog/preview` voor een kaartafbeelding, met een tijdelijke cache in het geheugen.
+- Beide databaseschema's blijven ongewijzigd; de bestaande catalogus kan direct gebruikt worden zonder herimport.
+
 ## 2.11.1 - 2026-10-03
 
 ### Reactieve filters bij Kaarten ontdekken

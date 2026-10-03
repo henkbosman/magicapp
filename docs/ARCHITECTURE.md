@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.11.1
+# Architectuur - Magic Collection Manager 2.11.2
 
 ## Overzicht
 
@@ -78,7 +78,8 @@ Belangrijke services:
 
 Belangrijke catalogusonderdelen:
 
-- `routes/card-catalog.js`: read-only status-, optie- en zoekendpoints;
+- `routes/card-catalog.js`: read-only status-, optie-, zoek- en previewendpoints;
+- `card-catalog/preview.js`: geïsoleerde Scryfall-afbeeldingsresolver met een begrensde geheugencache, zonder import of gebruik van de primaire database;
 - `card-catalog/repository.js`: validatie, gefacetteerde opties, SQL-filtering, sortering en paginering;
 - `card-catalog/database.js`: uitsluitend de aparte catalogusverbinding, read-only opening, validatie, recovery en activering;
 - `card-catalog/import-service.js`: maximaal één achtergrondjob, publieke voortgang en workerlevenscyclus;
@@ -97,7 +98,7 @@ Express mount drie API-zones:
 /api/ai
 ```
 
-`/api/read` accepteert alleen GET/HEAD. Hieronder zijn `GET /card-catalog/status`, `/options` en `/search` gemount. `/api/write` weigert GET/HEAD en bevat alle muterende endpoints, waaronder `POST /maintenance/card-catalog/import`. Dat endpoint antwoordt met HTTP 202 zodra de job gestart is; een tweede gelijktijdige start geeft HTTP 409. `/api/ai` accepteert alleen GET/HEAD en levert vier compacte modellen voor decks, deckkaarten, kaartdetails en een gefilterde collectie. De webinterface gebruikt `/api/ai` niet. De frontend controleert `POST /api/write/health`; wanneer dit niet bereikbaar is, worden schrijfcontrols disabled en verschijnt de interface als alleen-lezen. De catalogus blijft in die modus doorzoekbaar, maar een import kan dan niet worden gestart.
+`/api/read` accepteert alleen GET/HEAD. Hieronder zijn `GET /card-catalog/status`, `/options`, `/search` en `/preview` gemount. `/api/write` weigert GET/HEAD en bevat alle muterende endpoints, waaronder `POST /maintenance/card-catalog/import`. Dat endpoint antwoordt met HTTP 202 zodra de job gestart is; een tweede gelijktijdige start geeft HTTP 409. `/api/ai` accepteert alleen GET/HEAD en levert vier compacte modellen voor decks, deckkaarten, kaartdetails en een gefilterde collectie. De webinterface gebruikt `/api/ai` niet. De frontend controleert `POST /api/write/health`; wanneer dit niet bereikbaar is, worden schrijfcontrols disabled en verschijnt de interface als alleen-lezen. De catalogus blijft in die modus doorzoekbaar, maar een import kan dan niet worden gestart.
 
 ## Frontend
 
@@ -105,7 +106,11 @@ De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de has
 
 Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer heet zichtbaar **Kaart opzoeken**, bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. Na het laden van de printings herstelt de frontend eerst een eerdere selectie; anders beperkt zij de kandidaten tot een gekozen collectornummer en kiest daarbinnen een lokaal bekende of de eerste printing, die direct in het invoerpaneel wordt getoond. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
 
-`#/discover` biedt een afzonderlijke deckbouwzoekpagina en staat in zowel het linker- als mobiele menu. De view controleert eerst de catalogusstatus en toont zonder actieve catalogus een onderhouds-CTA. Met een beschikbare catalogus combineert zij naam, Oracle-tekst, ability, keyword, type, subtype, kleuridentiteit, mana value, legaliteit en effectfilters. Alle actieve filters zijn conjunctief. De kleurmodi zijn subset van gekozen Commander-kleuren, bevat alle gekozen kleuren en exact. Tokenfilters ondersteunen power, toughness en tokentype; tutorfilters ondersteunen het gezochte kaarttype. De filterstate, sortering en pagina staan in de hashquery. Resultaten tonen geen hoofd-databasekaart-ID of printingafbeelding: **Kaart opzoeken** opent op naam de bestaande printingselectie.
+`#/discover` biedt een afzonderlijke deckbouwzoekpagina en staat in zowel het linker- als mobiele menu. De view controleert eerst de catalogusstatus en toont zonder actieve catalogus een onderhouds-CTA. Met een beschikbare catalogus combineert zij naam, Oracle-tekst, ability, keyword, type, subtype, kleuridentiteit, mana value, legaliteit en effectfilters. Alle actieve filters zijn conjunctief. De kleurmodi zijn subset van gekozen Commander-kleuren, bevat alle gekozen kleuren en exact. Tokenfilters ondersteunen power, toughness en tokentype; tutorfilters ondersteunen het gezochte kaarttype. De filterstate, sortering en pagina staan in de hashquery. Zonder inhoudelijk zoekfilter laadt de view alleen opties, geen zoekresultaten; reset herstelt deze lege beginstaat. Kleur, mana en legaliteit staan in een horizontale details-sectie die standaard dicht is.
+
+Resultaten bevatten geen primaire database-ID. Een preview-icoon opent via `discovery-preview.js` een dialoog. Het nieuwe `GET /api/read/card-catalog/preview?name=...` resolveert de exacte kaartnaam via de vaste Scryfall named-route en geeft alleen gevalideerde afbeeldings-URL's terug. De resolver gebruikt een begrensde tijdelijke geheugencache, verzoekbundeling en time-outs; zij schrijft geen kaarten of cachegegevens in een database. De browser toont een of twee kaartzijden en meldt ontbrekende of mislukte afbeeldingen in de dialoog. De bestaande Content Security Policy blijft behouden.
+
+**Kaart opzoeken** bewaart via `prepareDiscoveryLookupNavigation` de ontdekroute en scrollpositie in een eigen terugkeercontext. De opzoekpagina behoudt `discoveryReturn` bij querywijzigingen en toont **Terug**. De ontdekroute bewaart voor deze terugkeer ook de open/dicht-toestand van de filterpanelen, zodat de pagina dezelfde hoogte krijgt. De bestaande router herstelt de scrollpositie na renderen. Precies één autocomplete-suggestie laadt automatisch printings, met guards tegen verouderde antwoorden en verder typen. `cardTextHtml` accepteert optioneel `{ highlight }` als derde parameter; letterlijke zoekmatches worden op brontekstposities gemarkeerd, zonder HTML-injectie of aantasting van symbolen en keywordmarkering.
 
 De onderhoudsview leest de catalogus en actuele importjob via `GET /api/read/card-catalog/status`. Na een succesvolle `POST` pollt zij dit endpoint zolang de job actief is. De jobstatus bevat fase, verwerkt aantal, downloadbytes, melding en eventuele fout, zodat de write-aanvraag zelf kort kan blijven.
 
