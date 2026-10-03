@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.11.3
+# Architectuur - Magic Collection Manager 2.12.0
 
 ## Overzicht
 
@@ -41,12 +41,15 @@ Belangrijkste tabellen:
 - `wanted_items`: wanted-kaarten;
 - `wanted_item_decks`: koppeling tussen wanted-items en decks;
 - `card_user_metadata`: Oracle-brede handmatige correcties voor mana-productie en library-searchfuncties;
+- `discovery_marks`: gemarkeerde ontdekkingskaarten op basis van Scryfall Oracle-ID of genormaliseerde naam;
 - `external_api_cache`: tijdelijke persistente Scryfall-responsecache;
 - `card_printing_catalog` + `card_printing_catalog_state`: lokale catalogus van mogelijke printings.
 
-Versie 2.11 voegt daarnaast standaard `mtgjson-atomic.sqlite` onder `DATA_DIR` toe. `CARD_CATALOG_DATABASE_FILE` kan het catalogusbestand wijzigen; configuratie weigert botsingen met `DATABASE_FILE` en met de bijbehorende SQLite journal-, WAL-, SHM- en herstelbestanden. De catalogus heeft een eigen schema in `src/card-catalog/schema.sql`, een eigen `user_version = 10000` en eigen interne foreign keys en indexen. De primaire database bevat geen catalogustabel, pad, foreign key of ander verwijsveld. De applicatie gebruikt geen SQLite `ATTACH` en voert geen cross-database-joins uit.
+Versie 2.11 voegt daarnaast standaard `mtgjson-atomic.sqlite` onder `DATA_DIR` toe. `CARD_CATALOG_DATABASE_FILE` kan het catalogusbestand wijzigen; configuratie weigert botsingen met `DATABASE_FILE` en met de bijbehorende SQLite journal-, WAL-, SHM- en herstelbestanden. De catalogus heeft een eigen schema in `src/card-catalog/schema.sql`, een eigen `user_version = 10000` en eigen interne foreign keys en indexen. De primaire database bevat geen catalogusgegevens, bestandspad, catalogusrij-ID of foreign key naar deze database. De applicatie gebruikt geen SQLite `ATTACH` en voert geen cross-database-joins uit.
 
-De catalogus bevat genormaliseerde AtomicCards-eigenschappen en facettabellen voor keywords, abilities, types, subtypes, supertypes, printings, legaliteiten, effecten en tutor-doelen. Zij bevat uitsluitend afgeleide externe kaartdata en geen collectie-, deck-, wanted- of andere gebruikersdata. De bestaande back-uproute maakt daarom alleen een consistente kopie van de primaire database; de catalogus is opnieuw vanuit MTGJSON op te bouwen.
+Versie 2.12 voegt bij het starten automatisch de zelfstandige tabel `discovery_marks` en een naamindex aan de primaire database toe. Alleen stabiele externe kaartidentiteiten, namen en tijdstempels worden opgeslagen. De bestaande collectie-, deck- en wanted-tabellen blijven intact; `user_version` blijft 20000. De catalogus krijgt geen schemawijziging en vereist geen herimport.
+
+De catalogus bevat genormaliseerde AtomicCards-eigenschappen en facettabellen voor keywords, abilities, types, subtypes, supertypes, printings, legaliteiten, effecten en tutor-doelen. Zij bevat uitsluitend afgeleide externe kaartdata en geen collectie-, deck-, wanted- of andere gebruikersdata. De bestaande back-uproute maakt daarom alleen een consistente kopie van de primaire database, inclusief markeringen; de catalogus is opnieuw vanuit MTGJSON op te bouwen.
 
 ## Kaartidentiteit
 
@@ -72,6 +75,7 @@ Belangrijke services:
 - `deck-link-service.js`: combo-/synergiegroepen;
 - `deck-printing-service.js`: deckprinting afstemmen na aankoop;
 - `wanted-service.js`: wanted CRUD en deckrelaties;
+- `discovery-mark-service.js`: permanente markeringen zonder afhankelijkheid van catalogusrijen of catalogusbestand;
 - `printing-catalog-service.js`: mogelijke printings/rarities per Oracle-kaart;
 - `card-insight-service.js`: afgeleide en handmatig corrigeerbare mana-/zoekkenmerken;
 - `import-export-service.js`: collectie-export, gecontroleerde collectie-import en deckimport/-export.
@@ -108,6 +112,10 @@ Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie 
 
 `#/discover` biedt een afzonderlijke deckbouwzoekpagina en staat in zowel het linker- als mobiele menu. De view controleert eerst de catalogusstatus en toont zonder actieve catalogus een onderhouds-CTA. Met een beschikbare catalogus combineert zij naam, Oracle-tekst, ability, keyword, type, subtype, kleuridentiteit, mana value, legaliteit en effectfilters. Alle actieve filters zijn conjunctief. De kleurmodi zijn subset van gekozen Commander-kleuren, bevat alle gekozen kleuren en exact. Tokenfilters ondersteunen power, toughness en tokentype; tutorfilters ondersteunen het gezochte kaarttype. De filterstate, sortering en pagina staan in de hashquery. Zonder inhoudelijk zoekfilter laadt de view alleen opties, geen zoekresultaten; reset herstelt deze lege beginstaat. Kleur, mana en legaliteit staan in een horizontale details-sectie die standaard dicht is.
 
+Sinds 2.12 verbergt de hoofdknop zowel het zijpaneel als de horizontale kleursectie. Tekst en kaartsoort en Effect zijn afzonderlijke native details-secties. Het zijpaneel is op desktop sticky en begrensd tot de schermhoogte, met eigen verticale scrollruimte; op mobiel volgt het de gewone paginascroll. Terugnavigatie bewaart ook de open/dicht-toestand en interne scrollpositie.
+
+Ieder resultaat toont links van de naam het preview-icoon en naast Kaart opzoeken een Markeren-knop. De view bevestigt een markering pas na een geslaagde write-response, blokkeert dubbele klikken en vernieuwt daarna resultaten en facets met de actuele filters. Alleen-lezenmodus blokkeert deze mutatie maar laat het Gemarkeerd-filter bruikbaar. Gemarkeerd telt zelfstandig als inhoudelijk zoekfilter; reset wist geen opgeslagen markeringen.
+
 Resultaten bevatten geen primaire database-ID. Een preview-icoon opent via `discovery-preview.js` een dialoog. Het nieuwe `GET /api/read/card-catalog/preview?name=...` resolveert de exacte kaartnaam via de vaste Scryfall named-route en geeft alleen gevalideerde afbeeldings-URL's terug. De resolver gebruikt een begrensde tijdelijke geheugencache, verzoekbundeling en time-outs; zij schrijft geen kaarten of cachegegevens in een database. De browser toont een of twee kaartzijden en meldt ontbrekende of mislukte afbeeldingen in de dialoog. De bestaande Content Security Policy blijft behouden.
 
 Sinds 2.11.3 rendert de ontdekview de `matchReasons` uit de zoek-API niet meer. `discoveryTypeLineHtml` markeert bekende kaarttypewoorden met vaste kleurklassen, afzonderlijk per kaartzijde en alleen vóór de subtype-scheiding. Supertypes en subtypes blijven gewone escaped tekst. Meerdere types op één kaart behouden ieder hun kleur.
@@ -124,7 +132,7 @@ De collectie rendert haar regels in dezelfde basisopbouw als de decklijst: kaart
 
 De in versie 2.9 toegevoegde tutorfilters veranderden geen endpointpaden of databasetabellen. De bestaande `ability`-parameter van de collectie accepteert daarvoor de synthetische waarden `Tutor land` en `Tutor creature`.
 
-Versie 2.11.0 voegt vier catalogusendpoints en een tweede SQLite-bestand toe. Het bestaande primaire databaseschema en de bestaande collectie-, deck-, wanted-, kaart- en AI-contracten blijven ongewijzigd.
+Versie 2.11.0 voegde vier catalogusendpoints en een tweede SQLite-bestand toe. Versie 2.12 voegt `GET /api/read/discovery-marks` en `POST /api/write/discovery-marks` toe. De bestaande collectie-, deck-, wanted-, kaart- en AI-contracten blijven ongewijzigd.
 
 ## Caching
 
@@ -146,7 +154,11 @@ De worker leest het JSON-document streaming en krijgt maximaal 256 MiB V8 old-ge
 
 ## Cataloguszoekmodel
 
-Sinds 2.11.1 accepteert het bestaande optiesendpoint dezelfde inhoudelijke filters als het zoekendpoint. Iedere facet past alle andere filters toe en laat zijn eigen dimensie weg (disjunctieve facets). Kleuren laten kleuridentiteit en kleurmodus weg; het manabereik laat beide grenzen weg; de effectfacet laat ook de effectafhankelijke token- en tutorwaarden weg. De tokenfacets toetsen overgebleven tokenkenmerken binnen dezelfde rij in `card_tokens`. Opties tellen unieke `catalog_key`-waarden over de volledige dataset, los van paginering en sortering. Alle queries blijven read-only; beide databaseschema's zijn ongewijzigd en bestaande catalogi vereisen geen herimport.
+Sinds 2.11.1 accepteert het bestaande optiesendpoint dezelfde inhoudelijke filters als het zoekendpoint. Iedere facet past alle andere filters toe en laat zijn eigen dimensie weg (disjunctieve facets). Kleuren laten kleuridentiteit en kleurmodus weg; het manabereik laat beide grenzen weg; de effectfacet laat ook de effectafhankelijke token- en tutorwaarden weg. De tokenfacets toetsen overgebleven tokenkenmerken binnen dezelfde rij in `card_tokens`. Opties tellen unieke `catalog_key`-waarden over de volledige dataset, los van paginering en sortering. Alle catalogusqueries blijven read-only en bestaande catalogi vereisen geen herimport.
+
+Sinds 2.12 lezen de zoek- en optieroutes de markeringen via de markeringservice en geven een momentopname als intern argument aan de catalogusrepository. Die repository opent de primaire database niet. `marked=1` beperkt alle facets en de zoekquery vóór telling, deduplicatie, sortering en paginering. Gebonden JSON-lijsten met `json_each` voorkomen een SQL-placeholderlimiet bij grote aantallen markeringen. Zoekresultaten bevatten altijd `markKey` en `marked`; interne markeringenlijsten komen niet in het publieke queryobject terecht.
+
+Een markering gebruikt bij voorkeur `oracle:<Scryfall Oracle-ID>` en anders `name:<genormaliseerde naam>`. Gelijke bekende Oracle-ID's matchen ongeacht de naam; naamfallback geldt alleen wanneer een van beide kanten geen Oracle-ID heeft. Twee verschillende bekende Oracle-ID's worden niet samengevoegd. Een naammarkering kan bij expliciet markeren met een later beschikbaar Oracle-ID worden opgewaardeerd. Bij verwijderen zonder Oracle-ID worden alle naamaliassen gewist die de betreffende naamkaart als gemarkeerd laten verschijnen. Afwezige kaarten blijven gemarkeerd in de primaire database en verschijnen weer zodra een passende cataloguskaart beschikbaar is. Status en preview blijven zonder gebruik van de primaire database werken.
 
 De ontdekview haalt opties en resultaten met dezelfde filterwaarden op en past beide samen toe. Bij invoer wordt een verouderd verzoek direct ongeldig; tekstinvoer wordt kort gebundeld voordat een nieuwe aanvraag start. De bestaande formulierelementen blijven staan, terwijl opties ter plekke worden vervangen. Gekozen waarden met nul matches blijven zichtbaar en verwijderbaar, lege facets gebruiken geen statische volledige optielijst als fallback. Manawaarden dienen als suggesties; een handmatig gekozen bereik wordt nooit stilzwijgend aangepast.
 

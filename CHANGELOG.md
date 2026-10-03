@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.12.0 - 2026-10-03
+
+### Markeringen bij Kaarten ontdekken
+
+- Elke kaart heeft naast **Kaart opzoeken** een knop **Markeren**. Dezelfde knop verwijdert een bestaande markering.
+- Het filter **Gemarkeerd** toont alleen opgeslagen kaarten, gecombineerd met de overige filters. Aantallen, paginering en reactieve filteropties worden over de volledige selectie berekend.
+- Markeringen staan in de nieuwe onafhankelijke tabel `discovery_marks` in de primaire gebruikersdatabase. De tabel wordt automatisch en idempotent aangemaakt bij opstarten; bestaande collectie-, deck- en wantedgegevens blijven behouden.
+- Oracle-identiteit en een genormaliseerde naam als terugval houden markeringen onafhankelijk van catalogusrijen. Een catalogusvervanging wist de markeringen niet. De bestaande databaseback-up bevat ze automatisch.
+- Nieuw: `GET /api/read/discovery-marks` en `POST /api/write/discovery-marks`. Cataloguszoekresultaten bevatten `marked` en `markKey`; zoek- en optiesendpoints accepteren `marked=1`. Het catalogusschema blijft ongewijzigd en herimport is niet nodig.
+
+### Filterbediening
+
+- **Filters verbergen** verbergt ook **Kleur, mana en legaliteit**; actieve filterwaarden blijven behouden.
+- **Tekst en kaartsoort** en **Effect** kunnen afzonderlijk worden ingeklapt.
+- Het filterpaneel blijft op desktop direct bereikbaar tijdens scrollen en krijgt bij lange inhoud een eigen scrollbar.
+- Het kaartafbeeldingsicoontje staat links van de kaarttitel.
+
 ## 2.11.3 - 2026-10-03
 
 ### Kaarten ontdekken

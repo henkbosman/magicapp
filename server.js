@@ -14,6 +14,7 @@ import { maintenanceReadRouter, maintenanceWriteRouter } from './src/routes/main
 import { wantedReadRouter, wantedWriteRouter } from './src/routes/wanted.js';
 import { aiRouter } from './src/routes/ai.js';
 import { cardCatalogReadRouter } from './src/routes/card-catalog.js';
+import { discoveryMarksReadRouter, discoveryMarksWriteRouter } from './src/routes/discovery-marks.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -44,6 +45,7 @@ readApi.use('/decks', decksReadRouter);
 readApi.use('/wanted', wantedReadRouter);
 readApi.use('/maintenance', maintenanceReadRouter);
 readApi.use('/card-catalog', cardCatalogReadRouter);
+readApi.use('/discovery-marks', discoveryMarksReadRouter);
 
 const writeApi = express.Router();
 writeApi.use((req, res, next) => {
@@ -68,6 +70,7 @@ writeApi.use('/collection', collectionWriteRouter);
 writeApi.use('/decks', decksWriteRouter);
 writeApi.use('/wanted', wantedWriteRouter);
 writeApi.use('/maintenance', maintenanceWriteRouter);
+writeApi.use('/discovery-marks', discoveryMarksWriteRouter);
 
 app.use('/api/read', readApi);
 app.use('/api/write', writeApi);

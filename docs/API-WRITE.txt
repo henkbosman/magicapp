@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.11.3
+MAGIC COLLECTION MANAGER WRITE API 2.12.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,23 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.11.3"}
+{"status":"ok","writeAvailable":true,"version":"2.12.0"}
+
+POST /api/write/discovery-marks
+
+Markeert een kaart als interessant of verwijdert die markering. Slaat uitsluitend een stabiele kaartidentiteit en naam op in discovery_marks in de primaire gebruikersdatabase. Vereist geen geïmporteerde catalogus, maakt geen collectie-/wanted-item aan en wijzigt de MTGJSON-catalogus niet. Herhalen met dezelfde gewenste marked-waarde is veilig.
+
+INPUT JSON
+
+{"name":"Voorbeeldkaart","scryfallOracleId":"11111111-1111-4111-8111-111111111111","marked":true}
+
+name is verplicht en bevat na trimmen 1 tot 300 tekens. marked is verplicht en moet de JSON-boolean true of false zijn. scryfallOracleId is optioneel (null of leeg is toegestaan); indien aanwezig moet het een UUID zijn. Gebruik de naam en scryfallOracleId uit het cataloguszoekresultaat. Ongeldige invoer geeft HTTP 400.
+
+OUTPUT JSON
+
+{"data":{"markKey":"oracle:11111111-1111-4111-8111-111111111111","name":"Voorbeeldkaart","scryfallOracleId":"11111111-1111-4111-8111-111111111111","marked":true}}
+
+HTTP 200 bij opslaan en verwijderen. Stuur marked=false voor verwijderen; de response bevat dan marked=false. Zonder Oracle-ID wordt de genormaliseerde naam als fallback gebruikt (markKey=name:<naam>). Een expliciet Oracle-ID kan een bestaande naammarkering vervangen. Verwijderen met een Oracle-ID laat andere bekende Oracle-ID's intact; verwijderen zonder ID verwijdert alle naamaliassen die deze naamkaart als gemarkeerd laten verschijnen. Markeringen worden via GET /api/read/discovery-marks gelezen en via marked=1 op cataloguszoeken en filteropties toegepast. De gebruikelijke toegangsbescherming van de write-API geldt ook hier.
 
 POST /api/write/cards/cache
 

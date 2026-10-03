@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.11.3
+MAGIC COLLECTION MANAGER READ API 2.12.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,11 +14,11 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.11.3"}
+{"status":"ok","version":"2.12.0"}
 
 GET /api/read/card-catalog/status
 
-Geeft de status van de volledig zelfstandige MTGJSON AtomicCards-catalogus en de actuele of laatst afgeronde importjob. Deze database bevat geen gebruikersdata en heeft geen koppeling met de primaire applicatiedatabase.
+Geeft de status van de volledig zelfstandige MTGJSON AtomicCards-catalogus en de actuele of laatst afgeronde importjob. Deze database bevat geen gebruikersdata of databasekoppeling met de primaire applicatiedatabase. Markeringen worden apart in de primaire database bewaard; dit statusendpoint gebruikt die niet.
 
 INPUT JSON
 
@@ -67,13 +67,15 @@ OUTPUT JSON
 
 faces bevat één of twee kaartzijden met een HTTPS-afbeeldings-URL. HTTP 400 bij ontbrekende/ongeldige naam, 404 bij ontbrekende kaart/afbeelding, 429 bij upstream rate limiting, 502 bij ongeldige upstreamdata, 503 bij verbindingsfout en 504 bij een time-out. De preview blijft read-only en is beschikbaar wanneer de write-API is afgeschermd.
 
-GET /api/read/card-catalog/options?type={type}&ability={ability}&keyword={keyword}&subtype={subtype}&name={name}&text={oracle-text}&colorIdentity={colors}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format}&effect={effect}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}
+GET /api/read/card-catalog/options?type={type}&ability={ability}&keyword={keyword}&subtype={subtype}&name={name}&text={oracle-text}&colorIdentity={colors}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format}&effect={effect}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&marked={0|1}
 
 Geeft reactieve filteropties met aantallen unieke cataloguskaarten. Accepteert dezelfde inhoudelijke filters en validatie als /search. Iedere facet houdt rekening met alle andere actieve filters, maar niet met zijn eigen filter; bijvoorbeeld type=Instant beperkt abilities tot instant-kaarten, terwijl types passende alternatieven blijft aanbieden. Zonder filters worden alle beschikbare opties teruggegeven. Zonder actieve catalogus volgt HTTP 503.
 
 Kleuridentiteit en kleurmodus vormen samen één facet; de kleuren tellen kaarten die de kleur in hun identiteit hebben (C is volledig kleurloos), onafhankelijk van de gekozen kleurmodus. Het manabereik negeert beide managrenzen. De effectfacet negeert naast effect ook tokenPower, tokenToughness, tokenType en tutorTarget zodat wisselen van effect mogelijk blijft. Tokenkenmerken worden binnen hetzelfde tokenprofiel gecombineerd. legalities bevat uitsluitend formaten waarin passende kaarten legal zijn. page, limit en sort worden genegeerd: opties gelden voor de volledige gefilterde catalogus.
 
 Arrays bevatten alleen opties met count > 0; lege facets zijn []. manaRange is {"min":null,"max":null} zonder passende kaarten. De interface behoudt al gekozen waarden die niet meer in een facet voorkomen als expliciete 0-matches-keuze, zonder de query automatisch te verruimen.
+
+marked=1 (ook true) beperkt alle facets tot opgeslagen markeringen. Deze beperking blijft bij iedere facet actief. marked=0, false of weglaten schakelt deze beperking uit; andere waarden geven HTTP 400. Zonder markeringen zijn de facets bij marked=1 leeg.
 
 INPUT JSON
 
@@ -107,9 +109,11 @@ OUTPUT JSON
   }
 }
 
-GET /api/read/card-catalog/search?name={name}&text={oracle-text}&ability={ability}&keyword={keyword}&type={type}&subtype={subtype}&colorIdentity={comma-separated W,U,B,R,G,C}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format[:status]}&effect={token|tutor|mana|draw|counter|pump|removal|sacrifice|graveyard|landfall}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&sort={relevance|name|mana}&page={integer}&limit={1..100}
+GET /api/read/card-catalog/search?name={name}&text={oracle-text}&ability={ability}&keyword={keyword}&type={type}&subtype={subtype}&colorIdentity={comma-separated W,U,B,R,G,C}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format[:status]}&effect={token|tutor|mana|draw|counter|pump|removal|sacrifice|graveyard|landfall}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&marked={0|1}&sort={relevance|name|mana}&page={integer}&limit={1..100}
 
 Doorzoekt de losse AtomicCards-catalogus. Alle opgegeven filters worden met AND gecombineerd. colorMode=subset toont kaarten die binnen de gekozen Commander-kleuren passen, contains vereist alle gekozen kleuren en exact vereist precies dezelfde kleuridentiteit. C staat voor volledig kleurloos en kan niet met W, U, B, R of G worden gecombineerd. legality gebruikt standaard status legal en accepteert daarnaast legal, banned, restricted of not_legal na een dubbele punt. Geldige tutorTarget-waarden zijn any, basic_land, land, creature, artifact, enchantment, instant, sorcery en planeswalker. Standaard zijn sort=relevance, page=1 en limit=50; maximaal 5.000 resultaten mogen worden overgeslagen. Zonder actieve catalogus volgt HTTP 503.
+
+marked=1 (ook true) toont uitsluitend gemarkeerde kaarten die aan alle overige filters voldoen. De beperking geldt vóór telling en paginering. marked=0, false of weglaten toont zowel gemarkeerde als ongemarkeerde kaarten. Ieder resultaat bevat marked en markKey, ook zonder dit filter. De markKey gebruikt een Scryfall Oracle-ID, of een genormaliseerde naam als dat ID ontbreekt; hij hangt niet af van de catalogusrij of importvolgorde. Opgeslagen markeringen waarvan de kaart in de huidige catalogus ontbreekt blijven bewaard, maar leveren geen zoekresultaat op.
 
 Voorbeelden:
 
@@ -151,6 +155,8 @@ OUTPUT JSON
         "tokens": [{"power":"2","toughness":"2","type":"Elemental"}],
         "tutorTargets": [],
         "scryfallOracleId": "uuid",
+        "markKey": "oracle:uuid",
+        "marked": false,
         "matchReasons": ["Ability: Landfall","Effect: token","Token: 2/2"]
       }
     ],
@@ -164,6 +170,7 @@ OUTPUT JSON
       "importedAt": "2026-10-03T06:30:00.000Z"
     },
     "query": {
+      "marked": false,
       "name": "",
       "text": "",
       "ability": "Landfall",
@@ -187,6 +194,20 @@ OUTPUT JSON
     }
   }
 }
+
+GET /api/read/discovery-marks
+
+Geeft alle opgeslagen markeringen, gesorteerd op kaartnaam. Leest uitsluitend de primaire gebruikersdatabase en werkt ook zonder geïmporteerde MTGJSON-catalogus. Een lege lijst geeft data=[]. Gebruik POST /api/write/discovery-marks om te markeren of een markering te verwijderen.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{"data":[{"markKey":"oracle:11111111-1111-4111-8111-111111111111","name":"Voorbeeldkaart","scryfallOracleId":"11111111-1111-4111-8111-111111111111","marked":true}]}
+
+Zonder Oracle-ID is scryfallOracleId=null en heeft markKey de vorm name:<genormaliseerde naam>. De lijst bevat geen catalogusrij-ID's en blijft behouden bij herimport of vervanging van de catalogus.
 
 GET /api/read/dashboard
 
@@ -737,7 +758,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.11.3",
+    "applicationVersion": "2.12.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

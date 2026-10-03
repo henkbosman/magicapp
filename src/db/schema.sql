@@ -205,6 +205,19 @@ CREATE TABLE IF NOT EXISTS card_user_metadata (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- User interests are independent of collection ownership and the replaceable
+-- MTGJSON catalog. Deliberately no foreign keys to either database's cards.
+CREATE TABLE IF NOT EXISTS discovery_marks (
+  mark_key TEXT PRIMARY KEY,
+  oracle_id TEXT,
+  name TEXT NOT NULL,
+  normalized_name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovery_marks_name ON discovery_marks(normalized_name);
+
 CREATE TRIGGER IF NOT EXISTS collection_items_updated
 AFTER UPDATE ON collection_items
 WHEN NEW.updated_at = OLD.updated_at

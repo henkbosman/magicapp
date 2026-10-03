@@ -1,6 +1,7 @@
 import { cardCatalogStatus, withCardCatalog } from './database.js';
 import { HttpError } from '../lib/http-error.js';
 import { colorMask, normalizeColors, normalizeSearchText } from '../lib/card-catalog-features.js';
+import { discoveryMarkIdentity } from '../lib/discovery-mark-identity.js';
 
 const EFFECT_ALIASES = Object.freeze({
   token: 'creature_token',
@@ -47,6 +48,41 @@ const TUTOR_TARGET_LABELS = Object.freeze({
 const COLOR_LABELS = Object.freeze({ W: 'Wit', U: 'Blauw', B: 'Zwart', R: 'Rood', G: 'Groen', C: 'Kleurloos' });
 
 const MAX_SEARCH_OFFSET = 5000;
+const markFunctionsRegistered = new WeakSet();
+
+function markContext(context = {}) {
+  const oracleIds = new Set();
+  const fallbackNames = new Set();
+  const allNames = new Set();
+  for (const mark of context.marks || []) {
+    const identity = discoveryMarkIdentity(mark);
+    if (identity.scryfallOracleId) oracleIds.add(identity.scryfallOracleId);
+    else if (identity.normalizedName) fallbackNames.add(identity.normalizedName);
+    if (identity.normalizedName) allNames.add(identity.normalizedName);
+  }
+  return {
+    oracleIds, fallbackNames, allNames,
+    oracleJson: JSON.stringify([...oracleIds]),
+    fallbackJson: JSON.stringify([...fallbackNames]),
+    namesJson: JSON.stringify([...allNames])
+  };
+}
+
+function registerMarkNameFunction(database, filters) {
+  if (!filters.marked || !filters._marks.allNames.size || markFunctionsRegistered.has(database)) return;
+  database.function('discovery_mark_name', { deterministic: true }, (name) => normalizeSearchText(name));
+  markFunctionsRegistered.add(database);
+}
+
+function markedItem(row, context) {
+  const identity = discoveryMarkIdentity({ name: row.name, scryfallOracleId: row.scryfall_oracle_id });
+  return {
+    markKey: identity.markKey,
+    marked: identity.scryfallOracleId
+      ? context.oracleIds.has(identity.scryfallOracleId) || context.fallbackNames.has(identity.normalizedName)
+      : context.allNames.has(identity.normalizedName)
+  };
+}
 
 export function cardCatalogTotalPages(total, limit) {
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(limit) || limit <= 0) return 0;
@@ -175,10 +211,14 @@ function tokenTypeFacetRows(database, filters) {
   }).sort((a, b) => a.value.localeCompare(b.value, 'en', { sensitivity: 'base', numeric: true }));
 }
 
-export function cardCatalogOptions(input = {}) {
+export function cardCatalogOptions(input = {}, context = {}) {
   // Facets describe the whole filtered catalog, not a sorted or paginated page.
-  const filters = normalizedFilters({ ...input, sort: undefined, page: undefined, limit: undefined });
+  const filters = {
+    ...normalizedFilters({ ...input, sort: undefined, page: undefined, limit: undefined }),
+    _marks: markContext(context)
+  };
   return withCardCatalog((database) => {
+    registerMarkNameFunction(database, filters);
     // Effect-specific fields disappear when switching effects, so they must not
     // prevent the user from choosing a different effect.
     const rawEffects = facetRows(database, 'card_effects', {
@@ -242,6 +282,10 @@ function normalizedFilters(input = {}) {
   const keyword = scalar(input.keyword, 'Keyword', 120);
   const type = scalar(input.type, 'Type', 120);
   const subtype = scalar(input.subtype, 'Subtype', 120);
+  const markedValue = scalar(input.marked, 'Gemarkeerd', 10).toLowerCase();
+  if (!['', '0', '1', 'false', 'true'].includes(markedValue)) {
+    throw new HttpError(400, 'Gemarkeerd moet 1, 0, true of false zijn.');
+  }
   const colorIdentityRaw = scalar(input.colorIdentity, 'Kleuridentiteit', 80);
   const colorTokens = colorIdentityRaw.split(/[\s,;]+/u).filter(Boolean);
   if (colorTokens.some((color) => !/^[WUBRGC]$/iu.test(color))) {
@@ -289,6 +333,7 @@ function normalizedFilters(input = {}) {
     keyword,
     type,
     subtype,
+    marked: markedValue === '1' || markedValue === 'true',
     colorIdentity,
     colorMode,
     manaMin,
@@ -309,6 +354,26 @@ function normalizedFilters(input = {}) {
 function queryParts(filters, { tokenProfileAlias = '' } = {}) {
   const conditions = [];
   const params = [];
+
+  if (filters.marked) {
+    const marks = filters._marks;
+    const alternatives = [];
+    if (marks.oracleIds.size) {
+      alternatives.push('lower(c.scryfall_oracle_id) IN (SELECT value FROM json_each(?))');
+      params.push(marks.oracleJson);
+    }
+    if (marks.fallbackNames.size) {
+      alternatives.push('discovery_mark_name(c.name) IN (SELECT value FROM json_each(?))');
+      params.push(marks.fallbackJson);
+    }
+    if (marks.allNames.size) {
+      alternatives.push("(COALESCE(c.scryfall_oracle_id, '') = '' AND discovery_mark_name(c.name) IN (SELECT value FROM json_each(?)))");
+      params.push(marks.namesJson);
+    }
+    // One bound JSON value per identity dimension avoids SQLite's variable
+    // limit even for a large list. No database is attached or cross-joined.
+    conditions.push(alternatives.length ? `(${alternatives.join(' OR ')})` : '0 = 1');
+  }
 
   if (filters.name) {
     const normalizedName = normalizeSearchText(filters.name);
@@ -455,6 +520,7 @@ function resultItem(row, reasons, tokens, filters) {
   const selectedToken = tokens.find((token) => tokenMatchesFilters(token, filters)) || tokens[0] || null;
   return {
     catalogId: row.catalog_key,
+    ...markedItem(row, filters._marks),
     name: row.name,
     faceName: row.face_name,
     manaCost: row.mana_cost,
@@ -482,14 +548,16 @@ function resultItem(row, reasons, tokens, filters) {
   };
 }
 
-export function searchCardCatalog(input = {}) {
+export function searchCardCatalog(input = {}, context = {}) {
   const filters = normalizedFilters(input);
-  const { conditions, params } = queryParts(filters);
+  const internalFilters = { ...filters, _marks: markContext(context) };
+  const { conditions, params } = queryParts(internalFilters);
   const where = whereClause(conditions);
   const offset = (filters.page - 1) * filters.limit;
   const reasons = matchReasons(filters);
 
   return withCardCatalog((database) => {
+    registerMarkNameFunction(database, internalFilters);
     const total = Number(database.prepare(`
       SELECT COUNT(DISTINCT c.catalog_key) AS count
       FROM cards c
@@ -539,7 +607,7 @@ export function searchCardCatalog(input = {}) {
           toughness: token.toughness,
           type: token.token_type
         })),
-        filters
+        internalFilters
       )),
       total,
       page: filters.page,

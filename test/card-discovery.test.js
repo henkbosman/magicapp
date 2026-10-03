@@ -63,12 +63,26 @@ test('ontdekquery normaliseert kleuridentiteit, pagina en effectafhankelijke fil
 });
 
 test('alleen inhoudelijke filters starten een zoekopdracht', () => {
-  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land']) {
+  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), false, query);
   }
-  for (const query of ['text=draw', 'type=Instant', 'manaMin=0', 'colorIdentity=C', 'effect=token&tokenPower=2']) {
+  for (const query of ['text=draw', 'type=Instant', 'manaMin=0', 'colorIdentity=C', 'effect=token&tokenPower=2', 'marked=1', 'marked=true']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), true, query);
   }
+});
+
+test('Gemarkeerd normaliseert echte selecties en laat uitgeschakelde waarden weg', () => {
+  for (const value of ['1', 'true']) {
+    const filters = discoveryFiltersFromQuery(new URLSearchParams({ marked: value }));
+    assert.equal(Boolean(filters.marked), true);
+    assert.equal(discoverySearchParams(filters).get('marked'), '1');
+  }
+  for (const value of ['', '0', 'false']) {
+    assert.equal(Boolean(discoveryFiltersFromQuery(new URLSearchParams({ marked: value })).marked), false);
+    assert.equal(discoverySearchParams({ marked: value }).has('marked'), false);
+  }
+  assert.equal(discoverySearchParams({ marked: true }).get('marked'), '1');
+  assert.equal(discoverySearchParams({ marked: false }).has('marked'), false);
 });
 
 test('catalogusstatus ondersteunt importvoortgang zonder hoofd-databasekaart-id', () => {
@@ -123,7 +137,16 @@ test('ontdekresultaten tonen mana, kaarttekst en een veilige opzoeklink zonder m
   assert.match(html, /href="#\/add\?name=Zendikar's%20Roil"[^>]*>Kaart opzoeken<\/a>/);
   assert.match(html, /data-discovery-preview="0" aria-label="Afbeelding van Zendikar&#039;s Roil bekijken"/);
   assert.match(html, /data-discovery-lookup/);
+  assert.match(html, /data-write-action[^>]*data-discovery-mark="0"/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*Markeren<\/button>/);
+  assert.ok(html.indexOf('data-discovery-preview') < html.indexOf("Zendikar&#039;s Roil</h2>"), 'preview icon precedes the title text');
   assert.doesNotMatch(html, /#\/cards\/catalog-901|\/cards\/catalog-901\/image/);
+});
+
+test('een opgeslagen markering is zichtbaar als bevestigde schakelknop', () => {
+  const html = renderDiscoveryResults({ items: [{ name: 'Gemarkeerde kaart', marked: true, markKey: 'oracle:card-1' }] });
+  assert.match(html, /data-write-action[^>]*data-discovery-mark="0"/);
+  assert.match(html, /aria-pressed="true"[^>]*>[^<]*Gemarkeerd<\/button>/);
 });
 
 test('ontdekkaarttypes krijgen afzonderlijke kleuren met behoud van super- en subtypes', () => {
@@ -197,8 +220,10 @@ test('een nieuwe ontdekpagina toont nog geen kaarten en vraagt alleen filteropti
     assert.doesNotMatch(view.html, /class="discovery-card"|Geen kaarten gevonden/);
     assert.equal(requested.filter((url) => url.includes('/search')).length, 0);
     assert.equal(requested.filter((url) => url.includes('/options')).length, 1);
-    assert.match(view.html, /<details class="panel discovery-secondary-filters">/);
-    assert.doesNotMatch(view.html, /<details[^>]+\bopen\b|discovery-filter-note|Effectfilters zijn afgeleid/);
+    assert.match(view.html, /<details[^>]*class="panel discovery-secondary-filters"[^>]*>/);
+    assert.doesNotMatch(view.html, /<details[^>]*class="panel discovery-secondary-filters"[^>]*\bopen\b|discovery-filter-note|Effectfilters zijn afgeleid/);
+    assert.match(view.html, /<details[^>]*id="discovery-text-filters"[^>]*\bopen\b[^>]*>[\s\S]*?<summary>Tekst en kaartsoort<\/summary>/);
+    assert.match(view.html, /<details[^>]*id="discovery-effect-filters"[^>]*\bopen\b[^>]*>[\s\S]*?<summary>Effect<\/summary>/);
     const sidebar = view.html.slice(view.html.indexOf('<aside'), view.html.indexOf('</aside>'));
     assert.doesNotMatch(sidebar, /name="colorIdentity"|name="manaMin"|name="legality"/);
     assert.match(view.html, /<form id="discovery-filters"[\s\S]*<aside[\s\S]*<details[\s\S]*name="colorIdentity"[\s\S]*<\/form>/);
@@ -245,7 +270,7 @@ test('ontdekpagina vraagt opties en zoekresultaten op en bouwt alle kernfilters'
       query: new URLSearchParams('ability=Landfall&effect=token&tokenPower=2&tokenToughness=2&colorIdentity=G')
     });
     assert.match(view.html, /<h1>Kaarten ontdekken<\/h1>/);
-    assert.match(view.html, /id="discovery-filter-toggle"[\s\S]*?aria-controls="discovery-filter-panel"/);
+    assert.match(view.html, /id="discovery-filter-toggle"[\s\S]*?aria-controls="discovery-filter-panel discovery-secondary-filters"/);
     assert.match(view.html, /id="discovery-filter-panel" class="panel discovery-filter-panel"/);
     assert.match(view.html, /name="name"/);
     assert.match(view.html, /name="text"/);

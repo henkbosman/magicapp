@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.11.3
+# Magic Collection Manager 2.12.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -10,7 +10,9 @@ Versie **2.11.2** laat de ontdekpagina leeg starten, markeert de gezochte kaartt
 
 Versie **2.11.3** verwijdert de herhaalde filterredenen bij ontdekresultaten en geeft elk kaarttype een eigen kleurmarkering. De afbeeldingspopup herkent een ontbrekend preview-endpoint en legt uit dat ook de backend moet worden bijgewerkt en herstart.
 
-De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. De bestaande gebruikersdatabase `magic-collection.sqlite`, het 2.0-basisschema en alle collectie-, wanted- en deckgegevens worden niet aangepast en bevatten geen verwijzing naar de catalogusdatabase. De twee databases worden niet met `ATTACH` of cross-database-relaties gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
+Versie **2.12.0** voegt blijvende markeringen voor interessante kaarten toe, inclusief het filter **Gemarkeerd**. De primaire gebruikersdatabase krijgt hiervoor automatisch een nieuwe tabel; de MTGJSON-database blijft ongewijzigd. De ontdekfilters kunnen per sectie worden ingeklapt en als geheel worden verborgen. Een hoog filterpaneel is zelfstandig scrollbaar en blijft op desktop meteen binnen bereik.
+
+De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. Markeringen staan vanaf 2.12.0 in `discovery_marks` in de bestaande gebruikersdatabase `magic-collection.sqlite`; bestaande collectie-, wanted- en deckgegevens blijven behouden. Markeringen gebruiken stabiele kaartidentiteiten, geen catalogusrij-ID's of databasepaden. De twee databases worden niet met `ATTACH` of foreign keys gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
 
 ## Belangrijkste mogelijkheden
 
@@ -18,6 +20,7 @@ De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `m
 - Verschillende fysieke printings, talen, condities, locaties en non-foil/foil/etched exemplaren registreren, met zichtbare Scryfall-prijzen per printing en afwerking.
 - Scryfall-autocomplete, printingselectie en lokaal opgeslagen kaartmetadata.
 - Een aparte ontdekpagina om kaarten op gecombineerde regels, kleuren en effecten te vinden, bijvoorbeeld Landfall-kaarten die een 2/2 creature token maken of groene kaarten met een tutor-effect.
+- Interessante kaarten markeren en via **Gemarkeerd** terugvinden, ook na het vervangen van de MTGJSON-catalogus.
 - Een onderhoudsimport van de officiële MTGJSON AtomicCards-catalogus naar een volledig losse, opnieuw opbouwbare SQLite-database.
 - Persistente SQLite-cache voor externe Scryfall-resultaten en een lokale schijfcache voor kaartafbeeldingen.
 - Decks bouwen met kaarten die wel of niet in de collectie aanwezig zijn, inclusief een atomaire actie die één printing tegelijk aan de collectie en een deck toevoegt.
@@ -168,7 +171,7 @@ Via **Instellingen en onderhoud → MTGJSON-kaartcatalogus** kan `AtomicCards.js
 
 De download en verwerking kunnen enige tijd duren en vereisen internettoegang en voldoende vrije schijfruimte. De onderhoudspagina toont download- en verwerkingsvoortgang. Per proces kan maar één catalogusimport tegelijk actief zijn. Een serverstop breekt een lopende import af en ruimt tijdelijke bestanden op.
 
-Deze catalogus is alleen een opnieuw opbouwbare zoekbron. Zij bevat geen collectie-, deck- of wantedgegevens en wordt nooit gekoppeld aan de primaire applicatiedatabase. De bestaande knop **Databaseback-up downloaden** maakt daarom uitsluitend een consistente back-up van `magic-collection.sqlite`; importeer AtomicCards opnieuw om de zoekcatalogus te herstellen.
+Deze catalogus is alleen een opnieuw opbouwbare zoekbron. Zij bevat geen collectie-, deck-, wanted- of markeringsgegevens en heeft geen databasekoppeling met de primaire applicatiedatabase. De bestaande knop **Databaseback-up downloaden** maakt een consistente back-up van `magic-collection.sqlite`, inclusief je markeringen; importeer AtomicCards opnieuw om de zoekcatalogus te herstellen.
 
 ## Kaarten ontdekken
 
@@ -176,13 +179,19 @@ De link **Kaarten ontdekken** in het linker- en mobiele menu opent een aparte zo
 
 Zonder ingevulde zoekfilters verschijnen nog geen kaarten. Zodra je een inhoudelijk filter invult, worden de resultaten geladen; **Filters resetten** maakt de resultaten weer leeg. Een opgeslagen link met filters herstelt de zoekopdracht direct. De sectie **Kleur, mana en legaliteit** staat horizontaal boven de resultaten en is bij een nieuw bezoek ingeklapt.
 
+**Filters verbergen** verbergt alle filterpanelen, inclusief **Kleur, mana en legaliteit**, zonder actieve filters te wissen. **Tekst en kaartsoort** en **Effect** zijn daarnaast afzonderlijk inklapbaar. Het filterpaneel blijft op desktop bovenaan in beeld zodra je scrollt; als de inhoud hoger is dan de beschikbare schermruimte, kun je binnen het paneel scrollen.
+
+Naast **Kaart opzoeken** staat **Markeren**. Daarmee bewaar je een interessante kaart; met dezelfde knop kun je de markering weer verwijderen. Het filter **Gemarkeerd** toont alleen opgeslagen kaarten en kan met alle andere filters worden gecombineerd. Dit filter start ook zonder andere zoektermen een zoekopdracht. Resetten van filters wist geen markeringen. In alleen-lezenmodus kun je markeringen bekijken en erop filteren; wijzigen vereist toegang tot de schrijf-API.
+
+Markeringen staan blijvend in de primaire gebruikersdatabase, op basis van Oracle-identiteit met een genormaliseerde kaartnaam als terugval. Het vervangen of opnieuw importeren van AtomicCards verwijdert ze niet. Een kaart die tijdelijk ontbreekt in de catalogus verschijnt daar niet als resultaat, maar de opgeslagen markering blijft bestaan.
+
 De filteropties zijn reactief. Kies je bijvoorbeeld **Instant**, dan tonen abilities, subtypes, effecten, legaliteit en de overige opties alleen waarden die bij instants en je andere filters passen. Ook naam- en kaarttekstzoeken beperken de keuzelijsten. Beschikbare manawaarden worden als suggesties getoond; je kunt zelf een minimum en maximum blijven invullen.
 
 Elke keuzelijst houdt rekening met de andere filters, maar niet met haar eigen gekozen waarde. Zo blijft een keuze vervangbaar. Aantallen worden over de volledige gefilterde catalogus berekend, niet alleen de zichtbare resultaatpagina. Een al gekozen waarde zonder matches blijft herkenbaar staan met **0 matches**, zodat niets stilzwijgend uit je zoekopdracht verdwijnt. Met de lege optie of **Filters resetten** maak je de zoekopdracht weer ruimer. Bij het wisselen van effect tellen verborgen token- of tutorfilters niet meer mee.
 
 Effectfilters omvatten onder meer Landfall, creature tokens, tutors, mana-productie, kaarten trekken, counters, power/toughness-verhoging, removal, sacrifice en graveyard-interactie. Bij tokens kan ook op power, toughness en tokentype worden gezocht; bij tutors op het gezochte kaarttype. Zo vindt de combinatie **Landfall**, **Token maken**, power **2** en toughness **2** kaarten die 2/2 tokens maken, terwijl **groen**, **Library doorzoeken** en eventueel een tutor-doel groene tutor-kaarten vindt. Effecten zijn automatisch afgeleid uit de Engelse AtomicCards-kaarttekst; controleer voor deckgebruik altijd de getoonde Oracle-tekst.
 
-Resultaten tonen de kaartnaam, manakosten, type, Oracle-tekst en kleuridentiteit. De filterredenen worden niet bij elke kaart herhaald. Elk kaarttype heeft een eigen kleurmarkering; bij een **Artifact Creature** worden beide types afzonderlijk gekleurd. Supertypes zoals Legendary en subtypes blijven gewone tekst. De invoer bij **Kaarttekst bevat** wordt letterlijk en zonder hoofdletteronderscheid in de kaarttekst gemarkeerd; mana-iconen en bestaande abilitymarkeringen blijven behouden. Het kleine afbeeldingsicoon naast de kaartnaam opent een popup met een Scryfall-afbeelding. Deze preview voegt niets aan je collectie of primaire database toe en vereist internettoegang wanneer de afbeelding nog niet geladen is.
+Resultaten tonen de kaartnaam, manakosten, type, Oracle-tekst en kleuridentiteit. De filterredenen worden niet bij elke kaart herhaald. Elk kaarttype heeft een eigen kleurmarkering; bij een **Artifact Creature** worden beide types afzonderlijk gekleurd. Supertypes zoals Legendary en subtypes blijven gewone tekst. De invoer bij **Kaarttekst bevat** wordt letterlijk en zonder hoofdletteronderscheid in de kaarttekst gemarkeerd; mana-iconen en bestaande abilitymarkeringen blijven behouden. Het kleine afbeeldingsicoon links van de kaartnaam opent een popup met een Scryfall-afbeelding. Deze preview voegt niets aan je collectie of primaire database toe en vereist internettoegang wanneer de afbeelding nog niet geladen is.
 
 **Kaart opzoeken** opent de bestaande Scryfall-printingselectie voor die kaart. De knop **Terug** op de opzoekpagina herstelt vervolgens de filters, resultaatpagina en scrollpositie van de ontdekpagina. Zonder geïmporteerde catalogus toont de ontdekpagina een directe verwijzing naar Onderhoud.
 
@@ -287,9 +296,9 @@ In de wanted-lijst opent een klik op de kaartafbeelding of kaartnaam eerst de gr
 
 ## Database
 
-Een nieuwe 2.0-installatie maakt de primaire gebruikersdatabase rechtstreeks uit `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts. Versie 2.11.3 wijzigt dit schema en `user_version = 20000` niet.
+Een nieuwe 2.0-installatie maakt de primaire gebruikersdatabase rechtstreeks uit `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts. Versie 2.12.0 voegt bij de eerste herstart automatisch de onafhankelijke tabel `discovery_marks` toe met `CREATE TABLE IF NOT EXISTS`; bestaande tabellen en gegevens worden niet vervangen. De compatibiliteitswaarde `user_version = 20000` blijft behouden. Voor bestaande 2.x-installaties is geen handmatige migratie nodig.
 
-Het primaire schema wordt idempotent geïnitialiseerd en gebruikt foreign keys, WAL-mode en een integriteitscontrole op de onderhoudspagina. De optionele MTGJSON-catalogus gebruikt een eigen schema en eigen SQLite-bestand. Zij heeft geen tabel, foreign key, `ATTACH`-koppeling of andere referentie in `magic-collection.sqlite`.
+Het primaire schema wordt idempotent geïnitialiseerd en gebruikt foreign keys, WAL-mode en een integriteitscontrole op de onderhoudspagina. De optionele MTGJSON-catalogus gebruikt een eigen schema en eigen SQLite-bestand. Markeringsrecords bevatten alleen onafhankelijke kaartidentiteiten, geen catalogusrij-ID, foreign key of `ATTACH`-koppeling. Het catalogusschema wijzigt niet en opnieuw importeren is niet nodig voor deze update.
 
 Maak regelmatig een back-up van gebruikersdata via **Instellingen en onderhoud → Databaseback-up downloaden** of door de volledige `data/`-map veilig te kopiëren wanneer de applicatie is gestopt. De downloadbare databaseback-up bevat alleen de primaire database; de MTGJSON-catalogus kan opnieuw worden geïmporteerd.
 

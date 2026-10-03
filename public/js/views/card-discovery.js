@@ -5,6 +5,7 @@ import { formFilters, replaceRouteQuery, resetFilterForm } from '../live-filters
 import { openDiscoveryCardPreview } from '../discovery-preview.js';
 import { prepareDiscoveryLookupNavigation } from '../navigation-state.js';
 import { emptyState, escapeHtml, toast } from '../utils.js';
+import { applyWriteAvailability } from '../write-access.js';
 
 const COLOR_OPTIONS = [
   ['W', 'Wit'],
@@ -122,6 +123,7 @@ export function discoveryFiltersFromQuery(query = new URLSearchParams()) {
   const colors = query.getAll('colorIdentity')
     .flatMap((value) => String(value).split(','));
   return {
+    marked: ['1', 'true'].includes(query.get('marked')) ? '1' : '',
     name: query.get('name') || '',
     text: query.get('text') || '',
     ability: query.get('ability') || '',
@@ -158,6 +160,10 @@ export function discoverySearchParams(values = {}) {
     }
   }
 
+  const marked = ['1', 'true'].includes(params.get('marked'));
+  params.delete('marked');
+  if (marked) params.set('marked', '1');
+
   const colors = uniqueColors(params.getAll('colorIdentity').flatMap((value) => String(value).split(',')));
   params.delete('colorIdentity');
   if (colors.length) params.set('colorIdentity', colors.join(','));
@@ -185,7 +191,7 @@ export function discoverySearchParams(values = {}) {
 
 export function hasDiscoveryFilters(values = {}) {
   const params = discoverySearchParams(values);
-  return ['name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
+  return ['marked', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
     'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .some((key) => String(params.get(key) || '').trim().length > 0);
 }
@@ -260,7 +266,7 @@ function colorIdentityFilterHtml(selectedColors = [], mode = 'subset', options =
 }
 
 function activeFilterCount(filters) {
-  return ['name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+  return ['marked', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .filter((key) => String(filters[key] || '').length > 0).length
     + (filters.colorIdentity.length ? 1 : 0);
 }
@@ -301,6 +307,10 @@ function catalogCardId(card) {
   return firstDefined(card.catalogId, card.id, card.catalogKey, '');
 }
 
+function discoveryMarkKey(card) {
+  return String(card.markKey || card.scryfallOracleId || card.name || '');
+}
+
 export function renderDiscoveryResults(result, filters = {}) {
   const normalized = normalizedResult(result);
   if (!normalized.items.length) {
@@ -315,7 +325,7 @@ export function renderDiscoveryResults(result, filters = {}) {
     return `<article class="discovery-card" ${catalogId !== '' ? `data-catalog-id="${escapeHtml(String(catalogId))}"` : ''}>
       <div class="discovery-card-heading">
         <div class="discovery-card-title">
-          <h2>${escapeHtml(card.name || 'Naamloze kaart')} <button type="button" class="discovery-preview-button" data-discovery-preview="${index}" aria-label="Afbeelding van ${escapeHtml(card.name || 'de kaart')} bekijken" title="Kaartafbeelding bekijken"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 6h8v7H8zM8 16h8M8 18.5h5"></path></svg></button></h2>
+          <div class="discovery-card-name"><button type="button" class="discovery-preview-button" data-discovery-preview="${index}" aria-label="Afbeelding van ${escapeHtml(card.name || 'de kaart')} bekijken" title="Kaartafbeelding bekijken"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 6h8v7H8zM8 16h8M8 18.5h5"></path></svg></button><h2>${escapeHtml(card.name || 'Naamloze kaart')}</h2></div>
           ${manaCost(card.manaCost)}
         </div>
         <p class="card-meta">${discoveryTypeLineHtml(typeLine)}</p>
@@ -327,7 +337,10 @@ export function renderDiscoveryResults(result, filters = {}) {
           <span>Mana value <strong>${Number(card.manaValue || 0)}</strong></span>
           ${card.power !== undefined && card.power !== null && card.power !== '' ? `<span><strong>${escapeHtml(String(card.power))}/${escapeHtml(String(card.toughness ?? ''))}</strong></span>` : ''}
         </div>
-        <a class="button primary small" data-discovery-lookup href="#/add?name=${encodeURIComponent(card.name || '')}">Kaart opzoeken</a>
+        <div class="discovery-card-actions">
+          <a class="button primary small" data-discovery-lookup href="#/add?name=${encodeURIComponent(card.name || '')}">Kaart opzoeken</a>
+          <button type="button" class="button secondary small discovery-mark-button${card.marked ? ' discovery-marked' : ''}" data-write-action data-discovery-mark="${index}" aria-pressed="${card.marked ? 'true' : 'false'}" title="${card.marked ? 'Markering verwijderen' : 'Kaart markeren'}">${card.marked ? 'Gemarkeerd' : 'Markeren'}</button>
+        </div>
       </footer>
     </article>`;
   }).join('')}</div>`;
@@ -398,6 +411,8 @@ export async function renderCardDiscovery(context) {
     ? context.query.get('filterPanelOpen') === '1'
     : !isCompactViewport || filterCount > 0 || filtersExpanded('discover');
   const secondaryFiltersOpen = context.query.get('colorsOpen') === '1';
+  const textFiltersOpen = context.query.get('textOpen') !== '0';
+  const effectFiltersOpen = context.query.get('effectOpen') !== '0';
 
   return {
     html: `
@@ -406,23 +421,27 @@ export async function renderCardDiscovery(context) {
         title: 'Kaarten ontdekken',
         description: 'Combineer meerdere kenmerken om precies de kaarten te vinden die bij je deckplan passen.'
       })}
-      ${filterToggleHtml({ id: 'discovery-filter-toggle', panelId: 'discovery-filter-panel', expanded: filtersOpen, activeCount: filterCount, resetId: 'discovery-filter-reset' })}
+      ${filterToggleHtml({ id: 'discovery-filter-toggle', panelId: 'discovery-filter-panel discovery-secondary-filters', expanded: filtersOpen, activeCount: filterCount, resetId: 'discovery-filter-reset' })}
       <form id="discovery-filters" class="discovery-layout" autocomplete="off">
         <aside id="discovery-filter-panel" class="panel discovery-filter-panel" ${filtersOpen ? '' : 'hidden'}>
           <header class="panel-header"><h2>Zoekfilters</h2></header>
           <div class="discovery-filter-form panel-body">
-            <section class="discovery-filter-section">
-              <h3>Tekst en kaartsoort</h3>
+            <label class="discovery-marked-filter"><input type="checkbox" name="marked" value="1" ${filters.marked ? 'checked' : ''}> Gemarkeerd</label>
+            <details id="discovery-text-filters" class="discovery-filter-section"${textFiltersOpen ? ' open' : ''}>
+              <summary>Tekst en kaartsoort</summary>
+              <div class="discovery-filter-section-body">
               <div class="field"><label for="discovery-name">Naam</label><input id="discovery-name" name="name" type="search" value="${escapeHtml(filters.name)}" placeholder="Bijv. Zendikar"></div>
               <div class="field"><label for="discovery-text">Kaarttekst bevat</label><input id="discovery-text" name="text" type="text" value="${escapeHtml(filters.text)}" placeholder="Bijv. create a 2/2"></div>
               <div class="field"><label for="discovery-ability">Ability of trigger</label><select id="discovery-ability" name="ability">${facetOptionsHtml('ability', options, filters.ability)}</select></div>
               <div class="field"><label for="discovery-keyword">Keyword</label><select id="discovery-keyword" name="keyword">${facetOptionsHtml('keyword', options, filters.keyword)}</select></div>
               <div class="field"><label for="discovery-type">Kaarttype</label><select id="discovery-type" name="type">${facetOptionsHtml('type', options, filters.type)}</select></div>
               <div class="field"><label for="discovery-subtype">Subtype</label><select id="discovery-subtype" name="subtype">${facetOptionsHtml('subtype', options, filters.subtype)}</select></div>
-            </section>
+              </div>
+            </details>
 
-            <section class="discovery-filter-section">
-              <h3>Effect</h3>
+            <details id="discovery-effect-filters" class="discovery-filter-section"${effectFiltersOpen ? ' open' : ''}>
+              <summary>Effect</summary>
+              <div class="discovery-filter-section-body">
               <div class="field"><label for="discovery-effect">Gewenst effect</label><select id="discovery-effect" name="effect">${facetOptionsHtml('effect', options, filters.effect)}</select></div>
               <div id="discovery-token-fields" class="discovery-effect-fields" ${filters.effect === 'token' ? '' : 'hidden'}>
                 <div class="discovery-token-stats">
@@ -434,12 +453,13 @@ export async function renderCardDiscovery(context) {
               <div id="discovery-tutor-fields" class="discovery-effect-fields" ${filters.effect === 'tutor' ? '' : 'hidden'}>
                 <div class="field"><label for="discovery-tutor-target">Zoekt naar</label><select id="discovery-tutor-target" name="tutorTarget">${facetOptionsHtml('tutorTarget', options, filters.tutorTarget)}</select></div>
               </div>
-            </section>
+              </div>
+            </details>
           </div>
         </aside>
 
         <div class="discovery-results-column">
-          <details class="panel discovery-secondary-filters"${secondaryFiltersOpen ? ' open' : ''}>
+          <details id="discovery-secondary-filters" class="panel discovery-secondary-filters"${secondaryFiltersOpen ? ' open' : ''}${filtersOpen ? '' : ' hidden'}>
             <summary>Kleur, mana en legaliteit</summary>
             <div class="discovery-secondary-filter-grid">
               ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode, options)}
@@ -471,6 +491,9 @@ export async function renderCardDiscovery(context) {
     mount() {
       const form = document.getElementById('discovery-filters');
       const filterPanel = document.getElementById('discovery-filter-panel');
+      const secondaryFilters = document.getElementById('discovery-secondary-filters');
+      const textFilters = document.getElementById('discovery-text-filters');
+      const effectFilters = document.getElementById('discovery-effect-filters');
       const results = document.getElementById('discovery-results');
       const count = document.getElementById('discovery-result-count');
       const pagination = document.getElementById('discovery-pagination-wrap');
@@ -486,6 +509,26 @@ export async function renderCardDiscovery(context) {
       let requestController = null;
       let debounceTimer = null;
       let currentOptions = options;
+      const pendingMarks = new Map();
+
+      filterPanel.scrollTop = Math.max(Number(context.query.get('filterScroll')) || 0, 0);
+
+      const refreshMarkButtons = () => {
+        if (form.isConnected === false) return;
+        for (const button of results.querySelectorAll('[data-discovery-mark]')) {
+          const card = result.items[Number(button.dataset.discoveryMark)];
+          if (!card) continue;
+          const pending = pendingMarks.has(discoveryMarkKey(card));
+          button.textContent = pending ? 'Opslaan…' : card.marked ? 'Gemarkeerd' : 'Markeren';
+          button.setAttribute('aria-pressed', card.marked ? 'true' : 'false');
+          button.title = card.marked ? 'Markering verwijderen' : 'Kaart markeren';
+          button.classList.toggle('discovery-marked', Boolean(card.marked));
+          // The shared write-access observer must not re-enable an in-flight save.
+          button.dataset.writeInitiallyDisabled = pending ? 'true' : 'false';
+          applyWriteAvailability(button);
+        }
+      };
+      refreshMarkButtons();
 
       const updateColors = () => {
         const colors = new Map(optionEntries(currentOptions.colors).map((entry) => [entry.value, entry]));
@@ -533,6 +576,9 @@ export async function renderCardDiscovery(context) {
             .map(([key]) => key));
           return active.size;
         }
+      });
+      document.getElementById('discovery-filter-toggle').addEventListener('click', () => {
+        secondaryFilters.hidden = filterPanel.hidden;
       });
 
       const routeParams = (page = currentPage) => {
@@ -602,10 +648,15 @@ export async function renderCardDiscovery(context) {
           if (signal.aborted || requestSequence !== resultRequestSequence || form.isConnected === false
             || discoverySearchParams(routeParams(requestedPage)).toString() !== apiParams.toString()) return false;
           const next = normalizedResult(nextResult, requestedPage);
+          if (shouldSearch && requestedPage > next.totalPages) {
+            currentPage = next.totalPages;
+            return loadResults(routeParams(currentPage));
+          }
           result = next;
           currentPage = next.page;
           updateOptions(nextOptions);
           results.innerHTML = shouldSearch ? renderDiscoveryResults(next, { text: apiParams.get('text') }) : discoveryStartHtml();
+          refreshMarkButtons();
           count.textContent = shouldSearch ? resultCountHtml(next) : 'Nog geen zoekopdracht';
           pagination.innerHTML = shouldSearch ? paginationHtml(next) : '';
           filterToggle.updateActiveCount();
@@ -642,7 +693,40 @@ export async function renderCardDiscovery(context) {
         if (event.target !== sort) applyFilters();
       });
 
-      results.addEventListener('click', (event) => {
+      results.addEventListener('click', async (event) => {
+        const markButton = event.target.closest('[data-discovery-mark]');
+        if (markButton) {
+          const card = result.items[Number(markButton.dataset.discoveryMark)];
+          if (!card || markButton.disabled || markButton.getAttribute('aria-disabled') === 'true') return;
+          const key = discoveryMarkKey(card);
+          if (pendingMarks.has(key)) return;
+          const operation = Symbol(key);
+          pendingMarks.set(key, operation);
+          refreshMarkButtons();
+          try {
+            const saved = await api('/discovery-marks', {
+              method: 'POST',
+              body: { name: card.name, scryfallOracleId: card.scryfallOracleId || null, marked: !card.marked }
+            });
+            if (typeof saved?.marked !== 'boolean') throw new Error('De server heeft de markering niet bevestigd.');
+            if (form.isConnected === false) return;
+            // A response may arrive after another filter has replaced the list.
+            for (const item of result.items) {
+              if (discoveryMarkKey(item) === key) item.marked = saved.marked;
+            }
+            pendingMarks.delete(key);
+            refreshMarkButtons();
+            // Refresh the latest controls, including text still awaiting its debounce.
+            // This also invalidates reads started before the saved mark was confirmed.
+            loadResults(routeParams());
+          } catch (error) {
+            if (form.isConnected !== false) toast(error.message || 'Markeren is mislukt.', 'error');
+          } finally {
+            if (pendingMarks.get(key) === operation) pendingMarks.delete(key);
+            refreshMarkButtons();
+          }
+          return;
+        }
         const preview = event.target.closest('[data-discovery-preview]');
         if (preview) {
           const card = result.items[Number(preview.dataset.discoveryPreview)];
@@ -656,8 +740,11 @@ export async function renderCardDiscovery(context) {
         // Capture edits that are still waiting for their debounce before leaving.
         invalidateRequest();
         const returnParams = routeParams();
-        if (form.querySelector('.discovery-secondary-filters').open) returnParams.set('colorsOpen', '1');
+        if (secondaryFilters.open) returnParams.set('colorsOpen', '1');
         returnParams.set('filterPanelOpen', filterPanel.hidden ? '0' : '1');
+        returnParams.set('textOpen', textFilters.open ? '1' : '0');
+        returnParams.set('effectOpen', effectFilters.open ? '1' : '0');
+        if (filterPanel.scrollTop > 0) returnParams.set('filterScroll', String(Math.round(filterPanel.scrollTop)));
         replaceRouteQuery('/discover', returnParams);
         window.location.hash = prepareDiscoveryLookupNavigation(link.getAttribute('href'));
       });

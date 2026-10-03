@@ -15,12 +15,14 @@ cardCatalogReadRouter.get('/status', (req, res) => {
   });
 });
 
-cardCatalogReadRouter.get('/options', (req, res) => {
-  res.json({ data: cardCatalogOptions(req.query) });
+cardCatalogReadRouter.get('/options', async (req, res) => {
+  const { discoveryMarkContext } = await import('../services/discovery-mark-service.js');
+  res.json({ data: cardCatalogOptions(req.query, discoveryMarkContext()) });
 });
 
-cardCatalogReadRouter.get('/search', (req, res) => {
-  res.json({ data: searchCardCatalog(req.query) });
+cardCatalogReadRouter.get('/search', async (req, res) => {
+  const { discoveryMarkContext } = await import('../services/discovery-mark-service.js');
+  res.json({ data: searchCardCatalog(req.query, discoveryMarkContext()) });
 });
 
 cardCatalogReadRouter.get('/preview', async (req, res) => {
