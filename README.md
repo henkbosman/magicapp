@@ -1,14 +1,18 @@
-# Magic Collection Manager 2.10.4
+# Magic Collection Manager 2.11.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
-Versie **2.0.0** is de eerste productiebaseline. Versie **2.10.4** markeert in kaarttekst alleen de exacte abilitynaam of het herkende keyword; de overige kaarttekst behoudt zijn normale achtergrond en leesbare grootte. Op de deckdetailpagina staan naast **Filters tonen** nieuwe keuzes voor sorteren op **Mana kosten** of **Naam kaart** en groeperen op **Type** of **Ability**. De standaardinstellingen zijn respectievelijk **Mana kosten** en **Type** en gelden voor zowel de lijst- als kaartenweergave. Abilitygroepering gebruikt het primaire herkende kaartkeyword, met bestaande functionele kaartinzichten als fallback, en plaatst kaarten zonder herkende ability onder **Geen ability**. Deze patch wijzigt geen API-endpoints en geen databaseschema. De kaarttekst- en rasterverbeteringen uit 2.10.3, de gewone kaartnamen en verplaatste rasterbediening uit 2.10.2, de rechts uitgelijnde manakosten en verborgen functionele collectiebadges uit 2.10.1, de vernieuwde kaartlijsten en snelle printingkeuze uit 2.10, de gebundelde decklijstacties en tutorfilters uit 2.9, de instelbare kaartweergave uit 2.8, de kaartpreviews, gegroepeerde deckweergave en mana-producerfilter uit 2.7 en de gecontroleerde kaartenlijstimport en mana- en tapsymbolen uit 2.6 blijven onderdeel van deze release. De experimentele Monte Carlo/deckanalyse uit eerdere ontwikkelversies en de historische 1.x-databasemigratieketen maken geen deel uit van de productiecode; een nieuwe installatie initialiseert rechtstreeks het definitieve 2.0-basisschema.
+Versie **2.0.0** is de eerste productiebaseline. Versie **2.11.0** voegt de pagina **Kaarten ontdekken** toe voor gericht zoeken tijdens het bouwen van een deck. De zoekcatalogus wordt opgebouwd uit MTGJSON AtomicCards en ondersteunt combineerbare filters voor onder meer kaarttekst, abilities, keywords, kleuridentiteit, kaarttype, mana value, legaliteit, effecten, tokenafmetingen en tutor-doelen. De onderhoudspagina kan deze catalogus op de achtergrond importeren en bijwerken.
+
+De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. De bestaande gebruikersdatabase `magic-collection.sqlite`, het 2.0-basisschema en alle collectie-, wanted- en deckgegevens worden niet aangepast en bevatten geen verwijzing naar de catalogusdatabase. De twee databases worden niet met `ATTACH` of cross-database-relaties gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
 
 ## Belangrijkste mogelijkheden
 
 - Snel lokaal zoeken en direct zien of een kaart in bezit is, hoeveel exemplaren beschikbaar zijn, in welke decks deze voorkomt en of de kaart op Wanted staat.
 - Verschillende fysieke printings, talen, condities, locaties en non-foil/foil/etched exemplaren registreren, met zichtbare Scryfall-prijzen per printing en afwerking.
 - Scryfall-autocomplete, printingselectie en lokaal opgeslagen kaartmetadata.
+- Een aparte ontdekpagina om kaarten op gecombineerde regels, kleuren en effecten te vinden, bijvoorbeeld Landfall-kaarten die een 2/2 creature token maken of groene kaarten met een tutor-effect.
+- Een onderhoudsimport van de officiële MTGJSON AtomicCards-catalogus naar een volledig losse, opnieuw opbouwbare SQLite-database.
 - Persistente SQLite-cache voor externe Scryfall-resultaten en een lokale schijfcache voor kaartafbeeldingen.
 - Decks bouwen met kaarten die wel of niet in de collectie aanwezig zijn, inclusief een atomaire actie die één printing tegelijk aan de collectie en een deck toevoegt.
 - Benoemde combo- en synergiegroepen met twee of meer kaarten, toelichting en een instelbare volgorde.
@@ -45,7 +49,7 @@ Permanente gegevens staan standaard in:
 data/
 ```
 
-Daarin staan onder andere de SQLite-database en de lokale afbeeldingscache.
+Daarin staan onder andere de primaire SQLite-database, de optionele losse MTGJSON-catalogus en de lokale afbeeldingscache.
 
 ## Starten zonder Docker
 
@@ -90,6 +94,7 @@ PORT=3000
 HOST=0.0.0.0
 DATA_DIR=./data
 DATABASE_FILE=magic-collection.sqlite
+CARD_CATALOG_DATABASE_FILE=mtgjson-atomic.sqlite
 SCRYFALL_TIMEOUT_MS=15000
 SCRYFALL_REQUEST_DELAY_MS=550
 SCRYFALL_AUTOCOMPLETE_CACHE_TTL_HOURS=168
@@ -104,6 +109,8 @@ Vul `PUBLIC_ORIGIN` in met de volledige oorsprong (bijvoorbeeld `https://cards.e
 
 Ongeldige numerieke waarden voor poort, time-out of request delay vallen veilig terug op de standaardwaarde.
 
+`CARD_CATALOG_DATABASE_FILE` bepaalt uitsluitend het databasebestand van de zelfstandige MTGJSON-zoekcatalogus; de relatieve standaardwaarde staat onder `DATA_DIR`. Het resolved pad mag niet gelijk zijn aan dat van `DATABASE_FILE`; de server weigert dan te starten. De importbron zelf is bewust niet configureerbaar en is vastgezet op de officiële HTTPS-download van MTGJSON.
+
 ## Lees-, schrijf- en AI-API
 
 De API is gescheiden in:
@@ -115,6 +122,8 @@ De API is gescheiden in:
 ```
 
 Alle normale leesacties van de webinterface gebruiken `/api/read`. Mutaties gebruiken `/api/write`. De aparte `/api/ai`-zone bevat vier compacte read-only endpoints voor LLM-tools en wordt niet door de webinterface zelf gebruikt. Hierdoor kan een reverse proxy bijvoorbeeld de volledige webapp en beide leeszones extern beschikbaar maken, terwijl alleen lokale netwerkadressen mogen schrijven.
+
+De ontdekpagina gebruikt de read-only endpoints onder `/api/read/card-catalog`. Het starten van een AtomicCards-import is een onderhoudsmutatie via `/api/write/maintenance/card-catalog/import`; de aanvraag antwoordt direct, waarna de voortgang via het read-only statusendpoint kan worden gevolgd.
 
 Een Nginx-voorbeeld staat in:
 
@@ -144,6 +153,22 @@ Scryfall is de primaire externe bron. De applicatie slaat kaartmetadata lokaal o
 Externe resultaten worden tijdelijk in SQLite gecachet. Kaartafbeeldingen worden standaard lokaal opgeslagen in `data/images/`. Daardoor zijn herhaalde schermweergaven niet afhankelijk van nieuwe Scryfall-aanroepen.
 
 Via **Instellingen en onderhoud** kan de externe responsecache worden geleegd of lokaal opgeslagen kaartmetadata opnieuw met Scryfall worden gesynchroniseerd. Gebruikersgegevens zoals aantallen, decks, wanted-status, notities en aankoopprijzen worden daarbij niet overschreven.
+
+## MTGJSON-kaartcatalogus
+
+Via **Instellingen en onderhoud → MTGJSON-kaartcatalogus** kan `AtomicCards.json.gz` van de vaste officiële MTGJSON-bron worden geïmporteerd. De import draait in een afzonderlijke worker, controleert de officiële SHA-256-controlecode, verwerkt het uitgepakte JSON-bestand begrensd en streaming en bouwt eerst een tijdelijke SQLite-database. Pas na een geslaagde integriteitscontrole wordt deze als `mtgjson-atomic.sqlite` geactiveerd. Tijdens een update blijft de vorige catalogus beschikbaar; bij een fout blijft die versie behouden.
+
+De download en verwerking kunnen enige tijd duren en vereisen internettoegang en voldoende vrije schijfruimte. De onderhoudspagina toont download- en verwerkingsvoortgang. Per proces kan maar één catalogusimport tegelijk actief zijn. Een serverstop breekt een lopende import af en ruimt tijdelijke bestanden op.
+
+Deze catalogus is alleen een opnieuw opbouwbare zoekbron. Zij bevat geen collectie-, deck- of wantedgegevens en wordt nooit gekoppeld aan de primaire applicatiedatabase. De bestaande knop **Databaseback-up downloaden** maakt daarom uitsluitend een consistente back-up van `magic-collection.sqlite`; importeer AtomicCards opnieuw om de zoekcatalogus te herstellen.
+
+## Kaarten ontdekken
+
+De link **Kaarten ontdekken** in het linker- en mobiele menu opent een aparte zoekpagina voor deckbouw. Alle actieve filters worden gecombineerd. Er kan worden gezocht op naam, Oracle-tekst, ability of trigger, keyword, type, subtype, Commander-kleuridentiteit, mana value, legaliteit en een afgeleid kaarteffect. De kleurmodus kan kaarten tonen die binnen de gekozen kleuren passen, alle gekozen kleuren bevatten of exact die kleuridentiteit hebben.
+
+Effectfilters omvatten onder meer Landfall, creature tokens, tutors, mana-productie, kaarten trekken, counters, power/toughness-verhoging, removal, sacrifice en graveyard-interactie. Bij tokens kan ook op power, toughness en tokentype worden gezocht; bij tutors op het gezochte kaarttype. Zo vindt de combinatie **Landfall**, **Token maken**, power **2** en toughness **2** kaarten die 2/2 tokens maken, terwijl **groen**, **Library doorzoeken** en eventueel een tutor-doel groene tutor-kaarten vindt. Effecten zijn automatisch afgeleid uit de Engelse AtomicCards-kaarttekst; controleer voor deckgebruik altijd de getoonde Oracle-tekst.
+
+Resultaten tonen de kaartnaam, manakosten, type, Oracle-tekst, kleuridentiteit en de redenen voor de match. **Kaart opzoeken** opent vervolgens de bestaande Scryfall-printingselectie voor die kaart. Zonder geïmporteerde catalogus toont de pagina een directe verwijzing naar Onderhoud.
 
 ## Kaart opzoeken en toevoegen
 
@@ -244,11 +269,11 @@ In de wanted-lijst opent een klik op de kaartafbeelding of kaartnaam eerst de gr
 
 ## Database
 
-Een nieuwe 2.0-installatie maakt rechtstreeks `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts.
+Een nieuwe 2.0-installatie maakt de primaire gebruikersdatabase rechtstreeks uit `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts. Versie 2.11.0 wijzigt dit schema en `user_version = 20000` niet.
 
-Het schema wordt idempotent geïnitialiseerd en gebruikt foreign keys, WAL-mode en een integriteitscontrole op de onderhoudspagina.
+Het primaire schema wordt idempotent geïnitialiseerd en gebruikt foreign keys, WAL-mode en een integriteitscontrole op de onderhoudspagina. De optionele MTGJSON-catalogus gebruikt een eigen schema en eigen SQLite-bestand. Zij heeft geen tabel, foreign key, `ATTACH`-koppeling of andere referentie in `magic-collection.sqlite`.
 
-Maak regelmatig een back-up via **Instellingen en onderhoud → Databaseback-up downloaden** of door de volledige `data/`-map veilig te kopiëren wanneer de applicatie is gestopt.
+Maak regelmatig een back-up van gebruikersdata via **Instellingen en onderhoud → Databaseback-up downloaden** of door de volledige `data/`-map veilig te kopiëren wanneer de applicatie is gestopt. De downloadbare databaseback-up bevat alleen de primaire database; de MTGJSON-catalogus kan opnieuw worden geïmporteerd.
 
 ## Projectstructuur
 
@@ -256,6 +281,11 @@ Maak regelmatig een back-up via **Instellingen en onderhoud → Databaseback-up 
 server.js
 src/
   config.js
+  card-catalog/
+    database.js
+    import-service.js
+    repository.js
+    schema.sql
   db/
     database.js
     schema.sql
@@ -280,7 +310,7 @@ Voor een snelle syntaxcontrole:
 npm run check
 ```
 
-De applicatie bevat gerichte regressietests voor kritieke repositorylogica en weergavecontracten. Voer ze uit met `npm test`.
+De applicatie bevat gerichte regressietests voor kritieke repositorylogica, de begrensde AtomicCards-parser, kaartcataloguszoekacties, importisolatie en frontendweergavecontracten. Voer ze uit met `npm test`.
 
 
 ## Read-only kaart opzoeken

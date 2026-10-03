@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.10.4
+MAGIC COLLECTION MANAGER READ API 2.11.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,153 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.10.4"}
+{"status":"ok","version":"2.11.0"}
+
+GET /api/read/card-catalog/status
+
+Geeft de status van de volledig zelfstandige MTGJSON AtomicCards-catalogus en de actuele of laatst afgeronde importjob. Deze database bevat geen gebruikersdata en heeft geen koppeling met de primaire applicatiedatabase.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{
+  "data": {
+    "available": true,
+    "databaseFile": "mtgjson-atomic.sqlite",
+    "databaseSizeBytes": 73400320,
+    "cardCount": 32100,
+    "sourceVersion": "5.3.0",
+    "sourceDate": "2026-10-02",
+    "importedAt": "2026-10-03T06:30:00.000Z",
+    "importJob": {
+      "id": "uuid",
+      "status": "completed",
+      "phase": "complete",
+      "processed": 32100,
+      "total": 32100,
+      "downloadedBytes": 52000000,
+      "totalBytes": 52000000,
+      "message": "32.100 kaartrecords zijn geïmporteerd.",
+      "startedAt": "2026-10-03T06:25:00.000Z",
+      "finishedAt": "2026-10-03T06:30:00.000Z"
+    }
+  }
+}
+
+Zonder geïmporteerde catalogus is available=false, cardCount=0 en kunnen sourceVersion, sourceDate en importedAt leeg zijn. importJob is null zolang in het huidige serverproces nog geen import is gestart. Een actieve job heeft status=running en voortgang in phase, processed, total, downloadedBytes en totalBytes; een mislukte job heeft status=failed en daarnaast error.
+
+GET /api/read/card-catalog/options
+
+Geeft de daadwerkelijk in de catalogus beschikbare abilities, keywords, types, subtypes, afgeleide effecten en tutor-doelen met aantallen. Zonder actieve catalogus volgt HTTP 503.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{
+  "data": {
+    "abilities": [{"value":"Landfall","label":"Landfall","count":187}],
+    "keywords": [{"value":"Trample","label":"Trample","count":1500}],
+    "types": [{"value":"Creature","label":"Creature","count":17000}],
+    "subtypes": [{"value":"Elf","label":"Elf","count":650}],
+    "effects": [
+      {"value":"landfall","label":"Landfall","count":187},
+      {"value":"token","label":"Maakt creature tokens","count":1800},
+      {"value":"tutor","label":"Zoekt in de library","count":900},
+      {"value":"mana","label":"Produceert mana","count":2600}
+    ],
+    "tutorTargets": [
+      {"value":"land","label":"Land","count":300},
+      {"value":"creature","label":"Creature","count":240}
+    ]
+  }
+}
+
+GET /api/read/card-catalog/search?name={name}&text={oracle-text}&ability={ability}&keyword={keyword}&type={type}&subtype={subtype}&colorIdentity={comma-separated W,U,B,R,G,C}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format[:status]}&effect={token|tutor|mana|draw|counter|pump|removal|sacrifice|graveyard|landfall}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&sort={relevance|name|mana}&page={integer}&limit={1..100}
+
+Doorzoekt de losse AtomicCards-catalogus. Alle opgegeven filters worden met AND gecombineerd. colorMode=subset toont kaarten die binnen de gekozen Commander-kleuren passen, contains vereist alle gekozen kleuren en exact vereist precies dezelfde kleuridentiteit. C staat voor volledig kleurloos en kan niet met W, U, B, R of G worden gecombineerd. legality gebruikt standaard status legal en accepteert daarnaast legal, banned, restricted of not_legal na een dubbele punt. Geldige tutorTarget-waarden zijn any, basic_land, land, creature, artifact, enchantment, instant, sorcery en planeswalker. Standaard zijn sort=relevance, page=1 en limit=50; maximaal 5.000 resultaten mogen worden overgeslagen. Zonder actieve catalogus volgt HTTP 503.
+
+Voorbeelden:
+
+GET /api/read/card-catalog/search?ability=Landfall&effect=token&tokenPower=2&tokenToughness=2
+
+GET /api/read/card-catalog/search?colorIdentity=G&colorMode=subset&effect=tutor
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{
+  "data": {
+    "items": [
+      {
+        "catalogId": "uuid",
+        "name": "Zendikar's Roil",
+        "faceName": "",
+        "manaCost": "{3}{G}{G}",
+        "manaValue": 5,
+        "colors": ["G"],
+        "colorIdentity": ["G"],
+        "typeLine": "Enchantment",
+        "oracleText": "Landfall — Whenever a land enters the battlefield under your control, create a 2/2 green Elemental creature token.",
+        "power": null,
+        "toughness": null,
+        "loyalty": null,
+        "defense": null,
+        "layout": "normal",
+        "keywords": ["Landfall"],
+        "subtypes": [],
+        "legalities": {"commander":"legal"},
+        "effects": ["creature_token","landfall"],
+        "tokenPower": "2",
+        "tokenToughness": "2",
+        "tokenType": "Elemental",
+        "tokens": [{"power":"2","toughness":"2","type":"Elemental"}],
+        "tutorTargets": [],
+        "scryfallOracleId": "uuid",
+        "matchReasons": ["Ability: Landfall","Effect: token","Token: 2/2"]
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 50,
+    "totalPages": 1,
+    "source": {
+      "version": "5.3.0",
+      "date": "2026-10-02",
+      "importedAt": "2026-10-03T06:30:00.000Z"
+    },
+    "query": {
+      "name": "",
+      "text": "",
+      "ability": "Landfall",
+      "keyword": "",
+      "type": "",
+      "subtype": "",
+      "colorIdentity": [],
+      "colorMode": "subset",
+      "manaMin": null,
+      "manaMax": null,
+      "legality": "",
+      "effect": "creature_token",
+      "effectInput": "token",
+      "tokenPower": "2",
+      "tokenToughness": "2",
+      "tokenType": "",
+      "tutorTarget": "",
+      "sort": "relevance",
+      "page": 1,
+      "limit": 50
+    }
+  }
+}
 
 GET /api/read/dashboard
 
@@ -565,7 +711,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.10.4",
+    "applicationVersion": "2.11.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

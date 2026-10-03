@@ -7,6 +7,45 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(rootDir, 'data'));
 const packageMetadata = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const applicationVersion = String(packageMetadata.version || '2.0.0');
+const databasePath = path.join(dataDir, process.env.DATABASE_FILE || 'magic-collection.sqlite');
+
+function cardCatalogFilename(value) {
+  const filename = String(value || 'mtgjson-atomic.sqlite').trim();
+  if (
+    !filename
+    || filename === '.'
+    || filename === '..'
+    || filename.includes('/')
+    || filename.includes('\\')
+    || path.basename(filename) !== filename
+  ) {
+    throw new Error('CARD_CATALOG_DATABASE_FILE moet een bestandsnaam binnen DATA_DIR zijn.');
+  }
+  return filename;
+}
+
+const cardCatalogDatabasePath = path.join(dataDir, cardCatalogFilename(process.env.CARD_CATALOG_DATABASE_FILE));
+
+const mainDatabaseFiles = new Set([
+  databasePath,
+  `${databasePath}-wal`,
+  `${databasePath}-shm`,
+  `${databasePath}-journal`
+].map((filePath) => path.resolve(filePath)));
+const cardCatalogFiles = [
+  cardCatalogDatabasePath,
+  `${cardCatalogDatabasePath}-wal`,
+  `${cardCatalogDatabasePath}-shm`,
+  `${cardCatalogDatabasePath}-journal`,
+  `${cardCatalogDatabasePath}.previous`,
+  `${cardCatalogDatabasePath}.previous-wal`,
+  `${cardCatalogDatabasePath}.previous-shm`,
+  `${cardCatalogDatabasePath}.previous-journal`
+].map((filePath) => path.resolve(filePath));
+
+if (cardCatalogFiles.some((filePath) => mainDatabaseFiles.has(filePath))) {
+  throw new Error('CARD_CATALOG_DATABASE_FILE en DATABASE_FILE mogen niet met elkaars SQLite-bestanden botsen.');
+}
 
 function nonNegativeInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10);
@@ -43,7 +82,8 @@ export const config = Object.freeze({
   rootDir,
   publicDir: path.join(rootDir, 'public'),
   dataDir,
-  databasePath: path.join(dataDir, process.env.DATABASE_FILE || 'magic-collection.sqlite'),
+  databasePath,
+  cardCatalogDatabasePath,
   imageCacheDir: path.join(dataDir, 'images'),
   port: positiveInteger(process.env.PORT, 3000),
   host: process.env.HOST || '0.0.0.0',

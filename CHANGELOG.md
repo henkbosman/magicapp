@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.11.0 - 2026-10-03
+
+### Kaarten ontdekken
+
+- De nieuwe pagina **Kaarten ontdekken** helpt tijdens deckbouw kaarten te vinden met combineerbare filters voor naam, Oracle-tekst, ability, keyword, type, subtype, Commander-kleuridentiteit, mana value en legaliteit.
+- Afgeleide effectfilters zoeken onder meer naar Landfall, creature tokens, tutors, mana-productie, card draw, counters, power/toughness-verhoging, removal, sacrifice en graveyard-interactie. Token power, toughness en type en het doel van een tutor kunnen verder worden verfijnd.
+- Kleuridentiteit ondersteunt de modi **Past binnen deze kleuren**, **Bevat alle gekozen kleuren** en **Precies deze kleuren**. Resultaten kunnen op relevantie, naam of mana value worden gesorteerd en worden gepagineerd.
+- Elk resultaat toont kaarttekst met gerenderde symbolen en matchredenen. **Kaart opzoeken** opent de bestaande Scryfall-printingselectie voor de gekozen kaart.
+- De ontdekpagina is via het linker- en mobiele menu bereikbaar en verwijst zonder geïmporteerde catalogus rechtstreeks naar Onderhoud.
+
+### MTGJSON-kaartcatalogus
+
+- **Instellingen en onderhoud** kan de officiële `AtomicCards.json.gz` van MTGJSON importeren en later vernieuwen. Download- en verwerkingsvoortgang zijn zichtbaar terwijl de import op de achtergrond draait.
+- De vaste HTTPS-bron en bijbehorende SHA-256-controlecode worden opgehaald zonder configureerbare externe URL. Omvang, time-outs, vrije schijfruimte en parserinvoer worden begrensd.
+- JSON wordt streaming verwerkt in een worker. De nieuwe catalogus wordt eerst als tijdelijk bestand opgebouwd, geïndexeerd en gecontroleerd en pas daarna veilig geactiveerd.
+- Tijdens een update blijft een bestaande catalogus beschikbaar. Bij download-, validatie- of activatiefouten blijft de vorige catalogus behouden; gelijktijdig een tweede import starten geeft HTTP 409.
+
+### Database-isolatie
+
+- AtomicCards wordt opgeslagen in de nieuwe, volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. Het catalogusbestand kan met `CARD_CATALOG_DATABASE_FILE` worden ingesteld; de relatieve standaardwaarde staat onder `DATA_DIR`.
+- De primaire `magic-collection.sqlite`, `src/db/schema.sql` en `user_version = 20000` zijn niet gewijzigd. De applicatie gebruikt geen `ATTACH`, foreign key of andere verwijzing tussen beide databases.
+- De bestaande downloadbare databaseback-up blijft uitsluitend een back-up van de primaire gebruikersdatabase. De catalogus bevat geen gebruikersdata en kan opnieuw vanuit MTGJSON worden opgebouwd.
+
+### API
+
+- Nieuw: `GET /api/read/card-catalog/status`, `GET /api/read/card-catalog/options` en `GET /api/read/card-catalog/search`.
+- Nieuw: `POST /api/write/maintenance/card-catalog/import`. Dit endpoint antwoordt met HTTP 202 en een importjob; de actuele voortgang wordt via het statusendpoint gelezen.
+- De bestaande endpoints en contracten voor collectie, decks, wanted en kaarten blijven ongewijzigd.
+
+### Tests
+
+- Nieuwe regressietests dekken de streaming AtomicCards-parser, featureherkenning, catalogusopbouw en -zoekfilters, configuratie-isolatie, importveiligheid, onderhoudsinterface en ontdekpagina.
+
 ## 2.10.4 - 2026-10-01
 
 ### Kaarttekst

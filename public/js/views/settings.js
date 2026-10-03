@@ -1,13 +1,69 @@
 import { api, downloadApi } from '../api.js';
 import { pageHeader, sectionCard } from '../components.js';
 import { escapeHtml, formatNumber, formValue, toast } from '../utils.js';
+import { applyWriteAvailability } from '../write-access.js';
+import { catalogImportActive, normalizeCatalogStatus } from './card-discovery.js';
 
 function formatMegabytes(bytes) {
   return `${(Number(bytes || 0) / 1024 / 1024).toFixed(2)} MB`;
 }
 
+function formatCatalogDate(value) {
+  if (!value) return '—';
+  const dateOnly = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: String(value).includes('T') ? 'short' : undefined }).format(date);
+}
+
+function catalogStatusTable(status) {
+  return `<table class="status-table">
+    <tr><td>Status</td><td>${status.available ? 'Beschikbaar' : 'Nog niet geïmporteerd'}</td></tr>
+    <tr><td>Kaarten</td><td>${formatNumber(status.cardCount)}</td></tr>
+    <tr><td>MTGJSON-versie</td><td>${escapeHtml(status.sourceVersion || '—')}</td></tr>
+    <tr><td>Brondatum</td><td>${escapeHtml(formatCatalogDate(status.sourceDate))}</td></tr>
+    <tr><td>Laatste import</td><td>${escapeHtml(formatCatalogDate(status.importedAt))}</td></tr>
+    <tr><td>Databasebestand</td><td>${escapeHtml(status.databaseFile || '—')}</td></tr>
+    <tr><td>Databasegrootte</td><td>${status.databaseSizeBytes ? formatMegabytes(status.databaseSizeBytes) : '—'}</td></tr>
+    ${status.error ? `<tr><td>Catalogusfout</td><td class="text-danger">${escapeHtml(status.error)}</td></tr>` : ''}
+  </table>`;
+}
+
+function catalogProgressHtml(status) {
+  const job = status.job;
+  if (!job || !job.status || ['idle', 'none'].includes(job.status)) return '';
+  const active = catalogImportActive(status);
+  const failed = ['failed', 'error'].includes(job.status);
+  const complete = ['complete', 'completed', 'done', 'success', 'succeeded'].includes(job.status);
+  const downloadPhase = ['checking', 'downloading', 'download', 'verifying'].includes(String(job.phase || '').toLowerCase());
+  const processed = job.total > 0 ? job.processed : downloadPhase ? job.downloadedBytes : 0;
+  const total = job.total > 0 ? job.total : downloadPhase ? job.totalBytes : 0;
+  const label = job.message
+    || (failed ? 'Importeren is mislukt.' : complete ? 'Importeren is voltooid.' : 'Kaartcatalogus importeren…');
+  const detail = job.total > 0
+    ? `${formatNumber(job.processed)} van ${formatNumber(job.total)} kaarten verwerkt`
+    : !downloadPhase && job.processed > 0
+      ? `${formatNumber(job.processed)} kaarten verwerkt`
+    : job.downloadedBytes > 0
+      ? `${formatMegabytes(job.downloadedBytes)}${job.totalBytes > 0 ? ` van ${formatMegabytes(job.totalBytes)}` : ''} gedownload`
+      : '';
+  return `<div class="catalog-import-progress ${failed ? 'failed' : complete ? 'complete' : active ? 'active' : ''}" role="status" aria-live="polite">
+    <strong>${escapeHtml(label)}</strong>
+    <progress ${total > 0 ? `max="${total}" value="${Math.min(processed, total)}"` : ''}></progress>
+    ${detail ? `<span>${escapeHtml(detail)}</span>` : ''}
+    ${job.error ? `<span class="text-danger">${escapeHtml(job.error)}</span>` : ''}
+  </div>`;
+}
+
 export async function renderSettings() {
-  const status = await api('/maintenance/status');
+  const [status, catalogResponse] = await Promise.all([
+    api('/maintenance/status'),
+    api('/card-catalog/status')
+  ]);
+  let catalogStatus = normalizeCatalogStatus(catalogResponse);
   const cache = status.externalApiCache || { entries: 0, freshEntries: 0, staleEntries: 0, payloadBytes: 0 };
   const printingCatalog = status.printingCatalog || { entries: 0, cards: 0, completeCards: 0, incompleteCards: 0 };
 
@@ -53,10 +109,80 @@ export async function renderSettings() {
       </section>
 
       <section class="grid-2 maintenance-grid">
+        ${sectionCard('MTGJSON-kaartcatalogus', `<p>Importeer AtomicCards om uitgebreid kaarten voor deckbouw te kunnen zoeken. De catalogus wordt in een volledig afzonderlijke SQLite-database opgeslagen; de collectie-database wordt hiervoor niet aangepast.</p>
+          <div id="card-catalog-status">${catalogStatusTable(catalogStatus)}</div>
+          <div id="card-catalog-progress">${catalogProgressHtml(catalogStatus)}</div>
+          <p class="help-text">Een bestaande catalogus blijft tijdens het downloaden en verwerken beschikbaar. De bron wordt rechtstreeks en uitsluitend van MTGJSON opgehaald.</p>
+          <div class="form-actions"><button id="import-card-catalog" class="button primary" type="button" data-write-action data-write-initially-disabled="${catalogImportActive(catalogStatus) ? 'true' : 'false'}" ${catalogImportActive(catalogStatus) ? 'disabled' : ''}>${catalogStatus.available ? 'Kaartcatalogus bijwerken' : 'AtomicCards importeren'}</button></div>`)}
+      </section>
+
+      <section class="grid-2 maintenance-grid">
         ${sectionCard('Interne REST API', `<p>Leesacties, schrijfacties en compacte LLM-uitvoer gebruiken afzonderlijke paden. Een reverse proxy kan daardoor <strong>/api/write/</strong> uitsluitend binnen het LAN toelaten.</p><div class="api-list"><div class="api-endpoint">GET /api/read/cards/search?q=eternal</div><div class="api-endpoint">GET /api/read/collection</div><div class="api-endpoint">GET /api/read/decks/:id/stats</div><div class="api-endpoint">GET /api/read/wanted</div><div class="api-endpoint">GET /api/ai/decks</div><div class="api-endpoint">GET /api/ai/collection</div><div class="api-endpoint">POST /api/write/collection</div><div class="api-endpoint">POST /api/write/collection/with-deck</div><div class="api-endpoint">PATCH /api/write/wanted/:id/printing</div><div class="api-endpoint">POST /api/write/maintenance/external-cache/clear</div></div><div class="api-doc-actions"><a class="button secondary" href="/API-READ.txt" target="_blank" rel="noopener">Read API (tekst)</a><a class="button secondary" href="/API-WRITE.txt" target="_blank" rel="noopener">Write API (tekst)</a><a class="button secondary" href="/API-AI.html" target="_blank" rel="noopener">LLM API (HTML)</a></div>`)}
         ${sectionCard('Databasecontrole', `<table class="status-table"><tr><td>2.0-basisschema</td><td>${Number(status.schemaVersion) === 20000 ? 'Actief' : `Versie ${escapeHtml(status.schemaVersion)}`}</td></tr><tr><td>Integriteitscontrole</td><td>${escapeHtml(status.databaseIntegrity)}</td></tr><tr><td>Foreign-keyproblemen</td><td>${formatNumber(status.foreignKeyIssues)}</td></tr></table>`)}
       </section>`,
     mount() {
+      const catalogStatusElement = document.getElementById('card-catalog-status');
+      const catalogProgressElement = document.getElementById('card-catalog-progress');
+      const catalogImportButton = document.getElementById('import-card-catalog');
+      let catalogPollTimer = null;
+
+      const showCatalogStatus = (nextStatus) => {
+        catalogStatus = normalizeCatalogStatus(nextStatus);
+        catalogStatusElement.innerHTML = catalogStatusTable(catalogStatus);
+        catalogProgressElement.innerHTML = catalogProgressHtml(catalogStatus);
+        const importActive = catalogImportActive(catalogStatus);
+        catalogImportButton.dataset.writeInitiallyDisabled = importActive ? 'true' : 'false';
+        catalogImportButton.disabled = importActive;
+        catalogImportButton.textContent = importActive
+          ? 'Importeren…'
+          : catalogStatus.available ? 'Kaartcatalogus bijwerken' : 'AtomicCards importeren';
+        applyWriteAvailability(catalogImportButton);
+      };
+
+      const pollCatalogStatus = async () => {
+        if (!catalogStatusElement.isConnected) return;
+        try {
+          showCatalogStatus(await api('/card-catalog/status'));
+        } catch (error) {
+          catalogProgressElement.innerHTML = `<p class="text-danger">${escapeHtml(error.message || 'De importstatus kon niet worden geladen.')}</p>`;
+          if (catalogImportActive(catalogStatus)) {
+            clearTimeout(catalogPollTimer);
+            catalogPollTimer = setTimeout(pollCatalogStatus, 2500);
+          } else {
+            catalogImportButton.dataset.writeInitiallyDisabled = 'false';
+            catalogImportButton.disabled = false;
+            applyWriteAvailability(catalogImportButton);
+          }
+          return;
+        }
+        if (catalogImportActive(catalogStatus)) {
+          clearTimeout(catalogPollTimer);
+          catalogPollTimer = setTimeout(pollCatalogStatus, 1200);
+        }
+      };
+
+      if (catalogImportActive(catalogStatus)) {
+        catalogPollTimer = setTimeout(pollCatalogStatus, 500);
+      }
+
+      catalogImportButton?.addEventListener('click', async () => {
+        catalogImportButton.disabled = true;
+        catalogImportButton.textContent = 'Import starten…';
+        try {
+          const started = await api('/maintenance/card-catalog/import', { method: 'POST', body: {} });
+          showCatalogStatus({
+            ...catalogStatus,
+            importJob: started?.importJob || started?.job || started
+          });
+          toast('De MTGJSON-import is gestart.');
+          await pollCatalogStatus();
+        } catch (error) {
+          toast(error.message || 'De MTGJSON-import kon niet worden gestart.', 'error');
+          catalogImportButton.disabled = false;
+          catalogImportButton.textContent = catalogStatus.available ? 'Kaartcatalogus bijwerken' : 'AtomicCards importeren';
+        }
+      });
+
       document.getElementById('download-backup')?.addEventListener('click', async (event) => {
         const button = event.currentTarget;
         button.disabled = true;

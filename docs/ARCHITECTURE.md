@@ -1,8 +1,8 @@
-# Architectuur - Magic Collection Manager 2.10.4
+# Architectuur - Magic Collection Manager 2.11.0
 
 ## Overzicht
 
-De applicatie is een single-process Node.js/Express-webapp met een statische HTML/CSS/JavaScript-frontend en SQLite als permanente lokale opslag.
+De applicatie is een Node.js/Express-webapp met een statische HTML/CSS/JavaScript-frontend. Het hoofdproces beheert de primaire SQLite-gebruikersdatabase; een worker bouwt op verzoek een volledig zelfstandige, read-only geopende SQLite-zoekcatalogus.
 
 ```text
 Browser
@@ -14,19 +14,21 @@ Browser
          │
       Express
          │
-  routes → services → SQLite
-                   ↘ Scryfall/cache
+         ├── bestaande routes/services → magic-collection.sqlite → Scryfall/cache
+         └── card-catalog route/repository → mtgjson-atomic.sqlite
+                                              ↑
+                                      importworker ← MTGJSON
 ```
 
 Er is geen authenticatie of gebruikersmodel. De netwerkgrens hoort bij de reverse proxy/firewall.
 
 ## Productiebaseline en database
 
-Versie 2.0 gebruikt één geconsolideerd schema in `src/db/schema.sql`. Bij iedere start wordt dit schema idempotent uitgevoerd met `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS` en `CREATE TRIGGER IF NOT EXISTS`.
+De primaire gebruikersdatabase gebruikt sinds versie 2.0 één geconsolideerd schema in `src/db/schema.sql`. Bij iedere start wordt dit schema idempotent uitgevoerd met `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS` en `CREATE TRIGGER IF NOT EXISTS`.
 
 Er is bewust geen historische migratie-engine in de 2.0-productiecode. 2.0 is de eerste ondersteunde productiebaseline.
 
-Permanente gegevens staan onder `DATA_DIR` (standaard `data/`). SQLite gebruikt foreign keys, WAL-mode, `synchronous=NORMAL` en een busy timeout.
+Permanente gegevens staan onder `DATA_DIR` (standaard `data/`). De primaire database heet standaard `magic-collection.sqlite`, gebruikt foreign keys, WAL-mode, `synchronous=NORMAL` en een busy timeout en behoudt `user_version = 20000`.
 
 Belangrijkste tabellen:
 
@@ -42,6 +44,10 @@ Belangrijkste tabellen:
 - `external_api_cache`: tijdelijke persistente Scryfall-responsecache;
 - `card_printing_catalog` + `card_printing_catalog_state`: lokale catalogus van mogelijke printings.
 
+Versie 2.11 voegt daarnaast standaard `mtgjson-atomic.sqlite` onder `DATA_DIR` toe. `CARD_CATALOG_DATABASE_FILE` kan het catalogusbestand wijzigen; configuratie weigert botsingen met `DATABASE_FILE` en met de bijbehorende SQLite journal-, WAL-, SHM- en herstelbestanden. De catalogus heeft een eigen schema in `src/card-catalog/schema.sql`, een eigen `user_version = 10000` en eigen interne foreign keys en indexen. De primaire database bevat geen catalogustabel, pad, foreign key of ander verwijsveld. De applicatie gebruikt geen SQLite `ATTACH` en voert geen cross-database-joins uit.
+
+De catalogus bevat genormaliseerde AtomicCards-eigenschappen en facettabellen voor keywords, abilities, types, subtypes, supertypes, printings, legaliteiten, effecten en tutor-doelen. Zij bevat uitsluitend afgeleide externe kaartdata en geen collectie-, deck-, wanted- of andere gebruikersdata. De bestaande back-uproute maakt daarom alleen een consistente kopie van de primaire database; de catalogus is opnieuw vanuit MTGJSON op te bouwen.
+
 ## Kaartidentiteit
 
 De tabel `cards` bevat fysieke printings en gebruikt Scryfall ID als unieke externe identifier. Voor beschikbaarheid en deckbehoefte wordt primair `oracle_id` gebruikt; wanneer die ontbreekt valt de applicatie terug op `scryfall_id`.
@@ -52,7 +58,7 @@ Joined queries aliasen de database-ID van `cards` expliciet als `card_record_id`
 
 ## Routes en services
 
-`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica zit in `src/services/`. `POST /api/write/collection/with-deck` is het expliciete endpoint voor een gecombineerde collectie- en decktoevoeging binnen één buitenste SQLite-transactie. `POST /api/write/collection` ondersteunt voor API-compatibiliteit dezelfde bewerking wanneer `deckId` aanwezig is. De collectie-import resolveert en valideert alle regels vóór de synchrone SQLite-transactie; hierdoor wordt een lijst volledig of helemaal niet toegevoegd. De bestaande collectie- en deckservices nemen via savepoints veilig aan buitenste transacties deel.
+`src/routes/` bevat dunne HTTP-routes. Validatie gebeurt bij de routegrens. Domeinlogica voor gebruikersdata zit in `src/services/`; de geïsoleerde zoekcatalogus zit onder `src/card-catalog/`. `POST /api/write/collection/with-deck` is het expliciete endpoint voor een gecombineerde collectie- en decktoevoeging binnen één buitenste SQLite-transactie. `POST /api/write/collection` ondersteunt voor API-compatibiliteit dezelfde bewerking wanneer `deckId` aanwezig is. De collectie-import resolveert en valideert alle regels vóór de synchrone SQLite-transactie; hierdoor wordt een lijst volledig of helemaal niet toegevoegd. De bestaande collectie- en deckservices nemen via savepoints veilig aan buitenste transacties deel.
 
 Belangrijke services:
 
@@ -70,6 +76,17 @@ Belangrijke services:
 - `card-insight-service.js`: afgeleide en handmatig corrigeerbare mana-/zoekkenmerken;
 - `import-export-service.js`: collectie-export, gecontroleerde collectie-import en deckimport/-export.
 
+Belangrijke catalogusonderdelen:
+
+- `routes/card-catalog.js`: read-only status-, optie- en zoekendpoints;
+- `card-catalog/repository.js`: validatie, gefacetteerde opties, SQL-filtering, sortering en paginering;
+- `card-catalog/database.js`: uitsluitend de aparte catalogusverbinding, read-only opening, validatie, recovery en activering;
+- `card-catalog/import-service.js`: maximaal één achtergrondjob, publieke voortgang en workerlevenscyclus;
+- `card-catalog/import-worker.js`: vaste officiële download, SHA-256-controle, limieten en gzip-stream;
+- `card-catalog/builder.js`: tijdelijke databaseopbouw, metadata, indexering en integriteitscontrole;
+- `lib/atomic-cards-parser.js`: begrensde streaming parser voor de `{meta,data}`-structuur;
+- `lib/card-catalog-features.js`: tolerante normalisatie en herkenning van abilities en effecten.
+
 ## API-zones
 
 Express mount drie API-zones:
@@ -80,13 +97,17 @@ Express mount drie API-zones:
 /api/ai
 ```
 
-`/api/read` accepteert alleen GET/HEAD. `/api/write` weigert GET/HEAD en bevat alle muterende endpoints. `/api/ai` accepteert alleen GET/HEAD en levert vier compacte modellen voor decks, deckkaarten, kaartdetails en een gefilterde collectie. De webinterface gebruikt `/api/ai` niet. De frontend controleert `POST /api/write/health`; wanneer dit niet bereikbaar is, worden schrijfcontrols disabled en verschijnt de interface als alleen-lezen.
+`/api/read` accepteert alleen GET/HEAD. Hieronder zijn `GET /card-catalog/status`, `/options` en `/search` gemount. `/api/write` weigert GET/HEAD en bevat alle muterende endpoints, waaronder `POST /maintenance/card-catalog/import`. Dat endpoint antwoordt met HTTP 202 zodra de job gestart is; een tweede gelijktijdige start geeft HTTP 409. `/api/ai` accepteert alleen GET/HEAD en levert vier compacte modellen voor decks, deckkaarten, kaartdetails en een gefilterde collectie. De webinterface gebruikt `/api/ai` niet. De frontend controleert `POST /api/write/health`; wanneer dit niet bereikbaar is, worden schrijfcontrols disabled en verschijnt de interface als alleen-lezen. De catalogus blijft in die modus doorzoekbaar, maar een import kan dan niet worden gestart.
 
 ## Frontend
 
-De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart toevoegen, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
+De frontend is frameworkloos ES modules JavaScript. `public/js/app.js` is de hash-router en laadt views voor dashboard, collectie, kaart opzoeken, kaarten ontdekken, decks, deckdetails, statistieken, simulator, wanted, kaartdetails en onderhoud.
 
 Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie in session storage. Daardoor kan de gebruiker terugkeren naar dezelfde lijstpositie. De snelle kaartinvoer heet zichtbaar **Kaart opzoeken**, bewaart formulierwaarden in de actieve DOM en reset deze alleen bij een andere printing; kaartnaam, collectornummer en printing staan in de hashroute voor terugnavigatie. Na het laden van de printings herstelt de frontend eerst een eerdere selectie; anders beperkt zij de kandidaten tot een gekozen collectornummer en kiest daarbinnen een lokaal bekende of de eerste printing, die direct in het invoerpaneel wordt getoond. De lijstimport gebruikt eerst een preview van alle gevonden printings en voert daarna één atomaire bulkactie uit. Na een geslaagde enkelvoudige toevoegactie blijven de drie actieknoppen vergrendeld totdat opnieuw een printing wordt gekozen.
+
+`#/discover` biedt een afzonderlijke deckbouwzoekpagina en staat in zowel het linker- als mobiele menu. De view controleert eerst de catalogusstatus en toont zonder actieve catalogus een onderhouds-CTA. Met een beschikbare catalogus combineert zij naam, Oracle-tekst, ability, keyword, type, subtype, kleuridentiteit, mana value, legaliteit en effectfilters. Alle actieve filters zijn conjunctief. De kleurmodi zijn subset van gekozen Commander-kleuren, bevat alle gekozen kleuren en exact. Tokenfilters ondersteunen power, toughness en tokentype; tutorfilters ondersteunen het gezochte kaarttype. De filterstate, sortering en pagina staan in de hashquery. Resultaten tonen geen hoofd-databasekaart-ID of printingafbeelding: **Kaart opzoeken** opent op naam de bestaande printingselectie.
+
+De onderhoudsview leest de catalogus en actuele importjob via `GET /api/read/card-catalog/status`. Na een succesvolle `POST` pollt zij dit endpoint zolang de job actief is. De jobstatus bevat fase, verwerkt aantal, downloadbytes, melding en eventuele fout, zodat de write-aanvraag zelf kort kan blijven.
 
 De deckdetailpagina gebruikt één centraal actiemodel voor het compacte **Acties**-menu in de lijst en het contextmenu in de visuele kaartweergave. Voor een normale kaart kan het lijstmenu Naar Wanted, Bewerken, Kenmerken, Combo's/synergieën en Verwijderen aanbieden; samengevoegde basic lands krijgen alleen groepsveilige acties. De lijst toont kaartafbeeldingen op 92 pixels breed. Binnen `.card-list-content` gebruikt de titelregel een flexibele naamkolom en een rechts uitgelijnde manaplaats. Daardoor krijgt de kaartnaam zoveel mogelijk ruimte zonder dat de mana-uitlijning per rij verloren gaat. De kaartnaam is gewone, niet-interactieve tekst; de afbeelding blijft de ingang voor de grotere kaartpreview. De kaarttekst en gerenderde symbolen staan vóór de actieknop op een duidelijk leesbare grootte. Generieke, numerieke, gekleurde, kleurloze en tapsymbolen gebruiken daar dezelfde verticale basislijn. Alleen de exacte tekst van een herkende abilitynaam of een herkend kaartkeyword wordt gemarkeerd; de overige Oracle-tekst blijft normaal weergegeven. In de kaartweergave staan geen zichtbare overflowknoppen; het contextmenu blijft bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`. De kaartweergave bewaart een expliciete keuze van 1 tot en met 8 kaarten per rij in de hashroute, gebruikt standaard 5 en begrenst het raster responsief; de keuzelijst bevat geen automatische optie. Naast **Filters tonen** staan keuzes voor sorteren op manakosten of kaartnaam en groeperen op type of ability. De standaardwaarden zijn respectievelijk manakosten en type. Beide instellingen gelden voor de lijst- en kaartenweergave en worden in de hashroute bewaard. Bij abilitygroepering bepaalt het primaire herkende kaartkeyword de groep. Als dat ontbreekt, wordt in vaste volgorde teruggevallen op de al verrijkte functionele kaartinzichten voor mana produceren, land zoeken en creature zoeken. Kaarten zonder bruikbare ability vallen onder **Geen ability**; een kaart wordt nooit over meerdere groepen verdeeld.
 
@@ -94,7 +115,7 @@ De collectie rendert haar regels in dezelfde basisopbouw als de decklijst: kaart
 
 De in versie 2.9 toegevoegde tutorfilters veranderden geen endpointpaden of databasetabellen. De bestaande `ability`-parameter van de collectie accepteert daarvoor de synthetische waarden `Tutor land` en `Tutor creature`.
 
-Versie 2.10.4 voegt geen endpoints toe, wijzigt geen API-contracten en wijzigt het databaseschema niet.
+Versie 2.11.0 voegt vier catalogusendpoints en een tweede SQLite-bestand toe. Het bestaande primaire databaseschema en de bestaande collectie-, deck-, wanted-, kaart- en AI-contracten blijven ongewijzigd.
 
 ## Caching
 
@@ -105,6 +126,20 @@ Versie 2.10.4 voegt geen endpoints toe, wijzigt geen API-contracten en wijzigt h
 ### Printingcatalogus
 
 Mogelijke papieren printings worden afzonderlijk genormaliseerd opgeslagen zodat Wanted-filters lokaal kunnen werken zonder per filterwijziging externe calls te doen.
+
+### MTGJSON-zoekcatalogus
+
+De MTGJSON-catalogus is geen cachetabel in de primaire database en staat los van de Scryfall-printingcatalogus. De actieve verbinding wordt read-only en met `query_only` geopend. Bij een import bouwt een worker een uniek tijdelijk SQLite-bestand en raakt hij de actieve database niet aan. Na parsing, indexering, `quick_check` en `foreign_key_check` sluit en synchroniseert de worker het bestand. Het hoofdproces controleert daarna lichtgewicht schema, kaartaantal en bronmetadata en activeert het bestand via een rename met een tijdelijk `.previous`-bestand. Bij een fout blijft de vorige catalogus actief of wordt zij hersteld.
+
+De import accepteert geen URL uit een request. Bron en checksum zijn vastgezet op de officiële MTGJSON HTTPS-locaties en redirects zijn uitgeschakeld. De gzip-download is maximaal 128 MiB, het uitgepakte document maximaal 512 MiB en de parser maximaal 100.000 kaartrecords; daarnaast gelden netwerk-time-outs, een schijfruimtecontrole en een maximale jobduur van twintig minuten. Het bestand wordt als gzip gecontroleerd en de gedownloade bytes moeten overeenkomen met de officiële SHA-256 voordat parsing begint.
+
+De worker leest het JSON-document streaming en krijgt maximaal 256 MiB V8 old-generation geheugen. Tijdelijke bestanden hebben beperkte bestandsrechten en worden na succes, fout of serverstop opgeruimd. Een exclusieve lockfile voorkomt ook tussen meerdere Node-processen dat imports en cataloguswissels overlappen. Tijdens shutdown wordt een actieve worker eerst beëindigd en daarna worden de catalogus- en primaire databaseverbinding afzonderlijk gesloten.
+
+## Cataloguszoekmodel
+
+De repository valideert lengte, numerieke bereiken, enums, pagina en limiet voordat SQL wordt opgebouwd. Alle waarden zijn gebonden parameters; tabelnamen komen uitsluitend uit interne vaste mappings. Zoekresultaten worden per `catalog_key` gededupliceerd en bieden maximaal 100 resultaten per pagina en maximaal 5.000 resultaten offset.
+
+Naam- en Oracle-tekstfilters gebruiken genormaliseerde of case-insensitive deelmatches. Facettabellen verzorgen exacte filters voor abilities, keywords, types en subtypes. `colorMode=subset` vereist dat de kaart binnen de gekozen kleuren past, `contains` vereist alle gekozen kleuren en `exact` vereist dezelfde identiteit. Legaliteit heeft het formaat `format` of `format:status`, waarbij `legal` standaard is. Effectaliases worden naar interne waarden vertaald. Creature-token-, tutor-, tokenstatistiek- en tutor-doelfilters leggen aanvullende `EXISTS`-voorwaarden op; hierdoor kan bijvoorbeeld `ability=Landfall&effect=token&tokenPower=2&tokenToughness=2` gericht worden gecombineerd.
 
 ### Afbeeldingen
 

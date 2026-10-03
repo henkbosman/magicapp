@@ -513,7 +513,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
     position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
     height: calc(72px + env(safe-area-inset-bottom));
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
     background: rgba(255,255,255,.97); border-top: 1px solid var(--line);
     box-shadow: 0 -7px 24px rgba(23,35,28,.08); backdrop-filter: blur(14px);
   }
@@ -2092,4 +2092,232 @@ html.write-unavailable [data-write-only] { display: none !important; }
   }
   .collection-card-row > .card-list-actions { justify-content: flex-end; }
   .collection-card-row > .card-list-actions .button { flex: 0 1 auto; min-width: 104px; }
+}
+
+/* Uitgebreide, lokaal geïmporteerde kaartcatalogus voor deckbouw. */
+.discovery-filter-note {
+  margin: -10px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #ead9ad;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: #704d13;
+  font-size: .8rem;
+}
+.discovery-layout {
+  display: grid;
+  grid-template-columns: minmax(270px, 320px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.discovery-layout:has(> .discovery-filter-panel[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.discovery-filter-panel {
+  min-width: 0;
+  position: sticky;
+  top: 18px;
+}
+.discovery-filter-form { display: grid; gap: 18px; }
+.discovery-filter-section {
+  min-width: 0;
+  display: grid;
+  gap: 11px;
+}
+.discovery-filter-section + .discovery-filter-section {
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+}
+.discovery-filter-section h3 {
+  margin: 0;
+  color: var(--primary-dark);
+  font-size: .82rem;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+.discovery-color-filter {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.discovery-color-filter legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--ink-soft);
+  font-size: .76rem;
+  font-weight: 700;
+}
+.discovery-color-options {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+.discovery-color-option {
+  min-width: 0;
+  min-height: 39px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.discovery-color-option:hover { border-color: #8aa792; background: var(--surface-soft); }
+.discovery-color-option:has(input:checked) {
+  border-color: var(--primary-dark);
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 2px rgba(40, 99, 62, .12);
+}
+.discovery-color-option:has(input:focus-visible) { outline: 3px solid rgba(40, 99, 62, .24); outline-offset: 2px; }
+.discovery-color-option .mana-symbol { width: 25px; height: 25px; flex-basis: 25px; }
+.discovery-color-filter > select { margin-top: 7px; }
+.discovery-mana-range,
+.discovery-token-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.discovery-effect-fields { display: grid; gap: 10px; }
+.discovery-results-column { min-width: 0; }
+.discovery-results-toolbar {
+  min-height: 43px;
+  margin-bottom: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.discovery-results-toolbar .result-count { margin: 0; }
+.discovery-sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: .76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.discovery-sort-control select { width: auto; min-width: 132px; background: var(--surface); }
+.discovery-card-list { display: grid; gap: 11px; }
+.discovery-card {
+  min-width: 0;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(210px, .75fr) minmax(270px, 1.25fr);
+  grid-template-areas:
+    "heading text"
+    "reasons text"
+    "footer footer";
+  gap: 11px 20px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.discovery-card:hover { border-color: var(--line-strong); }
+.discovery-card-heading { grid-area: heading; min-width: 0; }
+.discovery-card-title {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 9px;
+}
+.discovery-card-title h2 { overflow-wrap: anywhere; }
+.discovery-card-title .mana-cost { flex-wrap: nowrap; }
+.discovery-card-heading .card-meta { margin-bottom: 0; white-space: normal; }
+.discovery-card-rules {
+  grid-area: text;
+  min-width: 0;
+  color: var(--ink);
+  font-size: .9rem;
+  overflow-wrap: anywhere;
+}
+.discovery-match-reasons {
+  grid-area: reasons;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.discovery-match-reasons span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: .68rem;
+  font-weight: 720;
+}
+.discovery-card-footer {
+  grid-area: footer;
+  padding-top: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+}
+.discovery-card-facts {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 14px;
+  color: var(--ink-soft);
+  font-size: .76rem;
+}
+.discovery-card-facts .color-dots .mana-symbol { width: 21px; height: 21px; flex-basis: 21px; }
+.discovery-pagination {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.discovery-pagination > span { color: var(--ink-soft); font-size: .8rem; }
+.catalog-import-progress {
+  margin-top: 14px;
+  padding: 12px;
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  font-size: .8rem;
+}
+.catalog-import-progress progress { width: 100%; }
+.catalog-import-progress > span { color: var(--ink-soft); }
+.catalog-import-progress.complete { border-color: #b9d5bf; background: var(--primary-soft); }
+.catalog-import-progress.failed { border-color: #e7b9b5; background: var(--danger-soft); }
+
+@media (max-width: 1100px) {
+  .discovery-layout { grid-template-columns: minmax(245px, 285px) minmax(0, 1fr); }
+  .discovery-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "heading"
+      "reasons"
+      "text"
+      "footer";
+  }
+}
+
+@media (max-width: 900px) {
+  .discovery-layout { grid-template-columns: 1fr; }
+  .discovery-filter-panel { position: static; }
+}
+
+@media (max-width: 640px) {
+  .mobile-nav a small { font-size: .62rem; }
+  .discovery-filter-note { margin-top: 0; }
+  .discovery-results-toolbar { align-items: stretch; flex-direction: column; }
+  .discovery-sort-control { justify-content: space-between; }
+  .discovery-sort-control select { flex: 1 1 auto; min-width: 0; }
+  .discovery-card { padding: 12px; }
+  .discovery-card-title { grid-template-columns: minmax(0, 1fr) max-content; }
+  .discovery-card-footer { align-items: stretch; flex-direction: column; }
+  .discovery-card-footer .button { width: 100%; }
+  .discovery-pagination { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .discovery-pagination > span { grid-column: 1 / -1; grid-row: 1; text-align: center; }
+  .discovery-pagination .button { width: 100%; }
 }

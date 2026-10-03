@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.10.4
+MAGIC COLLECTION MANAGER WRITE API 2.11.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.10.4"}
+{"status":"ok","writeAvailable":true,"version":"2.11.0"}
 
 POST /api/write/cards/cache
 
@@ -521,9 +521,42 @@ OUTPUT JSON
 
 {"data":{"removed":15,"printingCatalogRemoved":{"entries":200,"cards":25},"cache":{"entries":0,"freshEntries":0,"staleEntries":0,"payloadBytes":0},"printingCatalog":{"entries":0,"cards":0,"completeCards":0,"incompleteCards":0}}}
 
+POST /api/write/maintenance/card-catalog/import
+
+Start op de achtergrond een import van de officiële MTGJSON AtomicCards-catalogus en antwoordt direct met HTTP 202. Er kan maar één import tegelijk actief zijn; een tweede start antwoordt met HTTP 409 en foutmelding "Er wordt al een MTGJSON-kaartcatalogus geïmporteerd.". De downloadbron is vastgezet op de officiële MTGJSON HTTPS-URL en kan niet via dit request worden gewijzigd.
+
+De import schrijft eerst een tijdelijke, zelfstandige SQLite-database en activeert die alleen na controle. De primaire gebruikersdatabase, het 2.0-schema en collectie-, deck- en wantedgegevens worden niet gewijzigd en bevatten geen verwijzing naar deze catalogus. Een bestaande catalogus blijft tijdens de import en bij een mislukking beschikbaar.
+
+Lees voortgang en het eindresultaat via GET /api/read/card-catalog/status. Mogelijke statuswaarden zijn running, completed en failed; phase beschrijft onder meer checking, downloading, verifying, parsing, indexing, activating, complete of failed.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON - HTTP 202
+
+{
+  "data": {
+    "id": "uuid",
+    "status": "running",
+    "phase": "checking",
+    "processed": 0,
+    "total": null,
+    "downloadedBytes": 0,
+    "totalBytes": null,
+    "message": "Import wordt voorbereid…",
+    "startedAt": "2026-10-03T06:25:00.000Z",
+    "finishedAt": null
+  }
+}
+
+OUTPUT JSON - HTTP 409
+
+{"error":{"message":"Er wordt al een MTGJSON-kaartcatalogus geïmporteerd."}}
+
 POST /api/write/maintenance/backup
 
-Maakt een consistente SQLite-back-up en stuurt die direct terug.
+Maakt een consistente SQLite-back-up van uitsluitend de primaire gebruikersdatabase en stuurt die direct terug. De opnieuw importeerbare MTGJSON-catalogus wordt niet in deze download opgenomen.
 
 INPUT JSON
 

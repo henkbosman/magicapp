@@ -9,6 +9,7 @@ import { getCardById, upsertScryfallCard } from '../services/card-repository.js'
 import { clearExternalApiCache, externalApiCacheStats } from '../services/external-api-cache-service.js';
 import { clearPrintingCatalog, printingCatalogStats } from '../services/printing-catalog-service.js';
 import { scryfallService } from '../services/scryfall-service.js';
+import { startCardCatalogImport } from '../card-catalog/import-service.js';
 
 export const maintenanceReadRouter = express.Router();
 export const maintenanceWriteRouter = express.Router();
@@ -81,6 +82,10 @@ maintenanceWriteRouter.post('/external-cache/clear', (req, res) => {
       printingCatalog: printingCatalogStats()
     }
   });
+});
+
+maintenanceWriteRouter.post('/card-catalog/import', (req, res) => {
+  res.status(202).json({ data: startCardCatalogImport() });
 });
 
 maintenanceWriteRouter.post('/backup', (req, res) => {

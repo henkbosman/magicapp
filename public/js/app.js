@@ -5,6 +5,7 @@ import { consumePendingScroll, prepareCardDetailNavigation } from './navigation-
 import { applyWriteAvailability, initializeWriteAccess } from './write-access.js';
 import { renderAddCard } from './views/add-card.js';
 import { renderCardDetail } from './views/card-detail.js';
+import { renderCardDiscovery } from './views/card-discovery.js';
 import { renderCollection } from './views/collection.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderDeckDetail } from './views/deck-detail.js';
@@ -22,6 +23,7 @@ const routes = [
   { pattern: /^\/dashboard$/, name: 'dashboard', render: renderDashboard },
   { pattern: /^\/collection$/, name: 'collection', render: renderCollection },
   { pattern: /^\/add$/, name: 'add', render: renderAddCard },
+  { pattern: /^\/discover$/, name: 'discover', render: renderCardDiscovery },
   { pattern: /^\/decks$/, name: 'decks', render: renderDecks },
   { pattern: /^\/decks\/(?<id>\d+)$/, name: 'decks', render: renderDeckDetail },
   { pattern: /^\/decks\/(?<id>\d+)\/stats$/, name: 'decks', render: renderDeckStatistics },

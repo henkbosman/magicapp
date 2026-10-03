@@ -2,6 +2,8 @@ import process from 'node:process';
 import express from 'express';
 import { config } from './src/config.js';
 import { closeDatabase } from './src/db/database.js';
+import { closeCardCatalogDatabase } from './src/card-catalog/database.js';
+import { stopCardCatalogImport } from './src/card-catalog/import-service.js';
 import { HttpError } from './src/lib/http-error.js';
 import { isCrossOriginBrowserRequest } from './src/lib/request-security.js';
 import { cardsReadRouter, cardsWriteRouter } from './src/routes/cards.js';
@@ -11,6 +13,7 @@ import { decksReadRouter, decksWriteRouter } from './src/routes/decks.js';
 import { maintenanceReadRouter, maintenanceWriteRouter } from './src/routes/maintenance.js';
 import { wantedReadRouter, wantedWriteRouter } from './src/routes/wanted.js';
 import { aiRouter } from './src/routes/ai.js';
+import { cardCatalogReadRouter } from './src/routes/card-catalog.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -40,6 +43,7 @@ readApi.use('/collection', collectionReadRouter);
 readApi.use('/decks', decksReadRouter);
 readApi.use('/wanted', wantedReadRouter);
 readApi.use('/maintenance', maintenanceReadRouter);
+readApi.use('/card-catalog', cardCatalogReadRouter);
 
 const writeApi = express.Router();
 writeApi.use((req, res, next) => {
@@ -122,7 +126,12 @@ const server = app.listen(config.port, config.host, () => {
 
 function shutdown(signal) {
   console.log(`\n${signal} ontvangen; server wordt afgesloten.`);
-  server.close(() => {
+  const stopImport = stopCardCatalogImport().catch((error) => {
+    console.error('[card-catalog-shutdown]', error);
+  });
+  server.close(async () => {
+    await stopImport;
+    closeCardCatalogDatabase();
     closeDatabase();
     process.exit(0);
   });
