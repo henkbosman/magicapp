@@ -130,7 +130,7 @@ export function discoveryFiltersFromQuery(query = new URLSearchParams()) {
     .flatMap((value) => String(value).split(','));
   return {
     marked: ['1', 'true'].includes(query.get('marked')) ? '1' : '',
-    excludeDeckId: normalizedDeckId(query.get('excludeDeckId')),
+    deckId: normalizedDeckId(query.has('deckId') ? query.get('deckId') : query.get('excludeDeckId')),
     name: query.get('name') || '',
     text: query.get('text') || '',
     ability: query.get('ability') || '',
@@ -154,6 +154,11 @@ export function discoveryFiltersFromQuery(query = new URLSearchParams()) {
 }
 
 export function discoverySearchParams(values = {}) {
+  // Saved 2.13.0 routes may still use excludeDeckId; send only the current name.
+  // An explicitly empty deckId clears a legacy selection as well.
+  const deckValue = values instanceof URLSearchParams
+    ? values.get(values.has('deckId') ? 'deckId' : 'excludeDeckId')
+    : values[Object.hasOwn(values, 'deckId') ? 'deckId' : 'excludeDeckId'];
   const params = values instanceof URLSearchParams
     ? new URLSearchParams(values)
     : new URLSearchParams();
@@ -171,9 +176,10 @@ export function discoverySearchParams(values = {}) {
   params.delete('marked');
   if (marked) params.set('marked', '1');
 
-  const excludeDeckId = normalizedDeckId(params.get('excludeDeckId'));
+  const deckId = normalizedDeckId(deckValue);
   params.delete('excludeDeckId');
-  if (excludeDeckId) params.set('excludeDeckId', excludeDeckId);
+  params.delete('deckId');
+  if (deckId) params.set('deckId', deckId);
 
   const colors = uniqueColors(params.getAll('colorIdentity').flatMap((value) => String(value).split(',')));
   params.delete('colorIdentity');
@@ -202,7 +208,7 @@ export function discoverySearchParams(values = {}) {
 
 export function hasDiscoveryFilters(values = {}) {
   const params = discoverySearchParams(values);
-  return ['marked', 'excludeDeckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
+  return ['marked', 'deckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
     'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .some((key) => String(params.get(key) || '').trim().length > 0);
 }
@@ -248,19 +254,19 @@ function manaValuesHtml(options) {
   return optionsHtml(options.manaValues || [], '');
 }
 
-function deckExclusionOptionsHtml(decks, selected) {
-  return option('', 'Geen deck uitsluiten', selected)
+function deckOptionsHtml(decks, selected) {
+  return option('', 'Geen deck geselecteerd', selected)
     + decks.map((deck) => option(deck.id, deck.name, selected)).join('')
     + (selected && !decks.some((deck) => String(deck.id) === selected)
       ? option(selected, `Deck #${selected} (niet beschikbaar)`, selected) : '')
     + (!decks.length && !selected ? '<option value="" disabled>Geen decks beschikbaar</option>' : '');
 }
 
-function deckExclusionErrorHtml(message = 'Het gekozen deck is niet beschikbaar.') {
-  return emptyState('Deckfilter niet beschikbaar', `${message} Kies een ander deck of selecteer “Geen deck uitsluiten”.`);
+function deckSelectionErrorHtml(message = 'Het gekozen deck is niet beschikbaar.') {
+  return emptyState('Deckvergelijking niet beschikbaar', `${message} Kies een ander deck of selecteer “Geen deck geselecteerd”.`);
 }
 
-function colorIdentityFilterHtml(selectedColors = [], mode = 'subset', options = {}) {
+function colorIdentityFilterHtml(selectedColors = [], options = {}) {
   const selected = new Set(uniqueColors(selectedColors));
   const colors = new Map(optionEntries(options.colors).map((entry) => [entry.value, entry]));
   return `<fieldset class="field discovery-color-filter">
@@ -273,16 +279,11 @@ function colorIdentityFilterHtml(selectedColors = [], mode = 'subset', options =
         <span aria-hidden="true">${manaSymbol(value, { label })}</span><span class="discovery-color-count" data-color-count aria-hidden="true">${count}</span>
       </label>`;
     }).join('')}</div>
-    <select name="colorMode" aria-label="Modus voor kleuridentiteit">
-      ${option('subset', 'Past binnen deze kleuren', mode)}
-      ${option('contains', 'Bevat alle gekozen kleuren', mode)}
-      ${option('exact', 'Precies deze kleuren', mode)}
-    </select>
   </fieldset>`;
 }
 
 function activeFilterCount(filters) {
-  return ['marked', 'excludeDeckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+  return ['marked', 'deckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .filter((key) => String(filters[key] || '').length > 0).length
     + (filters.colorIdentity.length ? 1 : 0);
 }
@@ -338,13 +339,14 @@ export function renderDiscoveryResults(result, filters = {}) {
     const typeLine = firstDefined(card.typeLine, card.type, '') || '';
     const colors = uniqueColors(firstDefined(card.colorIdentity, card.colors, []));
     const catalogId = catalogCardId(card);
-    return `<article class="discovery-card" ${catalogId !== '' ? `data-catalog-id="${escapeHtml(String(catalogId))}"` : ''}>
+    return `<article class="discovery-card${card.inDeck ? ' discovery-card-in-deck' : ''}" ${catalogId !== '' ? `data-catalog-id="${escapeHtml(String(catalogId))}"` : ''}>
       <div class="discovery-card-heading">
         <div class="discovery-card-title">
           <div class="discovery-card-name"><button type="button" class="discovery-preview-button" data-discovery-preview="${index}" aria-label="Afbeelding van ${escapeHtml(card.name || 'de kaart')} bekijken" title="Kaartafbeelding bekijken"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 6h8v7H8zM8 16h8M8 18.5h5"></path></svg></button><h2>${escapeHtml(card.name || 'Naamloze kaart')}</h2></div>
           ${manaCost(card.manaCost)}
         </div>
         <p class="card-meta">${discoveryTypeLineHtml(typeLine)}</p>
+        ${card.inDeck ? '<span class="discovery-deck-badge">Al in deck</span>' : ''}
       </div>
       <div class="discovery-card-rules oracle-text">${text ? cardTextHtml(text, cardKeywords(card), { highlight: filters.text || '' }) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
       <footer class="discovery-card-footer">
@@ -419,14 +421,14 @@ export async function renderCardDiscovery(context) {
   const initialSearch = hasDiscoveryFilters(initialParams);
   const deckResponse = await api('/decks');
   const decks = Array.isArray(deckResponse) ? deckResponse : [];
-  const unavailableDeck = Boolean(filters.excludeDeckId && !decks.some((deck) => String(deck.id) === filters.excludeDeckId));
+  const unavailableDeck = Boolean(filters.deckId && !decks.some((deck) => String(deck.id) === filters.deckId));
   let initialDeckError = unavailableDeck ? 'Het gekozen deck is niet beschikbaar.' : '';
   const [options, rawResult] = await Promise.all([
     unavailableDeck ? Promise.resolve({}) : api(`/card-catalog/options?${initialParams}`),
     initialSearch && !unavailableDeck ? api(`/card-catalog/search?${initialParams}`) : Promise.resolve({ items: [], total: 0, page: 1 })
   ]).catch((error) => {
     // A deck can disappear between loading the dropdown and querying the catalog.
-    if (!filters.excludeDeckId || ![400, 404].includes(error.status)) throw error;
+    if (!filters.deckId || ![400, 404].includes(error.status)) throw error;
     initialDeckError = error.message;
     return [{}, { items: [], total: 0, page: 1 }];
   });
@@ -488,20 +490,25 @@ export async function renderCardDiscovery(context) {
           <details id="discovery-secondary-filters" class="panel discovery-secondary-filters"${secondaryFiltersOpen ? ' open' : ''}${filtersOpen ? '' : ' hidden'}>
             <summary>Kleur, mana en legaliteit</summary>
             <div class="discovery-secondary-filter-grid">
-              ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode, options)}
+              ${colorIdentityFilterHtml(filters.colorIdentity, options)}
+              <select class="discovery-color-mode" name="colorMode" aria-label="Modus voor kleuridentiteit">
+                ${option('subset', 'Past binnen deze kleuren', filters.colorMode)}
+                ${option('contains', 'Bevat alle gekozen kleuren', filters.colorMode)}
+                ${option('exact', 'Precies deze kleuren', filters.colorMode)}
+              </select>
               <div class="discovery-mana-filter">
                 <div class="discovery-mana-range">
                   <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="any" list="discovery-mana-values" value="${escapeHtml(filters.manaMin)}"></div>
                   <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="any" list="discovery-mana-values" value="${escapeHtml(filters.manaMax)}"></div>
                 </div>
                 <datalist id="discovery-mana-values">${manaValuesHtml(options)}</datalist>
-                <div class="field"><label for="discovery-exclude-deck">Kaarten uit deck verbergen</label><select id="discovery-exclude-deck" name="excludeDeckId">${deckExclusionOptionsHtml(decks, filters.excludeDeckId)}</select></div>
               </div>
-              <div class="field"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality">${facetOptionsHtml('legality', options, filters.legality)}</select></div>
+              <select id="discovery-deck" class="discovery-deck-select" name="deckId" aria-label="Vergelijken met deck">${deckOptionsHtml(decks, filters.deckId)}</select>
+              <div class="field discovery-legality-filter"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality">${facetOptionsHtml('legality', options, filters.legality)}</select></div>
             </div>
           </details>
           <div class="discovery-results-toolbar">
-            <p id="discovery-result-count" class="result-count" aria-live="polite">${initialDeckError ? 'Deckfilter niet beschikbaar' : initialSearch ? resultCountHtml(result) : 'Nog geen zoekopdracht'}</p>
+            <p id="discovery-result-count" class="result-count" aria-live="polite">${initialDeckError ? 'Deckvergelijking niet beschikbaar' : initialSearch ? resultCountHtml(result) : 'Nog geen zoekopdracht'}</p>
             <label class="discovery-sort-control" for="discovery-sort">Sorteren
               <select id="discovery-sort">
                 ${option('relevance', 'Relevantie', filters.sort)}
@@ -510,7 +517,7 @@ export async function renderCardDiscovery(context) {
               </select>
             </label>
           </div>
-          <div id="discovery-results">${initialDeckError ? deckExclusionErrorHtml(initialDeckError) : initialSearch ? renderDiscoveryResults(result, filters) : discoveryStartHtml()}</div>
+          <div id="discovery-results">${initialDeckError ? deckSelectionErrorHtml(initialDeckError) : initialSearch ? renderDiscoveryResults(result, filters) : discoveryStartHtml()}</div>
           <div id="discovery-pagination-wrap">${initialSearch ? paginationHtml(result) : ''}</div>
         </div>
       </form>`,
@@ -528,9 +535,10 @@ export async function renderCardDiscovery(context) {
       const tokenFields = document.getElementById('discovery-token-fields');
       const tutorFields = document.getElementById('discovery-tutor-fields');
       const manaValues = document.getElementById('discovery-mana-values');
-      const excludeDeck = document.getElementById('discovery-exclude-deck');
+      const selectedDeck = document.getElementById('discovery-deck');
       const colorControls = [...form.querySelectorAll('input[name="colorIdentity"]')];
       let currentPage = result.page;
+      let displayedDeckId = filters.deckId;
       let resultRequestSequence = 0;
       let requestController = null;
       let debounceTimer = null;
@@ -668,6 +676,7 @@ export async function renderCardDiscovery(context) {
         if (!shouldSearch) {
           result = normalizedResult({ items: [], total: 0, page: 1 });
           currentPage = 1;
+          displayedDeckId = '';
           results.innerHTML = discoveryStartHtml();
           count.textContent = 'Nog geen zoekopdracht';
           pagination.innerHTML = '';
@@ -689,6 +698,7 @@ export async function renderCardDiscovery(context) {
           }
           result = next;
           currentPage = next.page;
+          displayedDeckId = apiParams.get('deckId') || '';
           updateOptions(nextOptions);
           results.innerHTML = shouldSearch ? renderDiscoveryResults(next, { text: apiParams.get('text') }) : discoveryStartHtml();
           refreshMarkButtons();
@@ -700,11 +710,14 @@ export async function renderCardDiscovery(context) {
         } catch (error) {
           if (requestSequence === resultRequestSequence && error?.name !== 'AbortError') {
             requestController.abort();
-            if (apiParams.get('excludeDeckId') && [400, 404].includes(error.status)) {
+            // Old badges are not authoritative for another selection or after
+            // a confirmed deck mutation whose refresh failed.
+            if (apiParams.get('deckId') || displayedDeckId) {
               result = normalizedResult({ items: [], total: 0, page: 1 });
               currentPage = 1;
-              results.innerHTML = deckExclusionErrorHtml(error.message);
-              count.textContent = 'Deckfilter niet beschikbaar';
+              displayedDeckId = '';
+              results.innerHTML = deckSelectionErrorHtml(error.message);
+              count.textContent = 'Deckvergelijking niet beschikbaar';
               pagination.innerHTML = '';
               filterToggle.updateActiveCount();
             }
@@ -750,7 +763,7 @@ export async function renderCardDiscovery(context) {
           };
           try {
             const dialog = await addCardToDeck(card, {
-              deckId: excludeDeck.value || null,
+              deckId: selectedDeck.value || null,
               onDone: async () => {
                 if (form.isConnected !== false) await loadResults(routeParams());
               }

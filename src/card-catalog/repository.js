@@ -2,7 +2,7 @@ import { cardCatalogStatus, withCardCatalog } from './database.js';
 import { HttpError } from '../lib/http-error.js';
 import { colorMask, normalizeColors, normalizeSearchText } from '../lib/card-catalog-features.js';
 import { discoveryMarkIdentity } from '../lib/discovery-mark-identity.js';
-import { discoveryExcludedDeckId } from '../lib/discovery-deck-filter.js';
+import { discoverySelectedDeckId } from '../lib/discovery-deck-filter.js';
 
 const EFFECT_ALIASES = Object.freeze({
   token: 'creature_token',
@@ -70,18 +70,18 @@ function identityContext(cards = []) {
 }
 
 function contextualFilters(filters, context) {
-  if (filters.excludeDeckId !== null && context.excludedDeck?.id !== filters.excludeDeckId) {
-    throw new HttpError(404, 'Het geselecteerde deck is niet beschikbaar om kaarten uit te sluiten.');
+  if (filters.deckId !== null && context.selectedDeck?.id !== filters.deckId) {
+    throw new HttpError(404, 'Het geselecteerde deck is niet beschikbaar om aanwezige kaarten te herkennen.');
   }
   return {
     ...filters,
     _marks: identityContext(context.marks || []),
-    _excludedCards: identityContext(filters.excludeDeckId === null ? [] : context.excludedDeck.cards)
+    _deckCards: identityContext(filters.deckId === null ? [] : context.selectedDeck.cards)
   };
 }
 
 function registerIdentityNameFunction(database, filters) {
-  const needsNames = (filters.marked && filters._marks.allNames.size) || filters._excludedCards.allNames.size;
+  const needsNames = filters.marked && filters._marks.allNames.size;
   if (!needsNames || identityFunctionsRegistered.has(database)) return;
   database.function('discovery_identity_name', { deterministic: true }, (name) => normalizeSearchText(name));
   identityFunctionsRegistered.add(database);
@@ -90,8 +90,6 @@ function registerIdentityNameFunction(database, filters) {
 function identityMatch(identities, params) {
   const alternatives = [];
   if (identities.oracleIds.size) {
-    // COALESCE matters for exclusion: NOT(NULL) would otherwise incorrectly
-    // remove unrelated cards that have no Oracle ID.
     alternatives.push("COALESCE(lower(trim(c.scryfall_oracle_id)), '') IN (SELECT value FROM json_each(?))");
     params.push(identities.oracleJson);
   }
@@ -103,17 +101,22 @@ function identityMatch(identities, params) {
     alternatives.push("(COALESCE(trim(c.scryfall_oracle_id), '') = '' AND discovery_identity_name(c.name) IN (SELECT value FROM json_each(?)))");
     params.push(identities.namesJson);
   }
-  // Bound JSON lists avoid SQLite's variable limit, including large decks.
+  // Bound JSON lists avoid SQLite's variable limit with many marked cards.
   return alternatives.length ? `(${alternatives.join(' OR ')})` : '0 = 1';
 }
 
-function markedItem(row, context) {
+function identityPresent(identity, context) {
+  return identity.scryfallOracleId
+    ? context.oracleIds.has(identity.scryfallOracleId) || context.fallbackNames.has(identity.normalizedName)
+    : context.allNames.has(identity.normalizedName);
+}
+
+function contextualItem(row, filters) {
   const identity = discoveryMarkIdentity({ name: row.name, scryfallOracleId: row.scryfall_oracle_id });
   return {
     markKey: identity.markKey,
-    marked: identity.scryfallOracleId
-      ? context.oracleIds.has(identity.scryfallOracleId) || context.fallbackNames.has(identity.normalizedName)
-      : context.allNames.has(identity.normalizedName)
+    marked: identityPresent(identity, filters._marks),
+    inDeck: identityPresent(identity, filters._deckCards)
   };
 }
 
@@ -364,7 +367,7 @@ function normalizedFilters(input = {}) {
     type,
     subtype,
     marked: markedValue === '1' || markedValue === 'true',
-    excludeDeckId: discoveryExcludedDeckId(input.excludeDeckId),
+    deckId: discoverySelectedDeckId(input),
     colorIdentity,
     colorMode,
     manaMin,
@@ -389,10 +392,6 @@ function queryParts(filters, { tokenProfileAlias = '' } = {}) {
   if (filters.marked) {
     conditions.push(identityMatch(filters._marks, params));
   }
-  if (filters.excludeDeckId !== null) {
-    conditions.push(`NOT (${identityMatch(filters._excludedCards, params)})`);
-  }
-
   if (filters.name) {
     const normalizedName = normalizeSearchText(filters.name);
     if (normalizedName) {
@@ -538,7 +537,7 @@ function resultItem(row, reasons, tokens, filters) {
   const selectedToken = tokens.find((token) => tokenMatchesFilters(token, filters)) || tokens[0] || null;
   return {
     catalogId: row.catalog_key,
-    ...markedItem(row, filters._marks),
+    ...contextualItem(row, filters),
     name: row.name,
     faceName: row.face_name,
     manaCost: row.mana_cost,

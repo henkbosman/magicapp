@@ -63,10 +63,10 @@ test('ontdekquery normaliseert kleuridentiteit, pagina en effectafhankelijke fil
 });
 
 test('alleen inhoudelijke filters starten een zoekopdracht', () => {
-  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false', 'excludeDeckId=', 'excludeDeckId=%20']) {
+  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false', 'deckId=', 'deckId=%20']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), false, query);
   }
-  for (const query of ['text=draw', 'type=Instant', 'manaMin=0', 'colorIdentity=C', 'effect=token&tokenPower=2', 'marked=1', 'marked=true', 'excludeDeckId=17']) {
+  for (const query of ['text=draw', 'type=Instant', 'manaMin=0', 'colorIdentity=C', 'effect=token&tokenPower=2', 'marked=1', 'marked=true', 'deckId=17']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), true, query);
   }
 });
@@ -85,11 +85,29 @@ test('Gemarkeerd normaliseert echte selecties en laat uitgeschakelde waarden weg
   assert.equal(discoverySearchParams({ marked: false }).has('marked'), false);
 });
 
-test('deckelectie normaliseert geldige IDs en bewaart ongeldige waarden om zichtbaar te kunnen herstellen', () => {
-  assert.equal(discoveryFiltersFromQuery(new URLSearchParams('excludeDeckId=0017')).excludeDeckId, '17');
-  assert.equal(discoverySearchParams({ excludeDeckId: ' 0017 ' }).get('excludeDeckId'), '17');
-  assert.equal(discoverySearchParams({ excludeDeckId: '' }).has('excludeDeckId'), false);
-  assert.equal(discoveryFiltersFromQuery(new URLSearchParams('excludeDeckId=missing')).excludeDeckId, 'missing');
+test('deckselectie normaliseert geldige IDs en bewaart ongeldige waarden om zichtbaar te kunnen herstellen', () => {
+  assert.equal(discoveryFiltersFromQuery(new URLSearchParams('deckId=0017')).deckId, '17');
+  assert.equal(discoverySearchParams({ deckId: ' 0017 ' }).get('deckId'), '17');
+  assert.equal(discoverySearchParams({ deckId: '' }).has('deckId'), false);
+  assert.equal(discoveryFiltersFromQuery(new URLSearchParams('deckId=missing')).deckId, 'missing');
+});
+
+test('oude deckuitsluiting wordt een vergelijking en een expliciete deckselectie heeft voorrang', () => {
+  for (const [query, expected] of [
+    ['excludeDeckId=0017', '17'],
+    ['excludeDeckId=17&deckId=18', '18'],
+    ['deckId=&excludeDeckId=17', '']
+  ]) {
+    const params = new URLSearchParams(query);
+    const filters = discoveryFiltersFromQuery(params);
+    assert.equal(filters.deckId, expected);
+    for (const input of [params, Object.fromEntries(params), filters]) {
+      const search = discoverySearchParams(input);
+      assert.equal(search.get('deckId') || '', expected);
+      assert.equal(search.has('excludeDeckId'), false);
+    }
+    assert.equal(hasDiscoveryFilters(params), Boolean(expected));
+  }
 });
 
 test('deckfilter toont alle decks veilig en bewaart een verwijderd deck zonder ongefilterde resultaten', async () => {
@@ -102,14 +120,15 @@ test('deckfilter toont alle decks veilig en bewaart een verwijderd deck zonder o
     return jsonResponse({ items: [], total: 0 });
   };
   try {
-    const available = await renderCardDiscovery({ query: new URLSearchParams('excludeDeckId=0017') });
-    assert.match(available.html, /name="excludeDeckId">[\s\S]*?<option value="17" selected>Yedora &lt;script&gt;<\/option>[\s\S]*?<option value="18"/);
-    assert.doesNotMatch(available.html, /Yedora <script>|discovery-mana-hint|Beschikbare mana values/);
-    assert.ok(requested.some((url) => url.includes('/search?') && url.includes('excludeDeckId=17')));
+    const available = await renderCardDiscovery({ query: new URLSearchParams('deckId=0017') });
+    assert.match(available.html, /name="deckId" aria-label="Vergelijken met deck">[\s\S]*?<option value="17" selected>Yedora &lt;script&gt;<\/option>[\s\S]*?<option value="18"/);
+    assert.doesNotMatch(available.html, /Yedora <script>|discovery-mana-hint|Beschikbare mana values|Kaarten uit deck verbergen|<label[^>]*for="discovery-deck"/);
+    assert.match(available.html, /<option value=""[^>]*>Geen deck geselecteerd<\/option>/);
+    assert.ok(requested.some((url) => url.includes('/search?') && url.includes('deckId=17')));
     requested.length = 0;
-    const missing = await renderCardDiscovery({ query: new URLSearchParams('excludeDeckId=99&type=Creature') });
+    const missing = await renderCardDiscovery({ query: new URLSearchParams('deckId=99&type=Creature') });
     assert.match(missing.html, /<option value="99" selected>Deck #99 \(niet beschikbaar\)<\/option>/);
-    assert.match(missing.html, /Deckfilter niet beschikbaar/);
+    assert.match(missing.html, /Deckvergelijking niet beschikbaar/);
     assert.match(missing.html, /value="Creature" selected/);
     assert.equal(requested.some((url) => /\/(search|options)\?/.test(url)), false);
     assert.doesNotMatch(missing.html, /class="discovery-card"/);
@@ -180,6 +199,22 @@ test('een opgeslagen markering is zichtbaar als bevestigde schakelknop', () => {
   const html = renderDiscoveryResults({ items: [{ name: 'Gemarkeerde kaart', marked: true, markKey: 'oracle:card-1' }] });
   assert.match(html, /data-write-action[^>]*data-discovery-mark="0"/);
   assert.match(html, /aria-pressed="true"[^>]*>[^<]*Gemarkeerd<\/button>/);
+});
+
+test('deckkaarten blijven zichtbaar met een eigen status naast persoonlijke markeringen', () => {
+  const html = renderDiscoveryResults({ items: [
+    { name: 'Already in deck', inDeck: true, marked: false },
+    { name: 'Interesting and in deck', inDeck: true, marked: true },
+    { name: 'Only interesting', inDeck: false, marked: true }
+  ] });
+  assert.equal((html.match(/<article /g) || []).length, 3);
+  assert.equal((html.match(/class="discovery-card discovery-card-in-deck"/g) || []).length, 2);
+  assert.equal((html.match(/class="discovery-deck-badge">Al in deck<\/span>/g) || []).length, 2);
+  assert.equal((html.match(/>Gemarkeerd<\/button>/g) || []).length, 2);
+  assert.equal((html.match(/>Markeren<\/button>/g) || []).length, 1);
+  assert.equal((html.match(/data-discovery-deck=/g) || []).length, 3);
+  assert.match(html, /Already in deck/);
+  assert.match(html, /Only interesting/);
 });
 
 test('ontdekkaarttypes krijgen afzonderlijke kleuren met behoud van super- en subtypes', () => {
@@ -360,7 +395,7 @@ test('lege facets blijven leeg en behouden veilige nulselecties uit een gedeelde
     assert.match(view.html, /name="manaMin"[^>]*step="any"[^>]*value="1\.5"/);
     assert.match(view.html, /name="manaMax"[^>]*value="99"/);
     assert.match(view.html, /<datalist id="discovery-mana-values"><\/datalist>/);
-    assert.match(view.html, /name="excludeDeckId"/);
+    assert.match(view.html, /name="deckId"/);
     assert.doesNotMatch(view.html, /Geen mana values binnen de overige filters|discovery-mana-hint/);
     assert.doesNotMatch(view.html, /discovery-filter-note/);
   } finally {
@@ -396,7 +431,7 @@ test('alle begrensde filters gebruiken facets en mana-suggesties zonder handmati
     }
     assert.match(view.html, /<option value="Arcane"[^>]*>Arcane \(3\)<\/option>/);
     assert.match(view.html, /<option value="Spirit"[^>]*>Spirit \(2\)<\/option>/);
-    assert.match(view.html, /Kaarten uit deck verbergen/);
+    assert.doesNotMatch(view.html, /Kaarten uit deck verbergen/);
     assert.doesNotMatch(view.html, /Beschikbare mana values:|discovery-mana-hint/);
     assert.match(view.html, /name="manaMin"[^>]*value="1"/);
     assert.match(view.html, /name="manaMax"[^>]*value="100"/);

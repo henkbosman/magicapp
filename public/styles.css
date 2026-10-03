@@ -2127,11 +2127,16 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .discovery-secondary-filter-grid {
   display: grid;
   grid-template-columns: minmax(210px, 1.2fr) minmax(160px, 1fr) minmax(125px, .8fr);
+  grid-template-areas: "colors mana legality" "color-mode deck legality";
   align-items: start;
   gap: 16px;
   padding: 0 16px 16px;
 }
-.discovery-mana-filter { min-width: 0; display: grid; gap: 8px; }
+.discovery-mana-filter { grid-area: mana; min-width: 0; display: grid; gap: 8px; }
+.discovery-color-mode { grid-area: color-mode; }
+.discovery-deck-select { grid-area: deck; }
+.discovery-color-mode, .discovery-deck-select { min-width: 0; }
+.discovery-legality-filter { grid-area: legality; }
 .discovery-filter-section {
   min-width: 0;
 }
@@ -2151,6 +2156,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
 }
 .discovery-filter-section > summary:focus-visible { outline: 3px solid rgba(40, 99, 62, .3); outline-offset: 3px; }
 .discovery-color-filter {
+  grid-area: colors;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -2191,7 +2197,6 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .discovery-color-option.discovery-color-unavailable { border-style: dashed; }
 .discovery-color-option:has(input:focus-visible) { outline: 3px solid rgba(40, 99, 62, .24); outline-offset: 2px; }
 .discovery-color-option .mana-symbol { width: 25px; height: 25px; flex-basis: 25px; }
-.discovery-color-filter > select { margin-top: 7px; }
 .discovery-mana-range,
 .discovery-token-stats {
   display: grid;
@@ -2236,6 +2241,17 @@ html.write-unavailable [data-write-only] { display: none !important; }
   box-shadow: var(--shadow-sm);
 }
 .discovery-card:hover { border-color: var(--line-strong); }
+.discovery-card.discovery-card-in-deck { border-color: #9db9d7; background: #f4f8fd; }
+.discovery-deck-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #dceafb;
+  color: #234f7d;
+  font-size: .76rem;
+  font-weight: 700;
+}
 .discovery-card-heading { grid-area: heading; min-width: 0; }
 .discovery-card-title {
   min-width: 0;
@@ -2343,8 +2359,10 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .catalog-import-progress.failed { border-color: #e7b9b5; background: var(--danger-soft); }
 
 @media (max-width: 1300px) {
-  .discovery-secondary-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .discovery-secondary-filter-grid > .discovery-color-filter { grid-column: 1 / -1; }
+  .discovery-secondary-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "colors colors" "color-mode deck" "mana legality";
+  }
 }
 
 @media (max-width: 1100px) {
@@ -2365,7 +2383,10 @@ html.write-unavailable [data-write-only] { display: none !important; }
 
 @media (max-width: 640px) {
   .mobile-nav a small { font-size: .62rem; }
-  .discovery-secondary-filter-grid { grid-template-columns: minmax(0, 1fr); }
+  .discovery-secondary-filter-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "colors" "color-mode" "mana" "deck" "legality";
+  }
   .discovery-results-toolbar { align-items: stretch; flex-direction: column; }
   .discovery-sort-control { justify-content: space-between; }
   .discovery-sort-control select { flex: 1 1 auto; min-width: 0; }

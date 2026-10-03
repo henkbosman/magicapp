@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.13.0
+MAGIC COLLECTION MANAGER READ API 2.13.1
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.13.0"}
+{"status":"ok","version":"2.13.1"}
 
 GET /api/read/card-catalog/status
 
@@ -67,7 +67,7 @@ OUTPUT JSON
 
 faces bevat één of twee kaartzijden met een HTTPS-afbeeldings-URL. HTTP 400 bij ontbrekende/ongeldige naam, 404 bij ontbrekende kaart/afbeelding, 429 bij upstream rate limiting, 502 bij ongeldige upstreamdata, 503 bij verbindingsfout en 504 bij een time-out. De preview blijft read-only en is beschikbaar wanneer de write-API is afgeschermd.
 
-GET /api/read/card-catalog/options?type={type}&ability={ability}&keyword={keyword}&subtype={subtype}&name={name}&text={oracle-text}&colorIdentity={colors}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format}&effect={effect}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&marked={0|1}&excludeDeckId={deck-id}
+GET /api/read/card-catalog/options?type={type}&ability={ability}&keyword={keyword}&subtype={subtype}&name={name}&text={oracle-text}&colorIdentity={colors}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format}&effect={effect}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&marked={0|1}&deckId={deck-id}
 
 Geeft reactieve filteropties met aantallen unieke cataloguskaarten. Accepteert dezelfde inhoudelijke filters en validatie als /search. Iedere facet houdt rekening met alle andere actieve filters, maar niet met zijn eigen filter; bijvoorbeeld type=Instant beperkt abilities tot instant-kaarten, terwijl types passende alternatieven blijft aanbieden. Zonder filters worden alle beschikbare opties teruggegeven. Zonder actieve catalogus volgt HTTP 503.
 
@@ -77,7 +77,7 @@ Arrays bevatten alleen opties met count > 0; lege facets zijn []. manaRange is {
 
 marked=1 (ook true) beperkt alle facets tot opgeslagen markeringen. Deze beperking blijft bij iedere facet actief. marked=0, false of weglaten schakelt deze beperking uit; andere waarden geven HTTP 400. Zonder markeringen zijn de facets bij marked=1 leeg.
 
-excludeDeckId beperkt alle facets tot kaarten die niet in het opgegeven deck voorkomen. De uitsluiting blijft bij iedere facet actief, ook als de eigen filterdimensie wordt weggelaten, en kan samen met marked=1 worden gebruikt. De deckkeuzelijst zelf komt uit GET /api/read/decks en blijft alle decks tonen.
+deckId geeft aan welk deck met de resultaten wordt vergeleken. De keuze beperkt geen facet en verandert de opties of aantallen niet. De deckkeuzelijst zelf komt uit GET /api/read/decks en blijft alle decks tonen. Het optiesendpoint accepteert dezelfde deckvalidatie en legacy-alias als /search.
 
 INPUT JSON
 
@@ -111,13 +111,15 @@ OUTPUT JSON
   }
 }
 
-GET /api/read/card-catalog/search?name={name}&text={oracle-text}&ability={ability}&keyword={keyword}&type={type}&subtype={subtype}&colorIdentity={comma-separated W,U,B,R,G,C}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format[:status]}&effect={token|tutor|mana|draw|counter|pump|removal|sacrifice|graveyard|landfall}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&marked={0|1}&excludeDeckId={deck-id}&sort={relevance|name|mana}&page={integer}&limit={1..100}
+GET /api/read/card-catalog/search?name={name}&text={oracle-text}&ability={ability}&keyword={keyword}&type={type}&subtype={subtype}&colorIdentity={comma-separated W,U,B,R,G,C}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format[:status]}&effect={token|tutor|mana|draw|counter|pump|removal|sacrifice|graveyard|landfall}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}&marked={0|1}&deckId={deck-id}&sort={relevance|name|mana}&page={integer}&limit={1..100}
 
 Doorzoekt de losse AtomicCards-catalogus. Alle opgegeven filters worden met AND gecombineerd. colorMode=subset toont kaarten die binnen de gekozen Commander-kleuren passen, contains vereist alle gekozen kleuren en exact vereist precies dezelfde kleuridentiteit. C staat voor volledig kleurloos en kan niet met W, U, B, R of G worden gecombineerd. legality gebruikt standaard status legal en accepteert daarnaast legal, banned, restricted of not_legal na een dubbele punt. Geldige tutorTarget-waarden zijn any, basic_land, land, creature, artifact, enchantment, instant, sorcery en planeswalker. Standaard zijn sort=relevance, page=1 en limit=50; maximaal 5.000 resultaten mogen worden overgeslagen. Zonder actieve catalogus volgt HTTP 503.
 
 marked=1 (ook true) toont uitsluitend gemarkeerde kaarten die aan alle overige filters voldoen. De beperking geldt vóór telling en paginering. marked=0, false of weglaten toont zowel gemarkeerde als ongemarkeerde kaarten. Ieder resultaat bevat marked en markKey, ook zonder dit filter. De markKey gebruikt een Scryfall Oracle-ID, of een genormaliseerde naam als dat ID ontbreekt; hij hangt niet af van de catalogusrij of importvolgorde. Opgeslagen markeringen waarvan de kaart in de huidige catalogus ontbreekt blijven bewaard, maar leveren geen zoekresultaat op.
 
-excludeDeckId is optioneel en bevat het positieve gehele ID van een bestaand deck. Weglaten of een lege waarde schakelt uitsluiting uit. Een ongeldig ID geeft HTTP 400; een niet-bestaand deck geeft HTTP 404. Alle kaartrollen worden uitgesloten, inclusief commander, partner, companion, main, sideboard en maybeboard. Dezelfde Oracle-kaart wordt over alle printings heen herkend. Genormaliseerde namen worden alleen als terugval vergeleken wanneer één van beide kanten geen Oracle-ID heeft. Verschillende bekende Oracle-ID's worden niet op naam gelijkgesteld. De beperking geldt vóór telling en paginering; een leeg deck sluit niets uit. De databases worden hierbij uitsluitend gelezen.
+deckId is optioneel en bevat het positieve gehele ID van een bestaand deck. Ieder zoekresultaat bevat inDeck: true als de kaart in dat deck voorkomt, anders false. Dit geldt voor alle rollen, inclusief commander, partner, companion, main, sideboard en maybeboard. Dezelfde Oracle-kaart wordt over alle printings heen herkend. Genormaliseerde namen worden alleen als terugval vergeleken wanneer één van beide kanten geen Oracle-ID heeft. Verschillende bekende Oracle-ID's worden niet op naam gelijkgesteld. Zonder deckkeuze of bij een leeg deck is inDeck overal false. De selectie verandert geen resultaten, totalen, sortering of paginering en staat los van marked. De databases worden hierbij uitsluitend gelezen.
+
+Een ongeldig deckId geeft HTTP 400; een niet-bestaand deck geeft HTTP 404. Weglaten of een lege waarde schakelt de deckaanduiding uit. Sinds 2.13.1 wordt de oudere parameter excludeDeckId als alias voor deckId behandeld: deze sluit geen kaarten meer uit. Een expliciet deckId, ook leeg, heeft voorrang op de alias. De queryresponse gebruikt alleen deckId.
 
 Voorbeelden:
 
@@ -125,7 +127,7 @@ GET /api/read/card-catalog/search?ability=Landfall&effect=token&tokenPower=2&tok
 
 GET /api/read/card-catalog/search?colorIdentity=G&colorMode=subset&effect=tutor
 
-GET /api/read/card-catalog/search?excludeDeckId=4&marked=1&type=Creature
+GET /api/read/card-catalog/search?deckId=4&marked=1&type=Creature
 
 INPUT JSON
 
@@ -163,6 +165,7 @@ OUTPUT JSON
         "scryfallOracleId": "uuid",
         "markKey": "oracle:uuid",
         "marked": false,
+        "inDeck": false,
         "matchReasons": ["Ability: Landfall","Effect: token","Token: 2/2"]
       }
     ],
@@ -177,7 +180,7 @@ OUTPUT JSON
     },
     "query": {
       "marked": false,
-      "excludeDeckId": null,
+      "deckId": null,
       "name": "",
       "text": "",
       "ability": "Landfall",
@@ -765,7 +768,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.13.0",
+    "applicationVersion": "2.13.1",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

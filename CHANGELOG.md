@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.13.1 - 2026-10-03
+
+### Zichtbare deckaanduiding bij Kaarten ontdekken
+
+- Kaarten die in het gekozen deck voorkomen blijven zichtbaar en krijgen **Al in deck** met een gekleurde rand. De deckkeuze verandert geen resultaten, totalen, paginering of reactieve opties meer.
+- De aanduiding werkt over verschillende printings heen en staat los van de persoonlijke knop **Markeren**. Na toevoegen aan het geselecteerde deck wordt de aanduiding direct bijgewerkt.
+- Het zichtbare label **Kaarten uit deck verbergen** is verwijderd. De deckdropdown houdt een toegankelijke naam en lijnt uit met de aangrenzende dropdown.
+- `deckId` is de nieuwe naam voor de deckkeuze. Oudere links en API-aanroepen met `excludeDeckId` werken als alias voor de nieuwe aanduiding en sluiten geen kaarten meer uit. Zoekresultaten bevatten altijd `inDeck`.
+- Geen nieuwe endpointpaden, databaseschemawijzigingen of herimport nodig.
+
 ## 2.13.0 - 2026-10-03
 
 ### Ontdekte kaarten aan decks toevoegen
