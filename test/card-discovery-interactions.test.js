@@ -341,7 +341,7 @@ test('effect wisselen sluit verborgen velden uit en reset herstelt de beschikbar
   assert.equal(ui.get('discovery-pagination-wrap').textContent, '');
 });
 
-test('lege opening, sorteren en reset tonen geen kaarten; een horizontaal filter start wel zoeken', async (t) => {
+test('lege opening, sorteren en een horizontaal filter tonen geen kaarten tot een tekstfilter wordt gekozen', async (t) => {
   const ui = await mount(t, '');
   assert.deepEqual(ui.requests.map((request) => request.kind), ['options']);
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
@@ -354,7 +354,13 @@ test('lege opening, sorteren en reset tonen geen kaarten; een horizontaal filter
   await flush();
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
   ui.edit('legality', 'modern');
+  assert.equal(ui.requests.length, 2, 'pending legality does not request options or results');
+  assert.equal(ui.control('legality').value, 'modern');
+  assert.match(ui.routes.at(-1), /legality=modern/);
+  assert.equal(ui.get('discovery-secondary-hint').hidden, false);
+  ui.edit('type', 'Instant');
   assert.equal(ui.pair().search.params.get('legality'), 'modern');
+  assert.equal(ui.get('discovery-secondary-hint').hidden, true);
   await ui.finish(ui.pair(), instantOptions, result('Legal card'));
   assert.match(ui.get('discovery-results').textContent, /Legal card/);
   ui.get('discovery-filter-reset').dispatch('click');
@@ -362,6 +368,126 @@ test('lege opening, sorteren en reset tonen geen kaarten; een horizontaal filter
   await flush();
   assert.deepEqual(ui.requests.map((request) => request.kind), ['options', 'options', 'options', 'search', 'options']);
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+});
+
+test('alle horizontale keuzes blijven klaarstaan zonder verzoek en worden samen actief na tekstinvoer', async (t) => {
+  const ui = await mount(t, 'colorsOpen=1');
+  const green = ui.form.querySelector('input[name="colorIdentity"][value="G"]');
+  green.checked = true;
+  green.dispatch('change');
+  ui.edit('colorMode', 'exact');
+  ui.edit('manaMin', '0', 'input');
+  ui.edit('manaMax', '5', 'input');
+  ui.edit('legality', 'modern');
+  ui.edit('deckId', '2');
+  await ui.tick();
+  assert.equal(ui.requests.length, 1, 'pending choices do not fetch options or cards');
+  const saved = new URLSearchParams(ui.routes.at(-1).split('?')[1]);
+  for (const [name, value] of Object.entries({ colorIdentity: 'G', colorMode: 'exact', manaMin: '0', manaMax: '5', legality: 'modern', deckId: '2' })) {
+    assert.equal(saved.get(name), value);
+  }
+  assert.equal(ui.get('discovery-secondary-hint').hidden, false);
+  assert.equal(ui.get('discovery-result-count').textContent, 'Nog geen zoekopdracht');
+  assert.equal(ui.form.getAttribute('aria-busy'), null);
+  ui.edit('text', 'draw', 'input');
+  assert.equal(ui.requests.length, 1);
+  await ui.tick();
+  const activated = ui.pair();
+  for (const [name, value] of saved) assert.equal(activated.search.params.get(name), value);
+  assert.equal(activated.search.params.get('text'), 'draw');
+  assert.equal(ui.get('discovery-secondary-hint').hidden, true);
+  await ui.finish(activated, instantOptions, result('Active filtered card'));
+  assert.equal(green.checked, true, 'a zero-match selected color survives reactive updates');
+  assert.equal(green.disabled, false);
+  assert.equal(ui.control('legality').value, 'modern');
+  assert.equal(ui.control('deckId').value, '2');
+});
+
+test('laatste tekstfilter wissen maakt resultaten direct leeg en oude antwoorden blijven ongeldig', async (t) => {
+  const ui = await mount(t, 'text=draw&deckId=2&colorIdentity=G&manaMin=0&legality=modern');
+  ui.edit('text', 'draw more', 'input');
+  await ui.tick();
+  const obsolete = ui.pair();
+  ui.edit('text', '  ', 'input');
+  assert.equal(obsolete.search.signal.aborted, true);
+  assert.equal(ui.get('discovery-result-count').textContent, 'Nog geen zoekopdracht');
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+  assert.equal(ui.get('discovery-pagination-wrap').textContent, '');
+  assert.equal(ui.get('discovery-secondary-hint').hidden, false);
+  const resetOptions = ui.requests.at(-1);
+  assert.equal(resetOptions.kind, 'options');
+  for (const key of ['deckId', 'colorIdentity', 'colorMode', 'manaMin', 'legality']) assert.equal(resetOptions.params.has(key), false);
+  const requestCount = ui.requests.length;
+  ui.edit('deckId', '1');
+  ui.edit('manaMin', '2', 'input');
+  assert.equal(ui.requests.length, requestCount);
+  assert.equal(resetOptions.signal.aborted, false, 'passive pending edits do not cancel equivalent options');
+  await ui.finish(obsolete, instantOptions, result('Obsolete draw card'));
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Obsolete draw card/);
+  resetOptions.resolve(allOptions);
+  await flush();
+  assert.equal(ui.form.querySelector('input[name="colorIdentity"][value="G"]').checked, true);
+  assert.equal(ui.control('deckId').value, '1');
+  assert.equal(ui.control('manaMin').value, '2');
+  assert.equal(ui.form.getAttribute('aria-busy'), null);
+  await ui.tick();
+  assert.equal(ui.requests.length, requestCount);
+});
+
+test('een zelfstandig effect negeert horizontale wijzigingen ook terwijl de zoekopdracht nog loopt', async (t) => {
+  const ui = await mount(t, 'effect=draw&deckId=1&colorIdentity=G&manaMin=0');
+  const initial = ui.pair();
+  assert.equal(initial.search.params.get('effect'), 'draw');
+  assert.equal(initial.search.params.has('deckId'), false);
+  assert.equal(initial.search.params.has('colorIdentity'), false);
+  ui.edit('effect', 'tutor');
+  const next = ui.pair();
+  const requestCount = ui.requests.length;
+  ui.edit('deckId', '2');
+  ui.edit('manaMin', '4', 'input');
+  ui.edit('colorMode', 'exact');
+  assert.equal(ui.requests.length, requestCount);
+  assert.equal(next.search.signal.aborted, false);
+  await ui.finish(next, { ...instantOptions, effects: entries('tutor'), colors: [] }, result('Tutor card'));
+  assert.match(ui.get('discovery-results').textContent, /Tutor card/);
+  assert.equal(ui.control('deckId').value, '2');
+  const green = ui.form.querySelector('input[name="colorIdentity"][value="G"]');
+  assert.equal(green.checked, true);
+  assert.equal(green.disabled, false);
+  assert.ok(ui.form.querySelectorAll('input[name="colorIdentity"]').every((control) => !control.disabled), 'inactive colors remain selectable');
+  assert.equal(ui.control('manaMin').value, '4');
+  assert.match(ui.routes.at(-1), /deckId=2/);
+  ui.edit('type', 'Instant');
+  const activated = ui.pair();
+  assert.equal(activated.search.params.get('effect'), 'tutor');
+  assert.equal(activated.search.params.get('deckId'), '2');
+  assert.equal(activated.search.params.get('colorIdentity'), 'G');
+  assert.equal(activated.search.params.get('manaMin'), '4');
+});
+
+test('een ongeldig wachtend deck blokkeert Gemarkeerd niet en wordt pas na kaartsoortselectie toegepast', async (t) => {
+  const ui = await mount(t, 'marked=1&excludeDeckId=99&colorIdentity=G&legality=modern');
+  assert.equal(ui.pair().search.params.get('marked'), '1');
+  assert.equal(ui.pair().search.params.has('deckId'), false);
+  assert.equal(ui.pair().options.params.has('legality'), false);
+  assert.equal(ui.control('deckId').value, '99');
+  assert.match(ui.control('deckId').textContent, /niet beschikbaar/);
+  assert.match(ui.get('discovery-results').textContent, /Initial card/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Deckvergelijking niet beschikbaar/);
+  ui.edit('type', 'Instant');
+  const active = ui.pair();
+  assert.equal(active.search.params.get('deckId'), '99');
+  active.search.fail(404);
+  active.options.fail(404);
+  await flush();
+  assert.match(ui.get('discovery-results').textContent, /Deckvergelijking niet beschikbaar/);
+  ui.edit('type', '');
+  const restored = ui.pair();
+  assert.equal(restored.search.params.get('marked'), '1');
+  assert.equal(restored.search.params.has('deckId'), false);
+  await ui.finish(restored, allOptions, result('Saved card'));
+  assert.match(ui.get('discovery-results').textContent, /Saved card/);
+  assert.equal(ui.control('deckId').value, '99');
 });
 
 test('opzoeken bewaart filters en scroll voordat nog geplande zoekinvoer kan navigatie overschrijven', async (t) => {
@@ -522,11 +648,15 @@ test('Gemarkeerd start zelfstandig zoeken en reset wist ook deze selectie', asyn
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
 });
 
-test('deck vergelijken zoekt zelfstandig, stuurt gelijke queries en reset de selectie', async (t) => {
+test('deck vergelijken wacht op een tekstfilter, stuurt daarna gelijke queries en reset de selectie', async (t) => {
   const ui = await mount(t, '');
   const select = ui.control('deckId');
   assert.equal(select.disabled, false);
   ui.edit('deckId', '2');
+  assert.equal(ui.requests.length, 1);
+  assert.match(ui.routes.at(-1), /deckId=2/);
+  assert.doesNotMatch(ui.get('discovery-filter-toggle').textContent, /1 actief/);
+  ui.edit('type', 'Instant');
   const next = ui.pair();
   assert.equal(next.search.params.get('deckId'), '2');
   assert.match(ui.routes.at(-1), /deckId=2/);
@@ -534,7 +664,7 @@ test('deck vergelijken zoekt zelfstandig, stuurt gelijke queries en reset de sel
   assert.equal(ui.control('deckId'), select, 'reactive updates keep the deck dropdown mounted');
   assert.deepEqual(select.options.map((option) => option.value), ['', '1', '2'], 'all decks remain selectable');
   assert.equal(select.value, '2');
-  assert.match(ui.get('discovery-filter-toggle').textContent, /1/);
+  assert.match(ui.get('discovery-filter-toggle').textContent, /2/);
   ui.get('discovery-filter-reset').dispatch('click');
   assert.equal(select.value, '');
   assert.equal(ui.requests.at(-1).kind, 'options');
@@ -730,7 +860,7 @@ test('toevoegen vanuit ontdekken houdt de kaart zichtbaar en vernieuwt de deckst
 test('toevoegen aan het vergelijkingsdeck behoudt de resultatenpagina en het totale aantal kaarten', async (t) => {
   const cards = result('Last card on page', 25, 2);
   cards.items[0].catalogId = 'atomic-last';
-  const ui = await mount(t, 'deckId=2&page=2', cards);
+  const ui = await mount(t, 'deckId=2&type=Instant&page=2', cards);
   ui.get('discovery-results').querySelector('[data-discovery-deck]').dispatch('click');
   ui.requests.at(-1).resolve(deckList);
   await flush();

@@ -5,9 +5,11 @@ import { test } from 'node:test';
 import {
   catalogImportActive,
   discoveryFiltersFromQuery,
+  discoveryRouteParams,
   discoverySearchParams,
   discoveryTypeLineHtml,
   hasDiscoveryFilters,
+  hasPrimaryDiscoveryFilters,
   normalizeCatalogStatus,
   paginationHtml,
   renderCardDiscovery,
@@ -58,17 +60,81 @@ test('ontdekquery normaliseert kleuridentiteit, pagina en effectafhankelijke fil
   assert.equal(tutorParams.has('tokenPower'), false);
   assert.equal(tutorParams.has('tokenToughness'), false);
 
-  const colorsWithColorless = discoverySearchParams({ colorIdentity: ['G', 'C'], colorMode: 'exact' });
+  const colorsWithColorless = discoverySearchParams({ type: 'Creature', colorIdentity: ['G', 'C'], colorMode: 'exact' });
   assert.equal(colorsWithColorless.get('colorIdentity'), 'G');
 });
 
 test('alleen inhoudelijke filters starten een zoekopdracht', () => {
-  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false', 'deckId=', 'deckId=%20']) {
+  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false', 'deckId=', 'deckId=%20', 'manaMin=0', 'colorIdentity=C', 'deckId=17', 'excludeDeckId=17', 'legality=modern&manaMax=3']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), false, query);
   }
-  for (const query of ['text=draw', 'type=Instant', 'manaMin=0', 'colorIdentity=C', 'effect=token&tokenPower=2', 'marked=1', 'marked=true', 'deckId=17']) {
+  for (const query of ['text=draw', 'type=Instant', 'type=Instant&manaMin=0', 'effect=token&tokenPower=2', 'marked=1', 'marked=true']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), true, query);
   }
+});
+
+test('elk tekst- of kaartsoortfilter activeert de bewaarde horizontale keuzes, witruimte niet', () => {
+  const pending = {
+    deckId: '17', colorIdentity: ['G'], colorMode: 'exact', manaMin: '0', manaMax: '5', legality: 'commander'
+  };
+  for (const key of ['name', 'text', 'ability', 'keyword', 'type', 'subtype']) {
+    for (const value of ['', '  \t ', 'Selected']) {
+      for (const input of [{ ...pending, [key]: value }, new URLSearchParams({ ...pending, [key]: value })]) {
+        const active = Boolean(value.trim());
+        assert.equal(hasPrimaryDiscoveryFilters(input), active, `${key}=${JSON.stringify(value)}`);
+        assert.equal(hasDiscoveryFilters(input), active);
+        const saved = discoveryRouteParams(input);
+        const search = discoverySearchParams(input);
+        for (const field of Object.keys(pending)) {
+          assert.equal(saved.has(field), true, `saved ${field}`);
+          assert.equal(search.has(field), active, `effective ${field}`);
+        }
+      }
+    }
+  }
+});
+
+test('zelfstandige Effect- en Gemarkeerd-filters negeren horizontale keuzes tot een tekstfilter actief is', () => {
+  for (const query of ['marked=1', 'effect=token&tokenPower=2&tokenType=Elf', 'effect=tutor&tutorTarget=land']) {
+    const input = new URLSearchParams(`${query}&deckId=17&colorIdentity=G&manaMin=0&manaMax=4&legality=commander`);
+    assert.equal(hasDiscoveryFilters(input), true);
+    const search = discoverySearchParams(input);
+    for (const field of ['deckId', 'colorIdentity', 'colorMode', 'manaMin', 'manaMax', 'legality']) {
+      assert.equal(search.has(field), false);
+    }
+    for (const [field, value] of new URLSearchParams(query)) assert.equal(search.get(field), value);
+  }
+});
+
+test('een opgeslagen horizontale selectie houdt het startscherm leeg en begrenst de opties nog niet', async () => {
+  const originalFetch = globalThis.fetch;
+  const requested = [];
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(url, 'http://localhost');
+    requested.push(parsed);
+    if (parsed.pathname.endsWith('/status')) return jsonResponse({ available: true, cardCount: 1200 });
+    if (parsed.pathname.endsWith('/decks')) return jsonResponse([{ id: 17, name: 'Yedora' }]);
+    return jsonResponse({});
+  };
+  try {
+    for (const deck of ['deckId=17', 'deckId=missing', 'excludeDeckId=99']) {
+      requested.length = 0;
+      const view = await renderCardDiscovery({
+        query: new URLSearchParams(`${deck}&name=%20%20&colorIdentity=G&colorMode=exact&manaMin=0&manaMax=4&legality=modern&colorsOpen=1`)
+      });
+      assert.match(view.html, /Nog geen zoekopdracht/);
+      assert.doesNotMatch(view.html, /Deckvergelijking niet beschikbaar|class="discovery-card"|>\d+ actief/);
+      assert.match(view.html, /name="colorIdentity" value="G" checked/);
+      assert.match(view.html, /name="manaMin"[^>]*value="0"/);
+      assert.match(view.html, /id="discovery-secondary-hint"[^>]*>Deze instellingen/);
+      assert.equal(requested.some((url) => url.pathname.endsWith('/search')), false);
+      const options = requested.filter((url) => url.pathname.endsWith('/options'));
+      assert.equal(options.length, 1);
+      for (const field of ['deckId', 'excludeDeckId', 'colorIdentity', 'colorMode', 'manaMin', 'manaMax', 'legality']) {
+        assert.equal(options[0].searchParams.has(field), false, field);
+      }
+    }
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test('Gemarkeerd normaliseert echte selecties en laat uitgeschakelde waarden weg', () => {
@@ -87,7 +153,8 @@ test('Gemarkeerd normaliseert echte selecties en laat uitgeschakelde waarden weg
 
 test('deckselectie normaliseert geldige IDs en bewaart ongeldige waarden om zichtbaar te kunnen herstellen', () => {
   assert.equal(discoveryFiltersFromQuery(new URLSearchParams('deckId=0017')).deckId, '17');
-  assert.equal(discoverySearchParams({ deckId: ' 0017 ' }).get('deckId'), '17');
+  assert.equal(discoveryRouteParams({ deckId: ' 0017 ' }).get('deckId'), '17');
+  assert.equal(discoverySearchParams({ type: 'Creature', deckId: ' 0017 ' }).get('deckId'), '17');
   assert.equal(discoverySearchParams({ deckId: '' }).has('deckId'), false);
   assert.equal(discoveryFiltersFromQuery(new URLSearchParams('deckId=missing')).deckId, 'missing');
 });
@@ -102,11 +169,14 @@ test('oude deckuitsluiting wordt een vergelijking en een expliciete deckselectie
     const filters = discoveryFiltersFromQuery(params);
     assert.equal(filters.deckId, expected);
     for (const input of [params, Object.fromEntries(params), filters]) {
-      const search = discoverySearchParams(input);
-      assert.equal(search.get('deckId') || '', expected);
-      assert.equal(search.has('excludeDeckId'), false);
+      const route = discoveryRouteParams(input);
+      assert.equal(route.get('deckId') || '', expected);
+      assert.equal(route.has('excludeDeckId'), false);
+      assert.equal(discoverySearchParams(input).has('deckId'), false);
+      route.set('type', 'Creature');
+      assert.equal(discoverySearchParams(route).get('deckId') || '', expected);
     }
-    assert.equal(hasDiscoveryFilters(params), Boolean(expected));
+    assert.equal(hasDiscoveryFilters(params), false);
   }
 });
 
@@ -120,7 +190,7 @@ test('deckfilter toont alle decks veilig en bewaart een verwijderd deck zonder o
     return jsonResponse({ items: [], total: 0 });
   };
   try {
-    const available = await renderCardDiscovery({ query: new URLSearchParams('deckId=0017') });
+    const available = await renderCardDiscovery({ query: new URLSearchParams('deckId=0017&type=Creature') });
     assert.match(available.html, /name="deckId" aria-label="Vergelijken met deck">[\s\S]*?<option value="17" selected>Yedora &lt;script&gt;<\/option>[\s\S]*?<option value="18"/);
     assert.doesNotMatch(available.html, /Yedora <script>|discovery-mana-hint|Beschikbare mana values|Kaarten uit deck verbergen|<label[^>]*for="discovery-deck"/);
     assert.match(available.html, /<option value=""[^>]*>Geen deck geselecteerd<\/option>/);

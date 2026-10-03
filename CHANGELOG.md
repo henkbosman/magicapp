@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.13.2 - 2026-10-03
+
+### Extra ontdekfilters pas na een zoekcriterium
+
+- **Kleur, mana en legaliteit**, inclusief deckkeuze, werkt pas zodra Naam, Kaarttekst bevat, Ability of trigger, Keyword, Kaarttype of Subtype bij **Tekst en kaartsoort** is ingevuld.
+- Alleen een kleur, managrens, legaliteit of deck kiezen start geen kaartzoekopdracht. Dit geldt ook bij openen via een opgeslagen link.
+- Vooraf gekozen extra opties blijven bewaard, maar worden pas met een actief criterium uit **Tekst en kaartsoort** naar zoeken en reactieve opties doorgestuurd. Het wissen van het laatste criterium schakelt ze weer uit.
+- **Effect** en **Gemarkeerd** blijven zelfstandig zoeken; de extra opties worden daarbij zonder **Tekst en kaartsoort** niet toegepast.
+- Geen wijzigingen aan API-contracten of databaseschema's en geen herimport nodig.
+
 ## 2.13.1 - 2026-10-03
 
 ### Zichtbare deckaanduiding bij Kaarten ontdekken

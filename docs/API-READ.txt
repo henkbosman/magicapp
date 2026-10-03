@@ -1,8 +1,10 @@
-MAGIC COLLECTION MANAGER READ API 2.13.1
+MAGIC COLLECTION MANAGER READ API 2.13.2
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
 Foutformaat: {"error":{"message":"...","details":null}}.
+
+De webpagina Kaarten ontdekken past sinds 2.13.2 kleur-, mana-, legaliteits- en deckparameters pas toe als Naam, Kaarttekst bevat, Ability of trigger, Keyword, Kaarttype of Subtype is ingevuld. Dit is uitsluitend frontendgedrag. De hieronder beschreven API-endpoints blijven hun afzonderlijke filters rechtstreeks accepteren.
 
 GET /api/read/health
 
@@ -14,7 +16,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.13.1"}
+{"status":"ok","version":"2.13.2"}
 
 GET /api/read/card-catalog/status
 
@@ -768,7 +770,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.13.1",
+    "applicationVersion": "2.13.2",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

@@ -58,6 +58,8 @@ const TUTOR_TARGET_OPTIONS = [
   ['planeswalker', 'Planeswalker']
 ];
 const ACTIVE_IMPORT_STATES = new Set(['queued', 'starting', 'downloading', 'download', 'parsing', 'importing', 'indexing', 'validating', 'running']);
+const PRIMARY_FILTER_FIELDS = ['name', 'text', 'ability', 'keyword', 'type', 'subtype'];
+const SECONDARY_FILTER_FIELDS = ['deckId', 'excludeDeckId', 'colorIdentity', 'colorMode', 'manaMin', 'manaMax', 'legality'];
 const FACET_FIELDS = [
   ['ability', 'abilities', 'Alle abilities'],
   ['keyword', 'keywords', 'Alle keywords'],
@@ -153,7 +155,7 @@ export function discoveryFiltersFromQuery(query = new URLSearchParams()) {
   };
 }
 
-export function discoverySearchParams(values = {}) {
+export function discoveryRouteParams(values = {}) {
   // Saved 2.13.0 routes may still use excludeDeckId; send only the current name.
   // An explicitly empty deckId clears a legacy selection as well.
   const deckValue = values instanceof URLSearchParams
@@ -206,10 +208,24 @@ export function discoverySearchParams(values = {}) {
   return params;
 }
 
+export function hasPrimaryDiscoveryFilters(values = {}) {
+  return PRIMARY_FILTER_FIELDS.some((key) => String(values instanceof URLSearchParams
+    ? values.get(key) || '' : values[key] || '').trim().length > 0);
+}
+
+export function discoverySearchParams(values = {}) {
+  const params = discoveryRouteParams(values);
+  // Preserve pending choices in the form and route, but apply them only once
+  // the user has selected a filter under “Tekst en kaartsoort”.
+  if (!hasPrimaryDiscoveryFilters(params)) {
+    for (const key of SECONDARY_FILTER_FIELDS) params.delete(key);
+  }
+  return params;
+}
+
 export function hasDiscoveryFilters(values = {}) {
   const params = discoverySearchParams(values);
-  return ['marked', 'deckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
-    'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+  return [...PRIMARY_FILTER_FIELDS, 'marked', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .some((key) => String(params.get(key) || '').trim().length > 0);
 }
 
@@ -266,7 +282,7 @@ function deckSelectionErrorHtml(message = 'Het gekozen deck is niet beschikbaar.
   return emptyState('Deckvergelijking niet beschikbaar', `${message} Kies een ander deck of selecteer “Geen deck geselecteerd”.`);
 }
 
-function colorIdentityFilterHtml(selectedColors = [], options = {}) {
+function colorIdentityFilterHtml(selectedColors = [], options = {}, active = true) {
   const selected = new Set(uniqueColors(selectedColors));
   const colors = new Map(optionEntries(options.colors).map((entry) => [entry.value, entry]));
   return `<fieldset class="field discovery-color-filter">
@@ -275,7 +291,7 @@ function colorIdentityFilterHtml(selectedColors = [], options = {}) {
       const count = colors.get(value)?.count || 0;
       const description = `${label} (${count || '0 matches'})`;
       return `<label class="discovery-color-option${!count && selected.has(value) ? ' discovery-color-unavailable' : ''}" title="${escapeHtml(description)}">
-        <input class="sr-only" type="checkbox" name="colorIdentity" value="${value}" ${selected.has(value) ? 'checked' : ''} ${!count && !selected.has(value) ? 'disabled' : ''} aria-label="${escapeHtml(description)}">
+        <input class="sr-only" type="checkbox" name="colorIdentity" value="${value}" ${selected.has(value) ? 'checked' : ''} ${active && !count && !selected.has(value) ? 'disabled' : ''} aria-label="${escapeHtml(description)}">
         <span aria-hidden="true">${manaSymbol(value, { label })}</span><span class="discovery-color-count" data-color-count aria-hidden="true">${count}</span>
       </label>`;
     }).join('')}</div>
@@ -284,7 +300,7 @@ function colorIdentityFilterHtml(selectedColors = [], options = {}) {
 
 function activeFilterCount(filters) {
   return ['marked', 'deckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
-    .filter((key) => String(filters[key] || '').length > 0).length
+    .filter((key) => String(filters[key] || '').trim().length > 0).length
     + (filters.colorIdentity.length ? 1 : 0);
 }
 
@@ -421,19 +437,21 @@ export async function renderCardDiscovery(context) {
   const initialSearch = hasDiscoveryFilters(initialParams);
   const deckResponse = await api('/decks');
   const decks = Array.isArray(deckResponse) ? deckResponse : [];
-  const unavailableDeck = Boolean(filters.deckId && !decks.some((deck) => String(deck.id) === filters.deckId));
+  const activeDeckId = initialParams.get('deckId') || '';
+  const unavailableDeck = Boolean(activeDeckId && !decks.some((deck) => String(deck.id) === activeDeckId));
   let initialDeckError = unavailableDeck ? 'Het gekozen deck is niet beschikbaar.' : '';
   const [options, rawResult] = await Promise.all([
     unavailableDeck ? Promise.resolve({}) : api(`/card-catalog/options?${initialParams}`),
     initialSearch && !unavailableDeck ? api(`/card-catalog/search?${initialParams}`) : Promise.resolve({ items: [], total: 0, page: 1 })
   ]).catch((error) => {
     // A deck can disappear between loading the dropdown and querying the catalog.
-    if (!filters.deckId || ![400, 404].includes(error.status)) throw error;
+    if (!activeDeckId || ![400, 404].includes(error.status)) throw error;
     initialDeckError = error.message;
     return [{}, { items: [], total: 0, page: 1 }];
   });
   let result = normalizedResult(rawResult, filters.page);
-  const filterCount = activeFilterCount(filters);
+  const filterCount = activeFilterCount(discoveryFiltersFromQuery(initialParams));
+  const secondaryFiltersActive = hasPrimaryDiscoveryFilters(filters);
   const isCompactViewport = globalThis.window?.matchMedia?.('(max-width: 900px)')?.matches === true;
   const filtersOpen = context.query.has('filterPanelOpen')
     ? context.query.get('filterPanelOpen') === '1'
@@ -489,8 +507,9 @@ export async function renderCardDiscovery(context) {
         <div class="discovery-results-column">
           <details id="discovery-secondary-filters" class="panel discovery-secondary-filters"${secondaryFiltersOpen ? ' open' : ''}${filtersOpen ? '' : ' hidden'}>
             <summary>Kleur, mana en legaliteit</summary>
+            <p id="discovery-secondary-hint" class="discovery-secondary-hint muted"${secondaryFiltersActive ? ' hidden' : ''}>Deze instellingen worden toegepast zodra je een filter bij “Tekst en kaartsoort” kiest.</p>
             <div class="discovery-secondary-filter-grid">
-              ${colorIdentityFilterHtml(filters.colorIdentity, options)}
+              ${colorIdentityFilterHtml(filters.colorIdentity, options, secondaryFiltersActive)}
               <select class="discovery-color-mode" name="colorMode" aria-label="Modus voor kleuridentiteit">
                 ${option('subset', 'Past binnen deze kleuren', filters.colorMode)}
                 ${option('contains', 'Bevat alle gekozen kleuren', filters.colorMode)}
@@ -536,9 +555,10 @@ export async function renderCardDiscovery(context) {
       const tutorFields = document.getElementById('discovery-tutor-fields');
       const manaValues = document.getElementById('discovery-mana-values');
       const selectedDeck = document.getElementById('discovery-deck');
+      const secondaryHint = document.getElementById('discovery-secondary-hint');
       const colorControls = [...form.querySelectorAll('input[name="colorIdentity"]')];
       let currentPage = result.page;
-      let displayedDeckId = filters.deckId;
+      let displayedDeckId = activeDeckId;
       let resultRequestSequence = 0;
       let requestController = null;
       let debounceTimer = null;
@@ -576,11 +596,12 @@ export async function renderCardDiscovery(context) {
 
       const updateColors = () => {
         const colors = new Map(optionEntries(currentOptions.colors).map((entry) => [entry.value, entry]));
+        const active = hasPrimaryDiscoveryFilters(new URLSearchParams(new FormData(form)));
         for (const control of colorControls) {
           const label = COLOR_OPTIONS.find(([value]) => value === control.value)?.[1] || control.value;
           const count = colors.get(control.value)?.count || 0;
           const description = `${label} (${count || '0 matches'})`;
-          control.disabled = !control.checked && !count;
+          control.disabled = active && !control.checked && !count;
           control.setAttribute('aria-label', description);
           const labelElement = control.closest('label');
           labelElement.title = description;
@@ -614,11 +635,8 @@ export async function renderCardDiscovery(context) {
         panel: filterPanel,
         key: 'discover',
         getActiveCount: () => {
-          const data = new FormData(form);
-          const active = new Set([...data.entries()]
-            .filter(([key, value]) => key !== 'colorMode' && String(value || '').length > 0)
-            .map(([key]) => key));
-          return active.size;
+          const params = discoverySearchParams(new URLSearchParams(new FormData(form)));
+          return activeFilterCount(discoveryFiltersFromQuery(params));
         }
       });
       document.getElementById('discovery-filter-toggle').addEventListener('click', () => {
@@ -632,6 +650,19 @@ export async function renderCardDiscovery(context) {
         if (page > 1) params.set('page', String(page));
         else params.delete('page');
         return params;
+      };
+
+      const updateSecondaryState = () => {
+        secondaryHint.hidden = hasPrimaryDiscoveryFilters(routeParams());
+        updateColors();
+      };
+
+      const savePendingSecondaryChoice = (control) => {
+        if (!SECONDARY_FILTER_FIELDS.includes(control.name) || hasPrimaryDiscoveryFilters(routeParams())) return false;
+        replaceRouteQuery('/discover', routeParams());
+        updateSecondaryState();
+        filterToggle.updateActiveCount();
+        return true;
       };
 
       const setLoading = (loading) => {
@@ -673,6 +704,7 @@ export async function renderCardDiscovery(context) {
         const shouldSearch = hasDiscoveryFilters(apiParams);
         const requestedPage = Number(apiParams.get('page'));
         replaceRouteQuery('/discover', routeValues);
+        updateSecondaryState();
         if (!shouldSearch) {
           result = normalizedResult({ items: [], total: 0, page: 1 });
           currentPage = 1;
@@ -740,14 +772,20 @@ export async function renderCardDiscovery(context) {
       });
       form.addEventListener('input', (event) => {
         if (!event.target.matches('input[type="search"], input[type="text"], input[type="number"]')) return;
+        if (savePendingSecondaryChoice(event.target)) return;
         invalidateRequest();
         currentPage = 1;
+        updateSecondaryState();
+        if (!hasDiscoveryFilters(routeParams(1))) {
+          applyFilters();
+          return;
+        }
         setLoading(true);
         filterToggle.updateActiveCount();
         debounceTimer = setTimeout(applyFilters, 220);
       });
       form.addEventListener('change', (event) => {
-        if (event.target !== sort) applyFilters();
+        if (event.target !== sort && !savePendingSecondaryChoice(event.target)) applyFilters();
       });
 
       results.addEventListener('click', async (event) => {

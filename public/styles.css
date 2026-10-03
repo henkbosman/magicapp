@@ -2124,6 +2124,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
   cursor: pointer;
 }
 .discovery-secondary-filters > summary:focus-visible { outline: 3px solid rgba(40, 99, 62, .3); outline-offset: -3px; }
+.discovery-secondary-hint { margin: 0; padding: 0 16px 12px; font-size: .9rem; }
 .discovery-secondary-filter-grid {
   display: grid;
   grid-template-columns: minmax(210px, 1.2fr) minmax(160px, 1fr) minmax(125px, .8fr);
