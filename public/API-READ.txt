@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.11.0
+MAGIC COLLECTION MANAGER READ API 2.11.1
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -14,7 +14,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.11.0"}
+{"status":"ok","version":"2.11.1"}
 
 GET /api/read/card-catalog/status
 
@@ -52,9 +52,13 @@ OUTPUT JSON
 
 Zonder geïmporteerde catalogus is available=false, cardCount=0 en kunnen sourceVersion, sourceDate en importedAt leeg zijn. importJob is null zolang in het huidige serverproces nog geen import is gestart. Een actieve job heeft status=running en voortgang in phase, processed, total, downloadedBytes en totalBytes; een mislukte job heeft status=failed en daarnaast error.
 
-GET /api/read/card-catalog/options
+GET /api/read/card-catalog/options?type={type}&ability={ability}&keyword={keyword}&subtype={subtype}&name={name}&text={oracle-text}&colorIdentity={colors}&colorMode={subset|contains|exact}&manaMin={number}&manaMax={number}&legality={format}&effect={effect}&tokenPower={value}&tokenToughness={value}&tokenType={type}&tutorTarget={target}
 
-Geeft de daadwerkelijk in de catalogus beschikbare abilities, keywords, types, subtypes, afgeleide effecten en tutor-doelen met aantallen. Zonder actieve catalogus volgt HTTP 503.
+Geeft reactieve filteropties met aantallen unieke cataloguskaarten. Accepteert dezelfde inhoudelijke filters en validatie als /search. Iedere facet houdt rekening met alle andere actieve filters, maar niet met zijn eigen filter; bijvoorbeeld type=Instant beperkt abilities tot instant-kaarten, terwijl types passende alternatieven blijft aanbieden. Zonder filters worden alle beschikbare opties teruggegeven. Zonder actieve catalogus volgt HTTP 503.
+
+Kleuridentiteit en kleurmodus vormen samen één facet; de kleuren tellen kaarten die de kleur in hun identiteit hebben (C is volledig kleurloos), onafhankelijk van de gekozen kleurmodus. Het manabereik negeert beide managrenzen. De effectfacet negeert naast effect ook tokenPower, tokenToughness, tokenType en tutorTarget zodat wisselen van effect mogelijk blijft. Tokenkenmerken worden binnen hetzelfde tokenprofiel gecombineerd. legalities bevat uitsluitend formaten waarin passende kaarten legal zijn. page, limit en sort worden genegeerd: opties gelden voor de volledige gefilterde catalogus.
+
+Arrays bevatten alleen opties met count > 0; lege facets zijn []. manaRange is {"min":null,"max":null} zonder passende kaarten. De interface behoudt al gekozen waarden die niet meer in een facet voorkomen als expliciete 0-matches-keuze, zonder de query automatisch te verruimen.
 
 INPUT JSON
 
@@ -77,7 +81,14 @@ OUTPUT JSON
     "tutorTargets": [
       {"value":"land","label":"Land","count":300},
       {"value":"creature","label":"Creature","count":240}
-    ]
+    ],
+    "colors": [{"value":"G","label":"Groen","count":6500}],
+    "legalities": [{"value":"commander","label":"Commander","count":29000}],
+    "manaValues": [{"value":"2","label":"2","count":4200}],
+    "manaRange": {"min":0,"max":16},
+    "tokenPowers": [{"value":"2","label":"2","count":300}],
+    "tokenToughnesses": [{"value":"2","label":"2","count":280}],
+    "tokenTypes": [{"value":"Beast","label":"Beast","count":120}]
   }
 }
 
@@ -711,7 +722,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.11.0",
+    "applicationVersion": "2.11.1",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

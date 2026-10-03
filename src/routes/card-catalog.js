@@ -15,7 +15,7 @@ cardCatalogReadRouter.get('/status', (req, res) => {
 });
 
 cardCatalogReadRouter.get('/options', (req, res) => {
-  res.json({ data: cardCatalogOptions() });
+  res.json({ data: cardCatalogOptions(req.query) });
 });
 
 cardCatalogReadRouter.get('/search', (req, res) => {

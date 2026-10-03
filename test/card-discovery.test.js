@@ -137,7 +137,11 @@ test('ontdekpagina vraagt opties en zoekresultaten op en bouwt alle kernfilters'
       return jsonResponse({
         abilities: [{ value: 'Landfall', count: 12 }],
         keywords: ['Trample'],
-        types: ['Creature', 'Enchantment']
+        types: ['Creature', 'Enchantment'],
+        effects: [{ value: 'token', label: 'Token maken', count: 8 }],
+        tokenPowers: [{ value: '2', count: 8 }],
+        tokenToughnesses: [{ value: '2', count: 8 }],
+        colors: [{ value: 'G', label: 'Groen', count: 8 }]
       });
     }
     return jsonResponse({ items: [], total: 0, page: 1, limit: 24, totalPages: 1 });
@@ -160,13 +164,90 @@ test('ontdekpagina vraagt opties en zoekresultaten op en bouwt alle kernfilters'
     assert.match(view.html, /name="manaMin"/);
     assert.match(view.html, /name="manaMax"/);
     assert.match(view.html, /name="legality"/);
-    assert.match(view.html, /name="effect"[\s\S]*?<option value="token" selected>Token maken<\/option>/);
-    assert.match(view.html, /name="tokenPower" value="2"/);
-    assert.match(view.html, /name="tokenToughness" value="2"/);
+    assert.match(view.html, /name="effect"[\s\S]*?<option value="token" selected>Token maken \(8\)<\/option>/);
+    assert.match(view.html, /name="tokenPower"[\s\S]*?<option value="2" selected>2 \(8\)<\/option>/);
+    assert.match(view.html, /name="tokenToughness"[\s\S]*?<option value="2" selected>2 \(8\)<\/option>/);
     assert.match(view.html, /name="tutorTarget"/);
     assert.match(view.html, /id="discovery-sort"/);
     assert.ok(requested.some((url) => url.includes('/card-catalog/options')));
     assert.ok(requested.some((url) => url.includes('/card-catalog/search?') && url.includes('ability=Landfall') && url.includes('effect=token')));
+    const optionQuery = requested.find((url) => url.includes('/card-catalog/options?')).split('?')[1];
+    const resultQuery = requested.find((url) => url.includes('/card-catalog/search?')).split('?')[1];
+    assert.equal(optionQuery, resultQuery, 'Opties gebruiken ook bij directe URL-navigatie alle actieve filters');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('lege facets blijven leeg en behouden veilige nulselecties uit een gedeelde URL', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('/status')) return jsonResponse({ available: true, cardCount: 1200 });
+    if (String(url).includes('/options')) {
+      return jsonResponse({
+        abilities: [], keywords: [], types: [], subtypes: [], colors: [], effects: [],
+        legalities: [], tutorTargets: [], tokenPowers: [], tokenToughnesses: [], tokenTypes: [],
+        manaValues: [], manaRange: { min: null, max: null }
+      });
+    }
+    return jsonResponse({ items: [], total: 0, page: 1 });
+  };
+  try {
+    const view = await renderCardDiscovery({ query: new URLSearchParams({
+      type: 'Instant', subtype: '\"><img src=x onerror=alert(1)>', legality: 'modern',
+      effect: 'tutor', tutorTarget: 'land', colorIdentity: 'G', manaMin: '1.5', manaMax: '99'
+    }) });
+    assert.match(view.html, /<option value="Instant" selected>Instant \(0 matches\)<\/option>/);
+    assert.match(view.html, /<option value="modern" selected>Modern \(0 matches\)<\/option>/);
+    assert.match(view.html, /<option value="tutor" selected>Library doorzoeken \(0 matches\)<\/option>/);
+    assert.match(view.html, /<option value="land" selected>Land \(0 matches\)<\/option>/);
+    assert.doesNotMatch(view.html, /<option value="(?:Creature|token|commander|artifact)"/);
+    assert.match(view.html, /name="subtype"><option value=""[^>]*>Alle subtypes<\/option><option value="&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;" selected/);
+    assert.doesNotMatch(view.html, /<img src=x/);
+    assert.match(view.html, /name="colorIdentity" value="G" checked\s+aria-label="Groen \(0 matches\)"/);
+    assert.match(view.html, /name="colorIdentity" value="W"\s+disabled/);
+    assert.match(view.html, /name="manaMin"[^>]*step="any"[^>]*value="1\.5"/);
+    assert.match(view.html, /name="manaMax"[^>]*value="99"/);
+    assert.match(view.html, /<datalist id="discovery-mana-values"><\/datalist>/);
+    assert.match(view.html, /Geen mana values binnen de overige filters/);
+    assert.match(view.html, /Geselecteerde opties met 0 matches blijven staan/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('alle begrensde filters gebruiken facets en mana-suggesties zonder handmatige grenzen te overschrijven', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('/status')) return jsonResponse({ available: true, cardCount: 1200 });
+    if (String(url).includes('/options')) {
+      return jsonResponse({
+        types: [{ value: 'Instant', count: 4 }],
+        subtypes: [{ value: 'Arcane', count: 3 }],
+        effects: [{ value: 'token', label: 'Token maken', count: 2 }],
+        tokenPowers: [{ value: '2', count: 2 }],
+        tokenToughnesses: [{ value: '2', count: 2 }],
+        tokenTypes: [{ value: 'Spirit', count: 2 }],
+        legalities: [{ value: 'modern', label: 'Modern', count: 4 }],
+        manaValues: [{ value: '2', count: 3 }, { value: '4', count: 1 }],
+        manaRange: { min: 2, max: 4 }
+      });
+    }
+    return jsonResponse({ items: [], total: 0, page: 1 });
+  };
+  try {
+    const view = await renderCardDiscovery({ query: new URLSearchParams('type=instant&effect=token&manaMin=1&manaMax=100') });
+    assert.match(view.html, /<option value="instant" selected>Instant \(4\)<\/option>/);
+    assert.doesNotMatch(view.html, /Instant \(0 matches\)/);
+    for (const name of ['subtype', 'legality', 'tokenPower', 'tokenToughness', 'tokenType']) {
+      assert.match(view.html, new RegExp(`<select[^>]+name="${name}"`));
+    }
+    assert.match(view.html, /<option value="Arcane"[^>]*>Arcane \(3\)<\/option>/);
+    assert.match(view.html, /<option value="Spirit"[^>]*>Spirit \(2\)<\/option>/);
+    assert.match(view.html, /Beschikbare mana values: 2–4/);
+    assert.match(view.html, /name="manaMin"[^>]*value="1"/);
+    assert.match(view.html, /name="manaMax"[^>]*value="100"/);
+    assert.match(view.html, /<datalist id="discovery-mana-values"><option value="2"[^>]*>2 \(3\)<\/option><option value="4"[^>]*>4 \(1\)<\/option><\/datalist>/);
   } finally {
     globalThis.fetch = originalFetch;
   }

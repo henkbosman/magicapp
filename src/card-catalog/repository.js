@@ -44,6 +44,8 @@ const TUTOR_TARGET_LABELS = Object.freeze({
   planeswalker: 'Planeswalker'
 });
 
+const COLOR_LABELS = Object.freeze({ W: 'Wit', U: 'Blauw', B: 'Zwart', R: 'Rood', G: 'Groen', C: 'Kleurloos' });
+
 const MAX_SEARCH_OFFSET = 5000;
 
 export function cardCatalogTotalPages(total, limit) {
@@ -88,35 +90,147 @@ function escapeLike(value) {
   return String(value).replace(/[\^%_]/gu, (character) => `^${character}`);
 }
 
-function facetRows(database, table, { valueColumn = 'value' } = {}) {
+function whereClause(conditions) {
+  return conditions.length ? `WHERE ${conditions.join('\n      AND ')}` : '';
+}
+
+function facetRows(database, table, filters, {
+  valueColumn = 'value',
+  tokenProfile = false,
+  extraConditions = []
+} = {}) {
+  const { conditions, params } = queryParts(filters, { tokenProfileAlias: tokenProfile ? 'facet' : '' });
   return database.prepare(`
     SELECT facet.${valueColumn} AS value, COUNT(DISTINCT c.catalog_key) AS count
     FROM ${table} facet
     JOIN cards c ON c.id = facet.card_id
+    ${whereClause([...conditions, ...extraConditions])}
     GROUP BY facet.${valueColumn} COLLATE NOCASE
     ORDER BY facet.${valueColumn} COLLATE NOCASE
-  `).all().map((row) => ({ value: row.value, label: row.value, count: Number(row.count || 0) }));
+  `).all(...params).map((row) => ({ value: row.value, label: row.value, count: Number(row.count || 0) }));
 }
 
-export function cardCatalogOptions() {
+function colorFacetRows(database, filters) {
+  const { conditions, params } = queryParts({ ...filters, colorIdentity: [] });
+  const colors = Object.keys(COLOR_LABELS);
+  const counts = database.prepare(`
+    SELECT ${colors.map((color) => `COUNT(DISTINCT CASE WHEN ${color === 'C'
+      ? 'c.color_identity_mask = 0'
+      : `(c.color_identity_mask & ${colorMask([color])}) != 0`}
+      THEN c.catalog_key END) AS ${color}`).join(', ')}
+    FROM cards c
+    ${whereClause(conditions)}
+  `).get(...params);
+  return colors
+    .filter((value) => counts[value] > 0)
+    .map((value) => ({ value, label: COLOR_LABELS[value], count: Number(counts[value]) }));
+}
+
+function manaFacetRows(database, filters) {
+  const { conditions, params } = queryParts({ ...filters, manaMin: null, manaMax: null });
+  return database.prepare(`
+    SELECT c.mana_value AS value, COUNT(DISTINCT c.catalog_key) AS count
+    FROM cards c
+    ${whereClause(conditions)}
+    GROUP BY c.mana_value
+    ORDER BY c.mana_value
+  `).all(...params).map((row) => ({ value: String(row.value), label: String(row.value), count: Number(row.count) }));
+}
+
+function tokenFacetRows(database, filters, field, column) {
+  return facetRows(database, 'card_tokens', { ...filters, [field]: '' }, {
+    valueColumn: column,
+    tokenProfile: true,
+    extraConditions: [`facet.${column} != ''`]
+  }).sort((a, b) => a.value.localeCompare(b.value, 'en', { sensitivity: 'base', numeric: true }));
+}
+
+function tokenTypeFacetRows(database, filters) {
+  const { conditions, params } = queryParts({ ...filters, tokenType: '' }, { tokenProfileAlias: 'facet' });
+  const rows = database.prepare(`
+    SELECT DISTINCT facet.token_type AS value, c.catalog_key AS catalogKey
+    FROM card_tokens facet
+    JOIN cards c ON c.id = facet.card_id
+    ${whereClause([...conditions, "facet.token_type != ''"])}
+    ORDER BY facet.token_type COLLATE NOCASE
+  `).all(...params);
+
+  // SQLite LIKE and NOCASE fold ASCII letters only. Match that behavior here
+  // so a partial type such as Warrior also counts Elf Warrior profiles.
+  const types = new Map();
+  for (const row of rows) {
+    const normalized = row.value.replace(/[A-Z]/gu, (letter) => letter.toLowerCase());
+    if (!types.has(normalized)) types.set(normalized, { value: row.value, cards: new Set() });
+    types.get(normalized).cards.add(row.catalogKey);
+  }
+  return [...types.entries()].map(([requestedType, { value }]) => {
+    const cards = new Set();
+    for (const [profileType, entry] of types) {
+      if (!profileType.includes(requestedType)) continue;
+      // A card may produce both Warrior and Elf Warrior tokens; do not sum
+      // profile counts or variants of the same catalog card twice.
+      for (const catalogKey of entry.cards) cards.add(catalogKey);
+    }
+    return { value, label: value, count: cards.size };
+  }).sort((a, b) => a.value.localeCompare(b.value, 'en', { sensitivity: 'base', numeric: true }));
+}
+
+export function cardCatalogOptions(input = {}) {
+  // Facets describe the whole filtered catalog, not a sorted or paginated page.
+  const filters = normalizedFilters({ ...input, sort: undefined, page: undefined, limit: undefined });
   return withCardCatalog((database) => {
-    const rawEffects = facetRows(database, 'card_effects');
+    // Effect-specific fields disappear when switching effects, so they must not
+    // prevent the user from choosing a different effect.
+    const rawEffects = facetRows(database, 'card_effects', {
+      ...filters, effect: '', tokenPower: '', tokenToughness: '', tokenType: '', tutorTarget: ''
+    });
     const effectCounts = new Map(rawEffects.map((entry) => [entry.value, entry.count]));
     const effects = Object.entries(EFFECT_OUTPUT)
       .filter(([stored]) => effectCounts.has(stored))
       .map(([stored, output]) => ({ ...output, count: effectCounts.get(stored) }));
-    const tutorTargets = facetRows(database, 'card_tutor_targets').map((entry) => ({
+    const tutorTargets = facetRows(database, 'card_tutor_targets', { ...filters, tutorTarget: '' }).map((entry) => ({
       ...entry,
       label: TUTOR_TARGET_LABELS[entry.value] || entry.value
     }));
+    const legalities = facetRows(database, 'card_legalities', { ...filters, legality: '' }, {
+      valueColumn: 'format',
+      extraConditions: ["facet.status = 'legal' COLLATE NOCASE"]
+    }).map((entry) => ({
+      ...entry,
+      label: entry.value.replaceAll('_', ' ').replace(/^./u, (letter) => letter.toUpperCase())
+    }));
+    const manaValues = manaFacetRows(database, filters);
+    const tokenTypes = tokenTypeFacetRows(database, filters)
+      .filter((entry) => entry.value.toLowerCase() !== 'creature');
+    // Creature is a generic search value, including token makers whose text
+    // does not contain an extractable power/toughness profile.
+    const creatureQuery = queryParts({ ...filters, tokenType: 'Creature' });
+    const creatureCount = Number(database.prepare(`
+      SELECT COUNT(DISTINCT c.catalog_key) AS count
+      FROM cards c
+      ${whereClause(creatureQuery.conditions)}
+    `).get(...creatureQuery.params).count);
+    if (creatureCount > 0) tokenTypes.unshift({ value: 'Creature', label: 'Creature', count: creatureCount });
 
     return {
-      abilities: facetRows(database, 'card_abilities'),
-      keywords: facetRows(database, 'card_keywords'),
-      types: facetRows(database, 'card_types'),
-      subtypes: facetRows(database, 'card_subtypes'),
+      // Excluding only the facet's own dimension keeps alternative choices
+      // available while every other active filter still narrows them.
+      abilities: facetRows(database, 'card_abilities', { ...filters, ability: '' }),
+      keywords: facetRows(database, 'card_keywords', { ...filters, keyword: '' }),
+      types: facetRows(database, 'card_types', { ...filters, type: '' }),
+      subtypes: facetRows(database, 'card_subtypes', { ...filters, subtype: '' }),
       effects,
-      tutorTargets
+      tutorTargets,
+      colors: colorFacetRows(database, filters),
+      legalities,
+      manaValues,
+      manaRange: {
+        min: manaValues.length ? Number(manaValues[0].value) : null,
+        max: manaValues.length ? Number(manaValues.at(-1).value) : null
+      },
+      tokenPowers: tokenFacetRows(database, filters, 'tokenPower', 'power'),
+      tokenToughnesses: tokenFacetRows(database, filters, 'tokenToughness', 'toughness'),
+      tokenTypes
     };
   });
 }
@@ -141,7 +255,7 @@ function normalizedFilters(input = {}) {
   if (!['exact', 'contains', 'subset'].includes(colorMode)) throw new HttpError(400, 'Ongeldige kleurmodus.');
 
   const effectInput = scalar(input.effect, 'Effect', 80).toLowerCase();
-  const effect = effectInput ? EFFECT_ALIASES[effectInput] : '';
+  const effect = Object.hasOwn(EFFECT_ALIASES, effectInput) ? EFFECT_ALIASES[effectInput] : '';
   if (effectInput && !effect) throw new HttpError(400, 'Onbekend kaarteffect.');
 
   const tutorTarget = scalar(input.tutorTarget, 'Tutor-doel', 80).toLowerCase();
@@ -192,7 +306,7 @@ function normalizedFilters(input = {}) {
   };
 }
 
-function queryParts(filters) {
+function queryParts(filters, { tokenProfileAlias = '' } = {}) {
   const conditions = [];
   const params = [];
 
@@ -257,7 +371,7 @@ function queryParts(filters) {
   }
 
   const needsToken = filters.effect === 'creature_token'
-    || filters.tokenPower || filters.tokenToughness || filters.tokenType;
+    || filters.tokenPower || filters.tokenToughness || filters.tokenType || tokenProfileAlias;
   const needsTutor = filters.effect === 'tutor' || filters.tutorTarget;
   if (filters.effect && !['creature_token', 'tutor'].includes(filters.effect)) {
     conditions.push('EXISTS (SELECT 1 FROM card_effects effect WHERE effect.card_id = c.id AND effect.value = ?)');
@@ -270,23 +384,30 @@ function queryParts(filters) {
     ? filters.tokenType
     : '';
   if (filters.tokenPower || filters.tokenToughness || specificTokenType) {
-    const tokenConditions = ['token.card_id = c.id'];
+    const tokenAlias = tokenProfileAlias || 'token';
+    const tokenConditions = [];
     if (filters.tokenPower) {
-      tokenConditions.push('token.power = ? COLLATE NOCASE');
+      tokenConditions.push(`${tokenAlias}.power = ? COLLATE NOCASE`);
       params.push(filters.tokenPower);
     }
     if (filters.tokenToughness) {
-      tokenConditions.push('token.toughness = ? COLLATE NOCASE');
+      tokenConditions.push(`${tokenAlias}.toughness = ? COLLATE NOCASE`);
       params.push(filters.tokenToughness);
     }
     if (specificTokenType) {
-      tokenConditions.push("token.token_type LIKE ? ESCAPE '^' COLLATE NOCASE");
+      tokenConditions.push(`${tokenAlias}.token_type LIKE ? ESCAPE '^' COLLATE NOCASE`);
       params.push(`%${escapeLike(specificTokenType)}%`);
     }
-    conditions.push(`EXISTS (
-      SELECT 1 FROM card_tokens token
-      WHERE ${tokenConditions.join(' AND ')}
-    )`);
+    if (tokenProfileAlias) {
+      // A token facet must aggregate the same profile matched by the remaining
+      // attributes, not another token produced by the same card.
+      conditions.push(...tokenConditions);
+    } else {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM card_tokens token
+        WHERE token.card_id = c.id AND ${tokenConditions.join(' AND ')}
+      )`);
+    }
   }
   if (needsTutor) {
     conditions.push("EXISTS (SELECT 1 FROM card_effects effect WHERE effect.card_id = c.id AND effect.value = 'tutor')");
@@ -364,7 +485,7 @@ function resultItem(row, reasons, tokens, filters) {
 export function searchCardCatalog(input = {}) {
   const filters = normalizedFilters(input);
   const { conditions, params } = queryParts(filters);
-  const where = conditions.length ? `WHERE ${conditions.join('\n      AND ')}` : '';
+  const where = whereClause(conditions);
   const offset = (filters.page - 1) * filters.limit;
   const reasons = matchReasons(filters);
 

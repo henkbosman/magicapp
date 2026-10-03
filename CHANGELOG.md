@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.11.1 - 2026-10-03
+
+### Reactieve filters bij Kaarten ontdekken
+
+- Alle filteropties en aantallen volgen de andere actieve filters, inclusief naam en kaarttekst. **Instant** beperkt bijvoorbeeld de beschikbare abilities, subtypes en effecten tot passende kaarten.
+- Elk filter blijft vervangbaar doordat de eigen gekozen waarde niet wordt toegepast bij het bepalen van zijn alternatieven. Gekozen waarden zonder resultaten blijven zichtbaar met **0 matches** en kunnen worden gewist.
+- Subtypes, legaliteit, kleuren, tokenkenmerken en tutor-doelen gebruiken de gefilterde catalogus; manawaarden tonen passende suggesties zonder een handmatig bereik te overschrijven.
+- Opties en resultaten worden samen bijgewerkt. Verouderde antwoorden bij snel typen of wisselen worden genegeerd; de formuliervelden en focus blijven behouden.
+
+### API en database
+
+- Het bestaande `GET /api/read/card-catalog/options` accepteert nu dezelfde inhoudelijke filters als `/search` en levert aanvullende kleur-, legaliteits-, mana- en tokenopties. Paginering en sortering hebben geen invloed op de opties.
+- Geen nieuwe endpointpaden of databaseschemawijzigingen. Zowel de primaire database als een al geïmporteerde MTGJSON-catalogus blijven direct bruikbaar; opnieuw importeren is niet nodig.
+
 ## 2.11.0 - 2026-10-03
 
 ### Kaarten ontdekken

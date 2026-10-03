@@ -2160,13 +2160,18 @@ html.write-unavailable [data-write-only] { display: none !important; }
   border-radius: 10px;
   background: var(--surface);
   cursor: pointer;
+  padding: 5px 0;
+  gap: 2px;
 }
 .discovery-color-option:hover { border-color: #8aa792; background: var(--surface-soft); }
+.discovery-color-option:has(input:disabled) { opacity: .4; cursor: not-allowed; }
+.discovery-color-count { color: var(--ink-soft); font-size: .65rem; line-height: 1; }
 .discovery-color-option:has(input:checked) {
   border-color: var(--primary-dark);
   background: var(--primary-soft);
   box-shadow: 0 0 0 2px rgba(40, 99, 62, .12);
 }
+.discovery-color-option.discovery-color-unavailable { border-style: dashed; }
 .discovery-color-option:has(input:focus-visible) { outline: 3px solid rgba(40, 99, 62, .24); outline-offset: 2px; }
 .discovery-color-option .mana-symbol { width: 25px; height: 25px; flex-basis: 25px; }
 .discovery-color-filter > select { margin-top: 7px; }
@@ -2177,6 +2182,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
   gap: 8px;
 }
 .discovery-effect-fields { display: grid; gap: 10px; }
+.discovery-facet-hint { margin: 0; color: var(--ink-soft); font-size: .72rem; line-height: 1.45; }
 .discovery-results-column { min-width: 0; }
 .discovery-results-toolbar {
   min-height: 43px;

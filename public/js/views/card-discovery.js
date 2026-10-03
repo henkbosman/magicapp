@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { cardTextHtml, colorIdentity, manaCost, manaSymbol, pageHeader } from '../components.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
-import { bindLiveFilters, replaceRouteQuery, resetFilterForm } from '../live-filters.js';
+import { formFilters, replaceRouteQuery, resetFilterForm } from '../live-filters.js';
 import { emptyState, escapeHtml, toast } from '../utils.js';
 
 const COLOR_OPTIONS = [
@@ -13,7 +13,6 @@ const COLOR_OPTIONS = [
   ['C', 'Kleurloos']
 ];
 
-const TYPE_OPTIONS = ['Creature', 'Land', 'Artifact', 'Enchantment', 'Instant', 'Sorcery', 'Planeswalker', 'Battle'];
 const LEGALITY_OPTIONS = [
   ['commander', 'Commander'],
   ['standard', 'Standard'],
@@ -47,6 +46,18 @@ const TUTOR_TARGET_OPTIONS = [
   ['planeswalker', 'Planeswalker']
 ];
 const ACTIVE_IMPORT_STATES = new Set(['queued', 'starting', 'downloading', 'download', 'parsing', 'importing', 'indexing', 'validating', 'running']);
+const FACET_FIELDS = [
+  ['ability', 'abilities', 'Alle abilities'],
+  ['keyword', 'keywords', 'Alle keywords'],
+  ['type', 'types', 'Alle types'],
+  ['subtype', 'subtypes', 'Alle subtypes'],
+  ['legality', 'legalities', 'Alle formaten'],
+  ['effect', 'effects', 'Alle effecten'],
+  ['tokenPower', 'tokenPowers', 'Elke sterkte'],
+  ['tokenToughness', 'tokenToughnesses', 'Elke defense'],
+  ['tokenType', 'tokenTypes', 'Elk tokentype'],
+  ['tutorTarget', 'tutorTargets', 'Elk doel']
+];
 
 function firstDefined(...values) {
   return values.find((value) => value !== undefined && value !== null);
@@ -169,7 +180,7 @@ function option(value, label, selected = '') {
 function optionEntries(values = []) {
   return (Array.isArray(values) ? values : []).map((entry) => {
     if (typeof entry === 'string') return { value: entry, label: entry, count: null };
-    const value = String(firstDefined(entry.value, entry.name, entry.key, '') || '');
+    const value = String(firstDefined(entry.value, entry.name, entry.key, ''));
     return {
       value,
       label: String(firstDefined(entry.label, entry.name, value) || value),
@@ -179,21 +190,50 @@ function optionEntries(values = []) {
 }
 
 function optionsHtml(values, selected) {
-  return optionEntries(values).map((entry) => option(
+  const entries = optionEntries(values);
+  const active = String(selected || '');
+  const matching = entries.find((entry) => entry.value.toLowerCase() === active.toLowerCase());
+  if (matching) matching.value = active;
+  else if (active) {
+    const label = [...EFFECT_OPTIONS, ...TUTOR_TARGET_OPTIONS, ...LEGALITY_OPTIONS].find(([value]) => value === active)?.[1] || active;
+    entries.push({ value: active, label, count: 0 });
+  }
+  return entries.filter((entry) => entry.count !== 0 || entry.value === active).map((entry) => option(
     entry.value,
-    entry.count === null ? entry.label : `${entry.label} (${entry.count})`,
+    entry.count === null ? entry.label : `${entry.label} (${entry.count === 0 ? '0 matches' : entry.count})`,
     selected
   )).join('');
 }
 
-function colorIdentityFilterHtml(selectedColors = [], mode = 'subset') {
+function facetOptionsHtml(name, options, selected = '') {
+  const [, key, placeholder] = FACET_FIELDS.find(([field]) => field === name);
+  return option('', placeholder, selected) + optionsHtml(options[key] || [], selected);
+}
+
+function manaValuesHtml(options) {
+  return optionsHtml(options.manaValues || [], '');
+}
+
+function manaHint(options) {
+  const { min, max } = options.manaRange || {};
+  return min === null || min === undefined || max === null || max === undefined
+    ? 'Geen mana values binnen de overige filters. Je kunt zelf een grens invullen.'
+    : `Beschikbare mana values: ${min}–${max}. Je kunt zelf een grens invullen.`;
+}
+
+function colorIdentityFilterHtml(selectedColors = [], mode = 'subset', options = {}) {
   const selected = new Set(uniqueColors(selectedColors));
+  const colors = new Map(optionEntries(options.colors).map((entry) => [entry.value, entry]));
   return `<fieldset class="field discovery-color-filter">
     <legend>Commander-kleuridentiteit</legend>
-    <div class="discovery-color-options">${COLOR_OPTIONS.map(([value, label]) => `<label class="discovery-color-option" title="${escapeHtml(label)}">
-      <input class="sr-only" type="checkbox" name="colorIdentity" value="${value}" ${selected.has(value) ? 'checked' : ''}>
-      <span aria-hidden="true">${manaSymbol(value, { label })}</span><span class="sr-only">${escapeHtml(label)}</span>
-    </label>`).join('')}</div>
+    <div class="discovery-color-options">${COLOR_OPTIONS.map(([value, label]) => {
+      const count = colors.get(value)?.count || 0;
+      const description = `${label} (${count || '0 matches'})`;
+      return `<label class="discovery-color-option${!count && selected.has(value) ? ' discovery-color-unavailable' : ''}" title="${escapeHtml(description)}">
+        <input class="sr-only" type="checkbox" name="colorIdentity" value="${value}" ${selected.has(value) ? 'checked' : ''} ${!count && !selected.has(value) ? 'disabled' : ''} aria-label="${escapeHtml(description)}">
+        <span aria-hidden="true">${manaSymbol(value, { label })}</span><span class="discovery-color-count" data-color-count aria-hidden="true">${count}</span>
+      </label>`;
+    }).join('')}</div>
     <select name="colorMode" aria-label="Modus voor kleuridentiteit">
       ${option('subset', 'Past binnen deze kleuren', mode)}
       ${option('contains', 'Bevat alle gekozen kleuren', mode)}
@@ -322,18 +362,13 @@ export async function renderCardDiscovery(context) {
   const filters = discoveryFiltersFromQuery(context.query);
   const initialParams = discoverySearchParams(filters);
   const [options, rawResult] = await Promise.all([
-    api('/card-catalog/options'),
+    api(`/card-catalog/options?${initialParams}`),
     api(`/card-catalog/search?${initialParams}`)
   ]);
   let result = normalizedResult(rawResult, filters.page);
   const filterCount = activeFilterCount(filters);
   const isCompactViewport = globalThis.window?.matchMedia?.('(max-width: 900px)')?.matches === true;
   const filtersOpen = !isCompactViewport || filterCount > 0 || filtersExpanded('discover');
-  const abilities = options.abilities || options.triggers || [];
-  const keywords = options.keywords || [];
-  const types = options.types?.length ? options.types : TYPE_OPTIONS;
-  const effects = options.effects?.length ? options.effects : EFFECT_OPTIONS.map(([value, label]) => ({ value, label }));
-  const tutorTargets = options.tutorTargets?.length ? options.tutorTargets : TUTOR_TARGET_OPTIONS.map(([value, label]) => ({ value, label }));
 
   return {
     html: `
@@ -342,7 +377,7 @@ export async function renderCardDiscovery(context) {
         title: 'Kaarten ontdekken',
         description: 'Combineer meerdere kenmerken om precies de kaarten te vinden die bij je deckplan passen.'
       })}
-      <p class="discovery-filter-note">Alle actieve filters worden gecombineerd. Effectfilters zijn afgeleid van de Engelse kaarttekst; controleer voor gebruik altijd de kaartdetails.</p>
+      <p class="discovery-filter-note">Filteropties passen zich aan de overige filters aan; je kunt elk filter blijven wijzigen. Geselecteerde opties met 0 matches blijven staan totdat je ze wist. Effectfilters zijn afgeleid van de Engelse kaarttekst; controleer altijd de kaartdetails.</p>
       ${filterToggleHtml({ id: 'discovery-filter-toggle', panelId: 'discovery-filter-panel', expanded: filtersOpen, activeCount: filterCount, resetId: 'discovery-filter-reset' })}
       <section class="discovery-layout">
         <aside id="discovery-filter-panel" class="panel discovery-filter-panel" ${filtersOpen ? '' : 'hidden'}>
@@ -352,34 +387,36 @@ export async function renderCardDiscovery(context) {
               <h3>Tekst en kaartsoort</h3>
               <div class="field"><label for="discovery-name">Naam</label><input id="discovery-name" name="name" type="search" value="${escapeHtml(filters.name)}" placeholder="Bijv. Zendikar"></div>
               <div class="field"><label for="discovery-text">Kaarttekst bevat</label><input id="discovery-text" name="text" type="text" value="${escapeHtml(filters.text)}" placeholder="Bijv. create a 2/2"></div>
-              <div class="field"><label for="discovery-ability">Ability of trigger</label><select id="discovery-ability" name="ability"><option value="">Alle abilities</option>${optionsHtml(abilities, filters.ability)}</select></div>
-              <div class="field"><label for="discovery-keyword">Keyword</label><select id="discovery-keyword" name="keyword"><option value="">Alle keywords</option>${optionsHtml(keywords, filters.keyword)}</select></div>
-              <div class="field"><label for="discovery-type">Kaarttype</label><select id="discovery-type" name="type"><option value="">Alle types</option>${optionsHtml(types, filters.type)}</select></div>
-              <div class="field"><label for="discovery-subtype">Subtype</label><input id="discovery-subtype" name="subtype" type="text" value="${escapeHtml(filters.subtype)}" placeholder="Bijv. Elf of Elemental"></div>
+              <div class="field"><label for="discovery-ability">Ability of trigger</label><select id="discovery-ability" name="ability">${facetOptionsHtml('ability', options, filters.ability)}</select></div>
+              <div class="field"><label for="discovery-keyword">Keyword</label><select id="discovery-keyword" name="keyword">${facetOptionsHtml('keyword', options, filters.keyword)}</select></div>
+              <div class="field"><label for="discovery-type">Kaarttype</label><select id="discovery-type" name="type">${facetOptionsHtml('type', options, filters.type)}</select></div>
+              <div class="field"><label for="discovery-subtype">Subtype</label><select id="discovery-subtype" name="subtype">${facetOptionsHtml('subtype', options, filters.subtype)}</select></div>
             </section>
 
             <section class="discovery-filter-section">
               <h3>Kleur, mana en legaliteit</h3>
-              ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode)}
+              ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode, options)}
               <div class="discovery-mana-range">
-                <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="1" value="${escapeHtml(filters.manaMin)}"></div>
-                <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="1" value="${escapeHtml(filters.manaMax)}"></div>
+                <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMin)}"></div>
+                <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMax)}"></div>
               </div>
-              <div class="field"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality"><option value="">Alle formaten</option>${LEGALITY_OPTIONS.map(([value, label]) => option(value, label, filters.legality)).join('')}</select></div>
+              <datalist id="discovery-mana-values">${manaValuesHtml(options)}</datalist>
+              <p id="discovery-mana-hint" class="discovery-facet-hint">${escapeHtml(manaHint(options))}</p>
+              <div class="field"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality">${facetOptionsHtml('legality', options, filters.legality)}</select></div>
             </section>
 
             <section class="discovery-filter-section">
               <h3>Effect</h3>
-              <div class="field"><label for="discovery-effect">Gewenst effect</label><select id="discovery-effect" name="effect"><option value="">Alle effecten</option>${optionsHtml(effects, filters.effect)}</select></div>
+              <div class="field"><label for="discovery-effect">Gewenst effect</label><select id="discovery-effect" name="effect">${facetOptionsHtml('effect', options, filters.effect)}</select></div>
               <div id="discovery-token-fields" class="discovery-effect-fields" ${filters.effect === 'token' ? '' : 'hidden'}>
                 <div class="discovery-token-stats">
-                  <div class="field"><label for="discovery-token-power">Tokensterkte</label><input id="discovery-token-power" name="tokenPower" value="${escapeHtml(filters.tokenPower)}" placeholder="2"></div>
-                  <div class="field"><label for="discovery-token-toughness">Tokendefense</label><input id="discovery-token-toughness" name="tokenToughness" value="${escapeHtml(filters.tokenToughness)}" placeholder="2"></div>
+                  <div class="field"><label for="discovery-token-power">Tokensterkte</label><select id="discovery-token-power" name="tokenPower">${facetOptionsHtml('tokenPower', options, filters.tokenPower)}</select></div>
+                  <div class="field"><label for="discovery-token-toughness">Tokendefense</label><select id="discovery-token-toughness" name="tokenToughness">${facetOptionsHtml('tokenToughness', options, filters.tokenToughness)}</select></div>
                 </div>
-                <div class="field"><label for="discovery-token-type">Tokentype</label><input id="discovery-token-type" name="tokenType" value="${escapeHtml(filters.tokenType)}" placeholder="Creature of Elemental"></div>
+                <div class="field"><label for="discovery-token-type">Tokentype</label><select id="discovery-token-type" name="tokenType">${facetOptionsHtml('tokenType', options, filters.tokenType)}</select></div>
               </div>
               <div id="discovery-tutor-fields" class="discovery-effect-fields" ${filters.effect === 'tutor' ? '' : 'hidden'}>
-                <div class="field"><label for="discovery-tutor-target">Zoekt naar</label><select id="discovery-tutor-target" name="tutorTarget"><option value="">Elk doel</option>${optionsHtml(tutorTargets, filters.tutorTarget)}</select></div>
+                <div class="field"><label for="discovery-tutor-target">Zoekt naar</label><select id="discovery-tutor-target" name="tutorTarget">${facetOptionsHtml('tutorTarget', options, filters.tutorTarget)}</select></div>
               </div>
             </section>
           </form>
@@ -410,17 +447,38 @@ export async function renderCardDiscovery(context) {
       const effect = document.getElementById('discovery-effect');
       const tokenFields = document.getElementById('discovery-token-fields');
       const tutorFields = document.getElementById('discovery-tutor-fields');
+      const manaValues = document.getElementById('discovery-mana-values');
+      const manaDescription = document.getElementById('discovery-mana-hint');
       const colorControls = [...form.querySelectorAll('input[name="colorIdentity"]')];
       let currentPage = result.page;
       let resultRequestSequence = 0;
-      let liveFilters;
+      let requestController = null;
+      let debounceTimer = null;
+      let currentOptions = options;
+
+      const updateColors = () => {
+        const colors = new Map(optionEntries(currentOptions.colors).map((entry) => [entry.value, entry]));
+        for (const control of colorControls) {
+          const label = COLOR_OPTIONS.find(([value]) => value === control.value)?.[1] || control.value;
+          const count = colors.get(control.value)?.count || 0;
+          const description = `${label} (${count || '0 matches'})`;
+          control.disabled = !control.checked && !count;
+          control.setAttribute('aria-label', description);
+          const labelElement = control.closest('label');
+          labelElement.title = description;
+          labelElement.classList.toggle('discovery-color-unavailable', !count && control.checked);
+          labelElement.querySelector('[data-color-count]').textContent = String(count);
+        }
+      };
 
       for (const control of colorControls) {
         control.addEventListener('change', () => {
-          if (!control.checked) return;
-          for (const other of colorControls) {
-            if (other !== control && (control.value === 'C' || other.value === 'C')) other.checked = false;
+          if (control.checked) {
+            for (const other of colorControls) {
+              if (other !== control && (control.value === 'C' || other.value === 'C')) other.checked = false;
+            }
           }
+          updateColors();
         });
       }
 
@@ -447,7 +505,7 @@ export async function renderCardDiscovery(context) {
       });
 
       const routeParams = (page = currentPage) => {
-        const params = liveFilters?.getParams() || new URLSearchParams(new FormData(form));
+        const params = formFilters(form, { colorMode: 'subset' });
         if (sort.value !== 'relevance') params.set('sort', sort.value);
         else params.delete('sort');
         if (page > 1) params.set('page', String(page));
@@ -455,42 +513,96 @@ export async function renderCardDiscovery(context) {
         return params;
       };
 
-      const loadResults = async (routeValues, signal) => {
-        const requestSequence = ++resultRequestSequence;
-        const apiParams = discoverySearchParams(routeValues);
-        const next = normalizedResult(await api(`/card-catalog/search?${apiParams}`, { signal }), Number(apiParams.get('page')));
-        if (requestSequence !== resultRequestSequence) return false;
-        result = next;
-        currentPage = next.page;
-        results.innerHTML = renderDiscoveryResults(next);
-        count.textContent = resultCountHtml(next);
-        pagination.innerHTML = paginationHtml(next);
-        filterToggle.updateActiveCount();
-        return true;
+      const setLoading = (loading) => {
+        form.classList.toggle('filters-loading', loading);
+        if (loading) {
+          form.setAttribute('aria-busy', 'true');
+          results.setAttribute('aria-busy', 'true');
+        } else {
+          form.removeAttribute('aria-busy');
+          results.removeAttribute('aria-busy');
+        }
       };
 
-      liveFilters = bindLiveFilters({
-        form,
-        routePath: '/discover',
-        defaults: { colorMode: 'subset' },
-        onApply: async (params, signal) => {
-          currentPage = 1;
-          if (sort.value !== 'relevance') params.set('sort', sort.value);
-          replaceRouteQuery('/discover', params);
-          await loadResults(params, signal);
-        },
-        onError: (error) => toast(error.message || 'Zoeken is mislukt.', 'error')
+      const invalidateRequest = () => {
+        clearTimeout(debounceTimer);
+        requestController?.abort();
+        resultRequestSequence += 1;
+      };
+
+      const updateOptions = (nextOptions) => {
+        currentOptions = nextOptions;
+        for (const [name] of FACET_FIELDS) {
+          const control = form.querySelector(`[name="${name}"]`);
+          // Keep the control itself mounted and preserve a selected zero-match value.
+          control.innerHTML = facetOptionsHtml(name, nextOptions, control.value);
+        }
+        updateColors();
+        manaValues.innerHTML = manaValuesHtml(nextOptions);
+        manaDescription.textContent = manaHint(nextOptions);
+        updateEffectFields();
+      };
+
+      const loadResults = async (routeValues) => {
+        invalidateRequest();
+        if (form.isConnected === false) return false;
+        requestController = new AbortController();
+        const { signal } = requestController;
+        const requestSequence = resultRequestSequence;
+        const apiParams = discoverySearchParams(routeValues);
+        const requestedPage = Number(apiParams.get('page'));
+        replaceRouteQuery('/discover', routeValues);
+        setLoading(true);
+        try {
+          const [nextOptions, nextResult] = await Promise.all([
+            api(`/card-catalog/options?${apiParams}`, { signal }),
+            api(`/card-catalog/search?${apiParams}`, { signal })
+          ]);
+          // A keystroke invalidates immediately, including while its debounce is pending.
+          if (signal.aborted || requestSequence !== resultRequestSequence || form.isConnected === false
+            || discoverySearchParams(routeParams(requestedPage)).toString() !== apiParams.toString()) return false;
+          const next = normalizedResult(nextResult, requestedPage);
+          result = next;
+          currentPage = next.page;
+          updateOptions(nextOptions);
+          results.innerHTML = renderDiscoveryResults(next);
+          count.textContent = resultCountHtml(next);
+          pagination.innerHTML = paginationHtml(next);
+          filterToggle.updateActiveCount();
+          return true;
+        } catch (error) {
+          if (requestSequence === resultRequestSequence && error?.name !== 'AbortError') {
+            requestController.abort();
+            toast(error.message || 'Zoeken is mislukt.', 'error');
+          }
+          return false;
+        } finally {
+          if (requestSequence === resultRequestSequence) setLoading(false);
+        }
+      };
+
+      const applyFilters = () => {
+        currentPage = 1;
+        return loadResults(routeParams(1));
+      };
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        applyFilters();
       });
+      form.addEventListener('input', (event) => {
+        if (!event.target.matches('input[type="search"], input[type="text"], input[type="number"]')) return;
+        invalidateRequest();
+        setLoading(true);
+        filterToggle.updateActiveCount();
+        debounceTimer = setTimeout(applyFilters, 220);
+      });
+      form.addEventListener('change', applyFilters);
 
       sort.addEventListener('change', async () => {
         currentPage = 1;
         const params = routeParams(1);
-        replaceRouteQuery('/discover', params);
-        try {
-          await loadResults(params);
-        } catch (error) {
-          toast(error.message || 'Sorteren is mislukt.', 'error');
-        }
+        await loadResults(params);
       });
 
       pagination.addEventListener('click', async (event) => {
@@ -498,13 +610,8 @@ export async function renderCardDiscovery(context) {
         if (!button || button.disabled) return;
         const nextPage = Math.max(Number(button.dataset.discoveryPage || 1), 1);
         const params = routeParams(nextPage);
-        replaceRouteQuery('/discover', params);
-        try {
-          if (await loadResults(params)) {
-            document.querySelector('.discovery-results-toolbar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        } catch (error) {
-          toast(error.message || 'Resultaten laden is mislukt.', 'error');
+        if (await loadResults(params)) {
+          document.querySelector('.discovery-results-toolbar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       });
 
@@ -512,7 +619,8 @@ export async function renderCardDiscovery(context) {
         resetFilterForm(form, { colorMode: 'subset' });
         sort.value = 'relevance';
         updateEffectFields();
-        liveFilters.apply();
+        updateColors();
+        applyFilters();
       });
     }
   };

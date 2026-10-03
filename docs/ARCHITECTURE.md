@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.11.0
+# Architectuur - Magic Collection Manager 2.11.1
 
 ## Overzicht
 
@@ -136,6 +136,10 @@ De import accepteert geen URL uit een request. Bron en checksum zijn vastgezet o
 De worker leest het JSON-document streaming en krijgt maximaal 256 MiB V8 old-generation geheugen. Tijdelijke bestanden hebben beperkte bestandsrechten en worden na succes, fout of serverstop opgeruimd. Een exclusieve lockfile voorkomt ook tussen meerdere Node-processen dat imports en cataloguswissels overlappen. Tijdens shutdown wordt een actieve worker eerst beëindigd en daarna worden de catalogus- en primaire databaseverbinding afzonderlijk gesloten.
 
 ## Cataloguszoekmodel
+
+Sinds 2.11.1 accepteert het bestaande optiesendpoint dezelfde inhoudelijke filters als het zoekendpoint. Iedere facet past alle andere filters toe en laat zijn eigen dimensie weg (disjunctieve facets). Kleuren laten kleuridentiteit en kleurmodus weg; het manabereik laat beide grenzen weg; de effectfacet laat ook de effectafhankelijke token- en tutorwaarden weg. De tokenfacets toetsen overgebleven tokenkenmerken binnen dezelfde rij in `card_tokens`. Opties tellen unieke `catalog_key`-waarden over de volledige dataset, los van paginering en sortering. Alle queries blijven read-only; beide databaseschema's zijn ongewijzigd en bestaande catalogi vereisen geen herimport.
+
+De ontdekview haalt opties en resultaten met dezelfde filterwaarden op en past beide samen toe. Bij invoer wordt een verouderd verzoek direct ongeldig; tekstinvoer wordt kort gebundeld voordat een nieuwe aanvraag start. De bestaande formulierelementen blijven staan, terwijl opties ter plekke worden vervangen. Gekozen waarden met nul matches blijven zichtbaar en verwijderbaar, lege facets gebruiken geen statische volledige optielijst als fallback. Manawaarden dienen als suggesties; een handmatig gekozen bereik wordt nooit stilzwijgend aangepast.
 
 De repository valideert lengte, numerieke bereiken, enums, pagina en limiet voordat SQL wordt opgebouwd. Alle waarden zijn gebonden parameters; tabelnamen komen uitsluitend uit interne vaste mappings. Zoekresultaten worden per `catalog_key` gededupliceerd en bieden maximaal 100 resultaten per pagina en maximaal 5.000 resultaten offset.
 
