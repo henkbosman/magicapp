@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.11.2
+# Architectuur - Magic Collection Manager 2.11.3
 
 ## Overzicht
 
@@ -109,6 +109,10 @@ Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie 
 `#/discover` biedt een afzonderlijke deckbouwzoekpagina en staat in zowel het linker- als mobiele menu. De view controleert eerst de catalogusstatus en toont zonder actieve catalogus een onderhouds-CTA. Met een beschikbare catalogus combineert zij naam, Oracle-tekst, ability, keyword, type, subtype, kleuridentiteit, mana value, legaliteit en effectfilters. Alle actieve filters zijn conjunctief. De kleurmodi zijn subset van gekozen Commander-kleuren, bevat alle gekozen kleuren en exact. Tokenfilters ondersteunen power, toughness en tokentype; tutorfilters ondersteunen het gezochte kaarttype. De filterstate, sortering en pagina staan in de hashquery. Zonder inhoudelijk zoekfilter laadt de view alleen opties, geen zoekresultaten; reset herstelt deze lege beginstaat. Kleur, mana en legaliteit staan in een horizontale details-sectie die standaard dicht is.
 
 Resultaten bevatten geen primaire database-ID. Een preview-icoon opent via `discovery-preview.js` een dialoog. Het nieuwe `GET /api/read/card-catalog/preview?name=...` resolveert de exacte kaartnaam via de vaste Scryfall named-route en geeft alleen gevalideerde afbeeldings-URL's terug. De resolver gebruikt een begrensde tijdelijke geheugencache, verzoekbundeling en time-outs; zij schrijft geen kaarten of cachegegevens in een database. De browser toont een of twee kaartzijden en meldt ontbrekende of mislukte afbeeldingen in de dialoog. De bestaande Content Security Policy blijft behouden.
+
+Sinds 2.11.3 rendert de ontdekview de `matchReasons` uit de zoek-API niet meer. `discoveryTypeLineHtml` markeert bekende kaarttypewoorden met vaste kleurklassen, afzonderlijk per kaartzijde en alleen vóór de subtype-scheiding. Supertypes en subtypes blijven gewone escaped tekst. Meerdere types op één kaart behouden ieder hun kleur.
+
+De algemene HTTP-404 **Endpoint niet gevonden.** is een ontbrekende route, geen Scryfall-afbeeldingsfout. De popup geeft bij precies die fout uitleg over backend-update en herstart. De previewroute zelf is sinds 2.11.2 geregistreerd onder `/api/read/card-catalog/preview`; een nog draaiend oud Node-proces of afwijkende proxyroute kan deze niet kennen, ook als nieuwe statische bestanden al zichtbaar zijn. De afzonderlijke HTTP-regressietest toetst de volledige routeprefix en onderscheidt deze fout van een bestaande route die geen afbeelding vindt; deze test vereist de normale Express-afhankelijkheid.
 
 **Kaart opzoeken** bewaart via `prepareDiscoveryLookupNavigation` de ontdekroute en scrollpositie in een eigen terugkeercontext. De opzoekpagina behoudt `discoveryReturn` bij querywijzigingen en toont **Terug**. De ontdekroute bewaart voor deze terugkeer ook de open/dicht-toestand van de filterpanelen, zodat de pagina dezelfde hoogte krijgt. De bestaande router herstelt de scrollpositie na renderen. Precies één autocomplete-suggestie laadt automatisch printings, met guards tegen verouderde antwoorden en verder typen. `cardTextHtml` accepteert optioneel `{ highlight }` als derde parameter; letterlijke zoekmatches worden op brontekstposities gemarkeerd, zonder HTML-injectie of aantasting van symbolen en keywordmarkering.
 

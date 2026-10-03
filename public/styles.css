@@ -2219,7 +2219,6 @@ html.write-unavailable [data-write-only] { display: none !important; }
   grid-template-columns: minmax(210px, .75fr) minmax(270px, 1.25fr);
   grid-template-areas:
     "heading text"
-    "reasons text"
     "footer footer";
   gap: 11px 20px;
   align-items: start;
@@ -2258,27 +2257,36 @@ html.write-unavailable [data-write-only] { display: none !important; }
 .oracle-search-match { padding: 0; border-radius: 2px; color: inherit; background: #ffe58a; box-shadow: 0 0 0 1px #f4cd65; }
 .discovery-card-title .mana-cost { flex-wrap: nowrap; }
 .discovery-card-heading .card-meta { margin-bottom: 0; white-space: normal; }
+.discovery-card-type {
+  display: inline-block;
+  padding: .12em .4em;
+  margin-block: 2px;
+  border-radius: 4px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.discovery-card-type-artifact { background: #e2e8f0; color: #334155; }
+.discovery-card-type-battle { background: #ffedd5; color: #9a3412; }
+.discovery-card-type-conspiracy { background: #fae8ff; color: #86198f; }
+.discovery-card-type-creature { background: #dcfce7; color: #166534; }
+.discovery-card-type-dungeon { background: #ede9e3; color: #59412d; }
+.discovery-card-type-enchantment { background: #f3e8ff; color: #6b21a8; }
+.discovery-card-type-instant { background: #dbeafe; color: #1e40af; }
+.discovery-card-type-kindred { background: #ccfbf1; color: #115e59; }
+.discovery-card-type-land { background: #fef3c7; color: #854d0e; }
+.discovery-card-type-phenomenon { background: #ecfccb; color: #3f6212; }
+.discovery-card-type-plane { background: #cffafe; color: #155e75; }
+.discovery-card-type-planeswalker { background: #fce7f3; color: #9d174d; }
+.discovery-card-type-scheme { background: #e0e7ff; color: #3730a3; }
+.discovery-card-type-sorcery { background: #fee2e2; color: #991b1b; }
+.discovery-card-type-tribal { background: #d5eee8; color: #25534a; }
+.discovery-card-type-vanguard { background: #f2e5d5; color: #69421c; }
 .discovery-card-rules {
   grid-area: text;
   min-width: 0;
   color: var(--ink);
   font-size: .9rem;
   overflow-wrap: anywhere;
-}
-.discovery-match-reasons {
-  grid-area: reasons;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.discovery-match-reasons span {
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary-dark);
-  font-size: .68rem;
-  font-weight: 720;
 }
 .discovery-card-footer {
   grid-area: footer;
@@ -2333,7 +2341,6 @@ html.write-unavailable [data-write-only] { display: none !important; }
     grid-template-columns: 1fr;
     grid-template-areas:
       "heading"
-      "reasons"
       "text"
       "footer";
   }

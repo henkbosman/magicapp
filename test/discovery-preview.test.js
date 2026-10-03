@@ -5,12 +5,19 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { catalogPreviewFromScryfall, createCatalogPreviewService } from '../src/card-catalog/preview.js';
-import { discoveryPreviewHtml, openDiscoveryCardPreview } from '../public/js/discovery-preview.js';
+import { discoveryPreviewErrorMessage, discoveryPreviewHtml, openDiscoveryCardPreview } from '../public/js/discovery-preview.js';
 
 const image = 'https://cards.scryfall.io/large/front/a/b/example.jpg';
 const backImage = 'https://cards.scryfall.io/large/back/a/b/example.jpg';
 const card = { name: 'Forest', image_uris: { large: image } };
 const json = (data, options = {}) => new Response(JSON.stringify(data), { ...options, headers: { 'content-type': 'application/json', ...options.headers } });
+
+test('discovery preview distinguishes an unavailable server route from a missing card image', () => {
+  const unavailable = discoveryPreviewErrorMessage({ status: 404, message: 'Endpoint niet gevonden.' });
+  assert.match(unavailable, /herstart de Node\.js-\/systemd-service/);
+  assert.equal(discoveryPreviewErrorMessage({ status: 404, message: 'Voor deze kaart is geen afbeelding beschikbaar.' }), 'Voor deze kaart is geen afbeelding beschikbaar.');
+  assert.equal(discoveryPreviewErrorMessage({ status: 503, message: 'De server is niet bereikbaar.' }), 'De server is niet bereikbaar.');
+});
 
 test('discovery preview resolves a single image or both transform faces without treating split faces as separate images', () => {
   assert.deepEqual(catalogPreviewFromScryfall(card), { name: 'Forest', faces: [{ name: 'Forest', image }] });
@@ -163,6 +170,16 @@ test('discovery image popup loads safe images and aborts/ignores stale responses
     assert.match(failed.body.innerHTML, /&lt;b&gt;Afbeelding niet beschikbaar&lt;\/b&gt;/);
     assert.doesNotMatch(failed.body.innerHTML, /<img|<b>/);
     failed.dialog.close();
+
+    const outdated = mockPreviewDialog();
+    globalThis.document = outdated.document;
+    globalThis.window = outdated.window;
+    globalThis.fetch = async () => json({ error: { message: 'Endpoint niet gevonden.' } }, { status: 404 });
+    openDiscoveryCardPreview({ name: 'Forest' });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.match(outdated.body.innerHTML, /herstart de Node\.js-\/systemd-service/);
+    assert.doesNotMatch(outdated.body.innerHTML, /Endpoint niet gevonden/);
+    outdated.dialog.close();
   } finally {
     Object.assign(globalThis, original);
   }

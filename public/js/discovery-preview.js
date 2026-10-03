@@ -27,6 +27,15 @@ export function discoveryPreviewHtml(preview) {
     </figure>`).join('')}</div>`;
 }
 
+export function discoveryPreviewErrorMessage(error) {
+  // A missing route differs from a known route that cannot find a card image.
+  // Static frontend files can already be new while Node still runs old routes.
+  if (error?.status === 404 && error.message === 'Endpoint niet gevonden.') {
+    return 'De actieve server kent de kaartpreview nog niet. Werk ook de serverbestanden bij en herstart de Node.js-/systemd-service. Open daarna de kaartafbeelding opnieuw.';
+  }
+  return error?.message || 'De kaartafbeelding kon niet worden geladen.';
+}
+
 export function openDiscoveryCardPreview(card) {
   if (!card?.name) return null;
   const controller = new AbortController();
@@ -59,7 +68,7 @@ export function openDiscoveryCardPreview(card) {
       }, { once: true }));
     } catch (error) {
       if (!dialog.open || controller.signal.aborted) return;
-      dialog.querySelector('.modal-body').innerHTML = `<p role="status">${escapeHtml(error.message || 'De kaartafbeelding kon niet worden geladen.')}</p>`;
+      dialog.querySelector('.modal-body').innerHTML = `<p role="status">${escapeHtml(discoveryPreviewErrorMessage(error))}</p>`;
     }
   })();
   return dialog;

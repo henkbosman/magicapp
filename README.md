@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.11.2
+# Magic Collection Manager 2.11.3
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -7,6 +7,8 @@ Versie **2.0.0** is de eerste productiebaseline. Versie **2.11.0** voegt de pagi
 Versie **2.11.1** maakt de filters op **Kaarten ontdekken** reactief: beschikbare opties en aantallen bewegen mee met de andere gekozen filters. De bestaande MTGJSON-catalogus blijft direct bruikbaar; opnieuw importeren is niet nodig.
 
 Versie **2.11.2** laat de ontdekpagina leeg starten, markeert de gezochte kaarttekst en voegt kaartafbeeldingen in een popup toe. Kleur, mana en legaliteit staan in een horizontale, standaard ingeklapte sectie. Vanuit **Kaart opzoeken** kun je met **Terug** naar dezelfde zoekopdracht en scrollpositie. Bij één overgebleven naamsuggestie verschijnen de printings automatisch.
+
+Versie **2.11.3** verwijdert de herhaalde filterredenen bij ontdekresultaten en geeft elk kaarttype een eigen kleurmarkering. De afbeeldingspopup herkent een ontbrekend preview-endpoint en legt uit dat ook de backend moet worden bijgewerkt en herstart.
 
 De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. De bestaande gebruikersdatabase `magic-collection.sqlite`, het 2.0-basisschema en alle collectie-, wanted- en deckgegevens worden niet aangepast en bevatten geen verwijzing naar de catalogusdatabase. De twee databases worden niet met `ATTACH` of cross-database-relaties gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
 
@@ -76,6 +78,8 @@ node server.js
 ```
 
 Gebruik bij systemd of PM2 de bijbehorende restart-opdracht.
+
+De melding **Endpoint niet gevonden.** bij een kaartafbeelding betekent dat de aanvraag niet bij het preview-endpoint uitkomt. Dit endpoint is aanwezig vanaf 2.11.2. Vervang de volledige applicatiecode (inclusief `server.js` en `src/`), behoud je `.env` en `data/`, en herstart de Node.js-/systemd-service. Via `/api/read/health` kun je daarna de actieve serverversie controleren. Blijft het probleem bestaan terwijl de juiste versie draait, controleer dan of de reverse proxy `/api/read/card-catalog/preview` doorstuurt naar dezelfde applicatie. Een ontbrekende kaartafbeelding bij Scryfall geeft een andere melding.
 
 ## Eerste productie-installatie
 
@@ -178,7 +182,7 @@ Elke keuzelijst houdt rekening met de andere filters, maar niet met haar eigen g
 
 Effectfilters omvatten onder meer Landfall, creature tokens, tutors, mana-productie, kaarten trekken, counters, power/toughness-verhoging, removal, sacrifice en graveyard-interactie. Bij tokens kan ook op power, toughness en tokentype worden gezocht; bij tutors op het gezochte kaarttype. Zo vindt de combinatie **Landfall**, **Token maken**, power **2** en toughness **2** kaarten die 2/2 tokens maken, terwijl **groen**, **Library doorzoeken** en eventueel een tutor-doel groene tutor-kaarten vindt. Effecten zijn automatisch afgeleid uit de Engelse AtomicCards-kaarttekst; controleer voor deckgebruik altijd de getoonde Oracle-tekst.
 
-Resultaten tonen de kaartnaam, manakosten, type, Oracle-tekst, kleuridentiteit en de redenen voor de match. De invoer bij **Kaarttekst bevat** wordt letterlijk en zonder hoofdletteronderscheid in de kaarttekst gemarkeerd; mana-iconen en bestaande abilitymarkeringen blijven behouden. Het kleine afbeeldingsicoon naast de kaartnaam opent een popup met een Scryfall-afbeelding. Deze preview voegt niets aan je collectie of primaire database toe en vereist internettoegang wanneer de afbeelding nog niet geladen is.
+Resultaten tonen de kaartnaam, manakosten, type, Oracle-tekst en kleuridentiteit. De filterredenen worden niet bij elke kaart herhaald. Elk kaarttype heeft een eigen kleurmarkering; bij een **Artifact Creature** worden beide types afzonderlijk gekleurd. Supertypes zoals Legendary en subtypes blijven gewone tekst. De invoer bij **Kaarttekst bevat** wordt letterlijk en zonder hoofdletteronderscheid in de kaarttekst gemarkeerd; mana-iconen en bestaande abilitymarkeringen blijven behouden. Het kleine afbeeldingsicoon naast de kaartnaam opent een popup met een Scryfall-afbeelding. Deze preview voegt niets aan je collectie of primaire database toe en vereist internettoegang wanneer de afbeelding nog niet geladen is.
 
 **Kaart opzoeken** opent de bestaande Scryfall-printingselectie voor die kaart. De knop **Terug** op de opzoekpagina herstelt vervolgens de filters, resultaatpagina en scrollpositie van de ontdekpagina. Zonder geïmporteerde catalogus toont de ontdekpagina een directe verwijzing naar Onderhoud.
 
@@ -283,7 +287,7 @@ In de wanted-lijst opent een klik op de kaartafbeelding of kaartnaam eerst de gr
 
 ## Database
 
-Een nieuwe 2.0-installatie maakt de primaire gebruikersdatabase rechtstreeks uit `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts. Versie 2.11.2 wijzigt dit schema en `user_version = 20000` niet.
+Een nieuwe 2.0-installatie maakt de primaire gebruikersdatabase rechtstreeks uit `src/db/schema.sql` aan. Er is geen `schema_migrations`-tabel en er zijn geen historische migratiescripts. Versie 2.11.3 wijzigt dit schema en `user_version = 20000` niet.
 
 Het primaire schema wordt idempotent geïnitialiseerd en gebruikt foreign keys, WAL-mode en een integriteitscontrole op de onderhoudspagina. De optionele MTGJSON-catalogus gebruikt een eigen schema en eigen SQLite-bestand. Zij heeft geen tabel, foreign key, `ATTACH`-koppeling of andere referentie in `magic-collection.sqlite`.
 

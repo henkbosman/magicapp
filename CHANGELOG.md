@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.11.3 - 2026-10-03
+
+### Kaarten ontdekken
+
+- De herhaalde filterredenen onder ieder resultaat zijn verwijderd, inclusief de bijbehorende lege lay-outruimte. De zoek-API blijft `matchReasons` voor bestaande API-clients teruggeven.
+- Kaarttypes krijgen elk een eigen kleurmarkering met leesbaar tekstcontrast. Meerdere types op één kaart worden apart gemarkeerd; supertypes, subtypes en dubbele kaartzijden blijven behouden.
+- De afbeeldingspopup onderscheidt een ontbrekend endpoint van een ontbrekende kaartafbeelding. Bij **Endpoint niet gevonden.** verschijnt nu concrete uitleg om de backendbestanden te vervangen en Node/systemd te herstarten.
+- De previewroute is aanwezig in zowel 2.11.2 als 2.11.3. Alleen frontendbestanden vervangen activeert deze route niet in een reeds draaiend ouder Node-proces.
+
+### Compatibiliteit
+
+- Geen nieuwe endpointpaden, API-contractwijzigingen, databaseschemawijzigingen of herimport nodig.
+
 ## 2.11.2 - 2026-10-03
 
 ### Ontdekken en opzoeken

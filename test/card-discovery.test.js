@@ -6,6 +6,7 @@ import {
   catalogImportActive,
   discoveryFiltersFromQuery,
   discoverySearchParams,
+  discoveryTypeLineHtml,
   hasDiscoveryFilters,
   normalizeCatalogStatus,
   paginationHtml,
@@ -95,7 +96,7 @@ test('een verouderde paginalink biedt een terugweg naar de laatste geldige pagin
   assert.match(html, /Pagina 100 bestaat niet meer/);
 });
 
-test('ontdekresultaten tonen mana, kaarttekst, matchredenen en alleen een veilige opzoeklink', () => {
+test('ontdekresultaten tonen mana, kaarttekst en een veilige opzoeklink zonder matchredenen', () => {
   const html = renderDiscoveryResults({
     items: [{
       catalogId: 'catalog-901',
@@ -106,7 +107,7 @@ test('ontdekresultaten tonen mana, kaarttekst, matchredenen en alleen een veilig
       typeLine: 'Enchantment',
       oracleText: 'Landfall — Whenever a land enters the battlefield under your control, create a 2/2 green Elemental creature token.',
       keywords: ['Landfall'],
-      matchReasons: ['Landfall', 'Maakt een 2/2 creature token']
+      matchReasons: ['Kaarttekst bevat “create”', 'Kleuridentiteit: G', { label: 'Maakt een 2/2 creature token' }]
     }],
     total: 1,
     page: 1,
@@ -117,11 +118,61 @@ test('ontdekresultaten tonen mana, kaarttekst, matchredenen en alleen een veilig
   assert.match(html, /data-catalog-id="catalog-901"/);
   assert.match(html, /aria-label="Manakosten \{3\}\{G\}\{G\}"/);
   assert.match(html, /<mark class="oracle-keyword">Landfall<\/mark>/);
-  assert.match(html, /Maakt een 2\/2 creature token/);
+  assert.doesNotMatch(html, /discovery-match-reasons|Kaarttekst bevat|Kleuridentiteit: G|Maakt een 2\/2 creature token/);
+  assert.match(html, /class="discovery-card-type discovery-card-type-enchantment">Enchantment<\/span>/);
   assert.match(html, /href="#\/add\?name=Zendikar's%20Roil"[^>]*>Kaart opzoeken<\/a>/);
   assert.match(html, /data-discovery-preview="0" aria-label="Afbeelding van Zendikar&#039;s Roil bekijken"/);
   assert.match(html, /data-discovery-lookup/);
   assert.doesNotMatch(html, /#\/cards\/catalog-901|\/cards\/catalog-901\/image/);
+});
+
+test('ontdekkaarttypes krijgen afzonderlijke kleuren met behoud van super- en subtypes', () => {
+  assert.equal(discoveryTypeLineHtml('Legendary Artifact Creature — Golem'),
+    'Legendary <span class="discovery-card-type discovery-card-type-artifact">Artifact</span> <span class="discovery-card-type discovery-card-type-creature">Creature</span> — Golem');
+  assert.equal(discoveryTypeLineHtml('Basic Snow Land — Forest'),
+    'Basic Snow <span class="discovery-card-type discovery-card-type-land">Land</span> — Forest');
+  const uncommon = discoveryTypeLineHtml('Kindred Instant — Arcane');
+  assert.match(uncommon, /discovery-card-type-kindred">Kindred<\/span>/);
+  assert.match(uncommon, /discovery-card-type-instant">Instant<\/span> — Arcane$/);
+});
+
+test('elke kaartzijde kleurt alleen types vóór de scheidingsstreep', () => {
+  const html = discoveryTypeLineHtml('Creature — Land // Sorcery — Instant');
+  assert.equal(html,
+    '<span class="discovery-card-type discovery-card-type-creature">Creature</span> — Land // <span class="discovery-card-type discovery-card-type-sorcery">Sorcery</span> — Instant');
+  assert.equal(discoveryTypeLineHtml('Artifact — Powerstone // Land'),
+    '<span class="discovery-card-type discovery-card-type-artifact">Artifact</span> — Powerstone // <span class="discovery-card-type discovery-card-type-land">Land</span>');
+});
+
+test('onbekende types en onveilige type-inhoud blijven gewone ontsnapte tekst', () => {
+  assert.equal(discoveryTypeLineHtml('Futuretype'), 'Futuretype');
+  assert.equal(discoveryTypeLineHtml(''), 'Kaarttype onbekend');
+  assert.equal(discoveryTypeLineHtml('  '), 'Kaarttype onbekend');
+  const html = discoveryTypeLineHtml('<img src=x onerror="alert(1)"> Creature — <script>Land</script>');
+  assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+  assert.match(html, /discovery-card-type-creature">Creature<\/span>/);
+  assert.match(html, /&lt;script&gt;Land&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<img|<script|discovery-card-type-land/);
+});
+
+test('alle kaarttypekleuren zijn verschillend en leesbaar', () => {
+  const styles = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const types = ['Artifact', 'Battle', 'Conspiracy', 'Creature', 'Dungeon', 'Enchantment', 'Instant', 'Kindred', 'Land', 'Phenomenon', 'Plane', 'Planeswalker', 'Scheme', 'Sorcery', 'Tribal', 'Vanguard'];
+  const backgrounds = new Set();
+  const luminance = (hex) => hex.match(/../g).map((channel) => parseInt(channel, 16) / 255)
+    .map((channel) => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4)
+    .reduce((sum, channel, i) => sum + channel * [.2126, .7152, .0722][i], 0);
+  for (const type of types) {
+    const html = discoveryTypeLineHtml(type);
+    const className = `discovery-card-type-${type.toLowerCase()}`;
+    assert.ok(html.includes(className), type);
+    const style = styles.match(new RegExp(`\\.${className} \\{ background: #([a-f0-9]{6}); color: #([a-f0-9]{6}); \\}`));
+    assert.ok(style, `Kleuren ontbreken voor ${type}`);
+    backgrounds.add(style[1]);
+    const contrast = (luminance(style[1]) + .05) / (luminance(style[2]) + .05);
+    assert.ok(contrast >= 4.5, `${type} heeft onvoldoende tekstcontrast (${contrast})`);
+  }
+  assert.equal(backgrounds.size, types.length);
 });
 
 test('ontdekresultaten arceren de letterlijke kaarttekstzoekopdracht en behouden keyword- en manamarkup', () => {

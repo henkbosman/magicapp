@@ -14,6 +14,14 @@ const COLOR_OPTIONS = [
   ['G', 'Groen'],
   ['C', 'Kleurloos']
 ];
+// Only these fixed class names may enter the markup; super- and subtypes stay plain text.
+const CARD_TYPE_CLASSES = new Map([
+  ['artifact', 'artifact'], ['battle', 'battle'], ['conspiracy', 'conspiracy'],
+  ['creature', 'creature'], ['dungeon', 'dungeon'], ['enchantment', 'enchantment'],
+  ['instant', 'instant'], ['kindred', 'kindred'], ['land', 'land'],
+  ['phenomenon', 'phenomenon'], ['plane', 'plane'], ['planeswalker', 'planeswalker'],
+  ['scheme', 'scheme'], ['sorcery', 'sorcery'], ['tribal', 'tribal'], ['vanguard', 'vanguard']
+]);
 
 const LEGALITY_OPTIONS = [
   ['commander', 'Commander'],
@@ -274,13 +282,19 @@ function cardKeywords(card) {
   return Array.isArray(card.keywords) ? card.keywords : [];
 }
 
-function cardMatchReasons(card) {
-  const raw = Array.isArray(card.matchReasons) ? card.matchReasons : [];
-  return raw.map((reason) => typeof reason === 'string'
-    ? reason
-    : firstDefined(reason.label, reason.description, reason.value, reason.kind, ''))
-    .map((reason) => String(reason || '').trim())
-    .filter(Boolean);
+export function discoveryTypeLineHtml(typeLine) {
+  if (!String(typeLine || '').trim()) return 'Kaarttype onbekend';
+  return String(typeLine).split(/(\/\/)/).map((face) => {
+    if (face === '//') return face;
+    const divider = face.search(/[—–]|\s-\s/);
+    const types = divider < 0 ? face : face.slice(0, divider);
+    const subtypes = divider < 0 ? '' : face.slice(divider);
+    return types.split(/(\s+)/).map((word) => {
+      const className = CARD_TYPE_CLASSES.get(word.toLowerCase());
+      const label = escapeHtml(word);
+      return className ? `<span class="discovery-card-type discovery-card-type-${className}">${label}</span>` : label;
+    }).join('') + escapeHtml(subtypes);
+  }).join('');
 }
 
 function catalogCardId(card) {
@@ -297,7 +311,6 @@ export function renderDiscoveryResults(result, filters = {}) {
     const text = firstDefined(card.oracleText, card.text, '') || '';
     const typeLine = firstDefined(card.typeLine, card.type, '') || '';
     const colors = uniqueColors(firstDefined(card.colorIdentity, card.colors, []));
-    const reasons = cardMatchReasons(card);
     const catalogId = catalogCardId(card);
     return `<article class="discovery-card" ${catalogId !== '' ? `data-catalog-id="${escapeHtml(String(catalogId))}"` : ''}>
       <div class="discovery-card-heading">
@@ -305,10 +318,9 @@ export function renderDiscoveryResults(result, filters = {}) {
           <h2>${escapeHtml(card.name || 'Naamloze kaart')} <button type="button" class="discovery-preview-button" data-discovery-preview="${index}" aria-label="Afbeelding van ${escapeHtml(card.name || 'de kaart')} bekijken" title="Kaartafbeelding bekijken"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 6h8v7H8zM8 16h8M8 18.5h5"></path></svg></button></h2>
           ${manaCost(card.manaCost)}
         </div>
-        <p class="card-meta">${escapeHtml(typeLine || 'Kaarttype onbekend')}</p>
+        <p class="card-meta">${discoveryTypeLineHtml(typeLine)}</p>
       </div>
       <div class="discovery-card-rules oracle-text">${text ? cardTextHtml(text, cardKeywords(card), { highlight: filters.text || '' }) : '<span class="muted">Geen kaarttekst beschikbaar.</span>'}</div>
-      ${reasons.length ? `<div class="discovery-match-reasons" aria-label="Waarom deze kaart overeenkomt">${reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join('')}</div>` : ''}
       <footer class="discovery-card-footer">
         <div class="discovery-card-facts">
           <span>${colorIdentity(colors)}</span>
