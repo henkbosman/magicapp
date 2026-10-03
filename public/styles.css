@@ -2199,7 +2199,6 @@ html.write-unavailable [data-write-only] { display: none !important; }
   gap: 8px;
 }
 .discovery-effect-fields { display: grid; gap: 10px; }
-.discovery-facet-hint { margin: 0; color: var(--ink-soft); font-size: .72rem; line-height: 1.45; }
 .discovery-results-column { min-width: 0; }
 .discovery-results-toolbar {
   min-height: 43px;

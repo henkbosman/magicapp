@@ -2,6 +2,7 @@ import { cardCatalogStatus, withCardCatalog } from './database.js';
 import { HttpError } from '../lib/http-error.js';
 import { colorMask, normalizeColors, normalizeSearchText } from '../lib/card-catalog-features.js';
 import { discoveryMarkIdentity } from '../lib/discovery-mark-identity.js';
+import { discoveryExcludedDeckId } from '../lib/discovery-deck-filter.js';
 
 const EFFECT_ALIASES = Object.freeze({
   token: 'creature_token',
@@ -48,14 +49,14 @@ const TUTOR_TARGET_LABELS = Object.freeze({
 const COLOR_LABELS = Object.freeze({ W: 'Wit', U: 'Blauw', B: 'Zwart', R: 'Rood', G: 'Groen', C: 'Kleurloos' });
 
 const MAX_SEARCH_OFFSET = 5000;
-const markFunctionsRegistered = new WeakSet();
+const identityFunctionsRegistered = new WeakSet();
 
-function markContext(context = {}) {
+function identityContext(cards = []) {
   const oracleIds = new Set();
   const fallbackNames = new Set();
   const allNames = new Set();
-  for (const mark of context.marks || []) {
-    const identity = discoveryMarkIdentity(mark);
+  for (const card of cards) {
+    const identity = discoveryMarkIdentity(card);
     if (identity.scryfallOracleId) oracleIds.add(identity.scryfallOracleId);
     else if (identity.normalizedName) fallbackNames.add(identity.normalizedName);
     if (identity.normalizedName) allNames.add(identity.normalizedName);
@@ -68,10 +69,42 @@ function markContext(context = {}) {
   };
 }
 
-function registerMarkNameFunction(database, filters) {
-  if (!filters.marked || !filters._marks.allNames.size || markFunctionsRegistered.has(database)) return;
-  database.function('discovery_mark_name', { deterministic: true }, (name) => normalizeSearchText(name));
-  markFunctionsRegistered.add(database);
+function contextualFilters(filters, context) {
+  if (filters.excludeDeckId !== null && context.excludedDeck?.id !== filters.excludeDeckId) {
+    throw new HttpError(404, 'Het geselecteerde deck is niet beschikbaar om kaarten uit te sluiten.');
+  }
+  return {
+    ...filters,
+    _marks: identityContext(context.marks || []),
+    _excludedCards: identityContext(filters.excludeDeckId === null ? [] : context.excludedDeck.cards)
+  };
+}
+
+function registerIdentityNameFunction(database, filters) {
+  const needsNames = (filters.marked && filters._marks.allNames.size) || filters._excludedCards.allNames.size;
+  if (!needsNames || identityFunctionsRegistered.has(database)) return;
+  database.function('discovery_identity_name', { deterministic: true }, (name) => normalizeSearchText(name));
+  identityFunctionsRegistered.add(database);
+}
+
+function identityMatch(identities, params) {
+  const alternatives = [];
+  if (identities.oracleIds.size) {
+    // COALESCE matters for exclusion: NOT(NULL) would otherwise incorrectly
+    // remove unrelated cards that have no Oracle ID.
+    alternatives.push("COALESCE(lower(trim(c.scryfall_oracle_id)), '') IN (SELECT value FROM json_each(?))");
+    params.push(identities.oracleJson);
+  }
+  if (identities.fallbackNames.size) {
+    alternatives.push('discovery_identity_name(c.name) IN (SELECT value FROM json_each(?))');
+    params.push(identities.fallbackJson);
+  }
+  if (identities.allNames.size) {
+    alternatives.push("(COALESCE(trim(c.scryfall_oracle_id), '') = '' AND discovery_identity_name(c.name) IN (SELECT value FROM json_each(?)))");
+    params.push(identities.namesJson);
+  }
+  // Bound JSON lists avoid SQLite's variable limit, including large decks.
+  return alternatives.length ? `(${alternatives.join(' OR ')})` : '0 = 1';
 }
 
 function markedItem(row, context) {
@@ -213,12 +246,9 @@ function tokenTypeFacetRows(database, filters) {
 
 export function cardCatalogOptions(input = {}, context = {}) {
   // Facets describe the whole filtered catalog, not a sorted or paginated page.
-  const filters = {
-    ...normalizedFilters({ ...input, sort: undefined, page: undefined, limit: undefined }),
-    _marks: markContext(context)
-  };
+  const filters = contextualFilters(normalizedFilters({ ...input, sort: undefined, page: undefined, limit: undefined }), context);
   return withCardCatalog((database) => {
-    registerMarkNameFunction(database, filters);
+    registerIdentityNameFunction(database, filters);
     // Effect-specific fields disappear when switching effects, so they must not
     // prevent the user from choosing a different effect.
     const rawEffects = facetRows(database, 'card_effects', {
@@ -334,6 +364,7 @@ function normalizedFilters(input = {}) {
     type,
     subtype,
     marked: markedValue === '1' || markedValue === 'true',
+    excludeDeckId: discoveryExcludedDeckId(input.excludeDeckId),
     colorIdentity,
     colorMode,
     manaMin,
@@ -356,23 +387,10 @@ function queryParts(filters, { tokenProfileAlias = '' } = {}) {
   const params = [];
 
   if (filters.marked) {
-    const marks = filters._marks;
-    const alternatives = [];
-    if (marks.oracleIds.size) {
-      alternatives.push('lower(c.scryfall_oracle_id) IN (SELECT value FROM json_each(?))');
-      params.push(marks.oracleJson);
-    }
-    if (marks.fallbackNames.size) {
-      alternatives.push('discovery_mark_name(c.name) IN (SELECT value FROM json_each(?))');
-      params.push(marks.fallbackJson);
-    }
-    if (marks.allNames.size) {
-      alternatives.push("(COALESCE(c.scryfall_oracle_id, '') = '' AND discovery_mark_name(c.name) IN (SELECT value FROM json_each(?)))");
-      params.push(marks.namesJson);
-    }
-    // One bound JSON value per identity dimension avoids SQLite's variable
-    // limit even for a large list. No database is attached or cross-joined.
-    conditions.push(alternatives.length ? `(${alternatives.join(' OR ')})` : '0 = 1');
+    conditions.push(identityMatch(filters._marks, params));
+  }
+  if (filters.excludeDeckId !== null) {
+    conditions.push(`NOT (${identityMatch(filters._excludedCards, params)})`);
   }
 
   if (filters.name) {
@@ -550,14 +568,14 @@ function resultItem(row, reasons, tokens, filters) {
 
 export function searchCardCatalog(input = {}, context = {}) {
   const filters = normalizedFilters(input);
-  const internalFilters = { ...filters, _marks: markContext(context) };
+  const internalFilters = contextualFilters(filters, context);
   const { conditions, params } = queryParts(internalFilters);
   const where = whereClause(conditions);
   const offset = (filters.page - 1) * filters.limit;
   const reasons = matchReasons(filters);
 
   return withCardCatalog((database) => {
-    registerMarkNameFunction(database, internalFilters);
+    registerIdentityNameFunction(database, internalFilters);
     const total = Number(database.prepare(`
       SELECT COUNT(DISTINCT c.catalog_key) AS count
       FROM cards c

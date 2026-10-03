@@ -4,6 +4,22 @@ import { findCardByCollector, findCardByName, getCardByScryfallId, upsertScryfal
 import { scryfallService } from './scryfall-service.js';
 
 export async function ensureCard(input) {
+  let expectedOracleId = '';
+  if (input.expectedOracleId !== undefined && input.expectedOracleId !== null) {
+    if (typeof input.expectedOracleId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.expectedOracleId.trim())) {
+      throw new HttpError(400, 'expectedOracleId moet een geldig Scryfall Oracle-ID zijn.');
+    }
+    expectedOracleId = input.expectedOracleId.trim().toLowerCase();
+  }
+  const card = await resolveCard(input);
+  if (expectedOracleId && String(card.oracleId || '').toLowerCase() !== expectedOracleId) {
+    throw new HttpError(409, 'De gevonden printing hoort niet bij deze cataloguskaart. Kies een specifieke printing via Kaart opzoeken.');
+  }
+  return card;
+}
+
+async function resolveCard(input) {
   if (input.cardId) {
     const { getCardById } = await import('./card-repository.js');
     const local = getCardById(Number(input.cardId));

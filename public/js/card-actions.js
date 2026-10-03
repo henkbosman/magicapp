@@ -143,7 +143,18 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
     window.location.hash = '#/decks';
     return null;
   }
-  const basicLand = isBasicLand(card);
+  // Discovery entries belong to a separate catalog: their identifiers can never
+  // identify a printing in the user's card database.
+  const localCardId = !Object.hasOwn(card, 'catalogId') && Number.isSafeInteger(Number(card.id)) && Number(card.id) > 0
+    ? Number(card.id) : null;
+  const identifier = localCardId
+    ? { cardId: localCardId }
+    : !Object.hasOwn(card, 'catalogId') && card.scryfallId
+      ? { scryfallId: card.scryfallId }
+      : { name: card.name, ...(card.scryfallOracleId ? { expectedOracleId: card.scryfallOracleId } : {}) };
+  const basicLand = isBasicLand(card) || /^Basic\b[^—]*\bLand\b/i.test(String(card.typeLine || ''));
+  let pending = false;
+  let completed = false;
   return openDialog({
     title: `${card.name} aan deck toevoegen`,
     submitLabel: 'Toevoegen',
@@ -157,40 +168,61 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
         ? '<p class="form-note full">Basic lands worden automatisch als beschikbaar behandeld en niet aan Wanted toegevoegd.</p>'
         : '<label class="checkbox-field full"><input name="addMissingWanted" type="checkbox"> Ontbrekende exemplaren ook aan Wanted toevoegen</label>'}
     </div>`,
-    onSubmit: async (data) => {
-      const selectedDeckId = Number(formValue(data, 'deckId'));
-      const requestedQuantity = Number(formValue(data, 'quantity', '1'));
-      const role = formValue(data, 'role', 'main');
-      const added = await api(`/decks/${selectedDeckId}/cards`, { method: 'POST', body: {
-        cardId: card.id,
-        quantity: requestedQuantity,
-        role,
-        tags: parseTags(formValue(data, 'tags')),
-        note: formValue(data, 'note')
-      }});
-      let wantedWarning = '';
-      if (!basicLand && data.has('addMissingWanted')) {
-        const effectiveAdded = ['commander', 'partner', 'companion'].includes(role) ? 1 : requestedQuantity;
-        const wantedGap = Math.max((added.card?.usage?.shortage || 0) - (added.card?.usage?.wanted || 0), 0);
-        const quantityForWanted = Math.min(effectiveAdded, wantedGap);
-        if (quantityForWanted > 0) {
-          try {
-            await api('/wanted', { method: 'POST', body: {
-              cardId: card.id,
-              quantity: quantityForWanted,
-              priority: 3,
-              maximumPrice: null,
-              notes: `Ontbreekt voor deck: ${decks.find((deck) => deck.id === selectedDeckId)?.name || ''}`,
-              deckId: selectedDeckId
-            }});
-          } catch (error) {
-            wantedWarning = ` Wanted bijwerken mislukte: ${error.message}`;
+    onSubmit: async (data, dialog) => {
+      // A write response refreshes global write availability. Keep a separate
+      // guard while Wanted and the result refresh are still being processed.
+      if (pending || completed) return false;
+      pending = true;
+      dialog.dataset.preventClose = 'true';
+      try {
+        const selectedDeckId = Number(formValue(data, 'deckId'));
+        const requestedQuantity = Number(formValue(data, 'quantity', '1'));
+        const role = formValue(data, 'role', 'main');
+        const added = await api(`/decks/${selectedDeckId}/cards`, { method: 'POST', body: {
+          ...identifier,
+          quantity: requestedQuantity,
+          role,
+          tags: parseTags(formValue(data, 'tags')),
+          note: formValue(data, 'note')
+        }});
+        completed = true;
+        let wantedWarning = '';
+        if (!basicLand && data.has('addMissingWanted')) {
+          const effectiveAdded = ['commander', 'partner', 'companion'].includes(role) ? 1 : requestedQuantity;
+          const wantedGap = Math.max((added.card?.usage?.shortage || 0) - (added.card?.usage?.wanted || 0), 0);
+          const quantityForWanted = Math.min(effectiveAdded, wantedGap);
+          if (quantityForWanted > 0) {
+            try {
+              const addedCardId = Number(added.card?.id);
+              if (!Number.isSafeInteger(addedCardId) || addedCardId <= 0) {
+                throw new Error('Het kaartnummer van de toegevoegde kaart ontbreekt.');
+              }
+              await api('/wanted', { method: 'POST', body: {
+                cardId: addedCardId,
+                quantity: quantityForWanted,
+                priority: 3,
+                maximumPrice: null,
+                notes: `Ontbreekt voor deck: ${decks.find((deck) => deck.id === selectedDeckId)?.name || ''}`,
+                deckId: selectedDeckId
+              }});
+            } catch (error) {
+              wantedWarning = ` Wanted bijwerken mislukte: ${error.message}`;
+            }
           }
         }
+        toast(`${card.name} is aan het deck toegevoegd.${wantedWarning}`, wantedWarning ? 'warning' : 'success');
+        try {
+          await onDone?.();
+        } catch (error) {
+          // The addition has already committed; reopening submit would duplicate
+          // it. A failed refresh must only ask the user to reload the results.
+          toast(`De kaart is toegevoegd, maar het overzicht kon niet worden vernieuwd: ${error.message}`, 'warning');
+        }
+        return true;
+      } finally {
+        pending = false;
+        delete dialog.dataset.preventClose;
       }
-      toast(`${card.name} is aan het deck toegevoegd.${wantedWarning}`, wantedWarning ? 'warning' : 'success');
-      await onDone?.();
-      return true;
     }
   });
 }

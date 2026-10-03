@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.13.0 - 2026-10-03
+
+### Ontdekte kaarten aan decks toevoegen
+
+- Elke ontdekkaart heeft naast **Markeren** een knop **Naar deck**, met dezelfde toevoegpopup als de collectiepagina.
+- De bestaande deckactie ondersteunt ook cataloguskaarten zonder lokaal kaart-ID. Pas bij bevestigen wordt de kaart opgezocht en aan het deck toegevoegd. Wanted blijft optioneel en standaard uitgeschakeld.
+- Na toevoegen worden resultaten en reactieve filters vernieuwd met de actuele zoekinstellingen, met behoud van de filterpanelen en scrollpositie.
+
+### Kaarten uit een deck uitsluiten
+
+- **Kaarten uit deck verbergen** vervangt de tekst over beschikbare mana values bij **Kleur, mana en legaliteit**. De managrenzen blijven instelbaar.
+- De keuzelijst bevat alle decks. Kaarten uit het gekozen deck worden op Oracle-identiteit uitgesloten, onafhankelijk van printing. Naamvergelijking is de terugval bij ontbrekende Oracle-ID's.
+- De uitsluiting omvat alle deckrollen en geldt vóór telling en paginering, ook voor alle reactieve filteropties en in combinatie met **Gemarkeerd**.
+- Het gekozen deck wordt vooraf ingevuld bij **Naar deck**. Na toevoegen verdwijnt de kaart uit de resultaten wanneer dat deck wordt uitgesloten.
+- De bestaande zoek- en optiesendpoints accepteren de optionele queryparameter `excludeDeckId`. De bestaande decktoevoegroute wordt hergebruikt. Beide databaseschema's blijven ongewijzigd; herimport is niet nodig.
+
 ## 2.12.0 - 2026-10-03
 
 ### Markeringen bij Kaarten ontdekken

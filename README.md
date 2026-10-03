@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.12.0
+# Magic Collection Manager 2.13.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -12,6 +12,8 @@ Versie **2.11.3** verwijdert de herhaalde filterredenen bij ontdekresultaten en 
 
 Versie **2.12.0** voegt blijvende markeringen voor interessante kaarten toe, inclusief het filter **Gemarkeerd**. De primaire gebruikersdatabase krijgt hiervoor automatisch een nieuwe tabel; de MTGJSON-database blijft ongewijzigd. De ontdekfilters kunnen per sectie worden ingeklapt en als geheel worden verborgen. Een hoog filterpaneel is zelfstandig scrollbaar en blijft op desktop meteen binnen bereik.
 
+Versie **2.13.0** laat kaarten vanuit **Kaarten ontdekken** rechtstreeks aan een deck toevoegen. Een deckkeuze bij **Kleur, mana en legaliteit** verbergt kaarten die al in dat deck voorkomen, ook als je daar een andere printing gebruikt. Deze update verandert geen databaseschema en vereist geen herimport.
+
 De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. Markeringen staan vanaf 2.12.0 in `discovery_marks` in de bestaande gebruikersdatabase `magic-collection.sqlite`; bestaande collectie-, wanted- en deckgegevens blijven behouden. Markeringen gebruiken stabiele kaartidentiteiten, geen catalogusrij-ID's of databasepaden. De twee databases worden niet met `ATTACH` of foreign keys gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
 
 ## Belangrijkste mogelijkheden
@@ -21,6 +23,7 @@ De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `m
 - Scryfall-autocomplete, printingselectie en lokaal opgeslagen kaartmetadata.
 - Een aparte ontdekpagina om kaarten op gecombineerde regels, kleuren en effecten te vinden, bijvoorbeeld Landfall-kaarten die een 2/2 creature token maken of groene kaarten met een tutor-effect.
 - Interessante kaarten markeren en via **Gemarkeerd** terugvinden, ook na het vervangen van de MTGJSON-catalogus.
+- Ontdekte kaarten rechtstreeks aan een deck toevoegen en kaarten uit een gekozen deck uitsluiten van de zoekresultaten.
 - Een onderhoudsimport van de officiële MTGJSON AtomicCards-catalogus naar een volledig losse, opnieuw opbouwbare SQLite-database.
 - Persistente SQLite-cache voor externe Scryfall-resultaten en een lokale schijfcache voor kaartafbeeldingen.
 - Decks bouwen met kaarten die wel of niet in de collectie aanwezig zijn, inclusief een atomaire actie die één printing tegelijk aan de collectie en een deck toevoegt.
@@ -184,6 +187,12 @@ Zonder ingevulde zoekfilters verschijnen nog geen kaarten. Zodra je een inhoudel
 Naast **Kaart opzoeken** staat **Markeren**. Daarmee bewaar je een interessante kaart; met dezelfde knop kun je de markering weer verwijderen. Het filter **Gemarkeerd** toont alleen opgeslagen kaarten en kan met alle andere filters worden gecombineerd. Dit filter start ook zonder andere zoektermen een zoekopdracht. Resetten van filters wist geen markeringen. In alleen-lezenmodus kun je markeringen bekijken en erop filteren; wijzigen vereist toegang tot de schrijf-API.
 
 Markeringen staan blijvend in de primaire gebruikersdatabase, op basis van Oracle-identiteit met een genormaliseerde kaartnaam als terugval. Het vervangen of opnieuw importeren van AtomicCards verwijdert ze niet. Een kaart die tijdelijk ontbreekt in de catalogus verschijnt daar niet als resultaat, maar de opgeslagen markering blijft bestaan.
+
+Naast **Markeren** staat **Naar deck**. Deze knop opent dezelfde toevoegpopup als op de collectiepagina, met deck, aantal, rol, tags en notitie. **Ontbrekende exemplaren ook aan Wanted toevoegen** staat standaard uit. Een kaart hoeft nog niet in je collectie te zitten: bij bevestigen wordt een lokaal bekende printing gebruikt of via Scryfall op exacte naam opgehaald. Voor een specifieke printing kun je eerst **Kaart opzoeken** gebruiken. De actie voegt geen fysieke exemplaren aan je collectie toe.
+
+Bij **Kleur, mana en legaliteit** vervangt **Kaarten uit deck verbergen** de toelichting onder het manabereik. Kies een deck om alle kaarten daaruit van de resultaten uit te sluiten, inclusief commanders, sideboard en maybeboard. De vergelijking gebruikt Oracle-ID's over verschillende printings heen, met een genormaliseerde naam als terugval wanneer een Oracle-ID ontbreekt. De uitsluiting werkt samen met **Gemarkeerd** en alle andere filters, inclusief reactieve opties en aantallen. Zonder deckkeuze wordt niets uitgesloten. De keuze blijft bij terugnavigatie behouden en wordt met **Filters resetten** gewist; deckkaarten worden nooit verwijderd.
+
+Het gekozen deck staat alvast geselecteerd in de toevoegpopup. Na toevoegen worden de huidige resultaten en filteropties vernieuwd; een kaart die nu in het uitgesloten deck zit verdwijnt direct uit beeld. Een lege laatste resultaatpagina wordt teruggezet naar de laatste beschikbare pagina.
 
 De filteropties zijn reactief. Kies je bijvoorbeeld **Instant**, dan tonen abilities, subtypes, effecten, legaliteit en de overige opties alleen waarden die bij instants en je andere filters passen. Ook naam- en kaarttekstzoeken beperken de keuzelijsten. Beschikbare manawaarden worden als suggesties getoond; je kunt zelf een minimum en maximum blijven invullen.
 

@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.12.0
+# Architectuur - Magic Collection Manager 2.13.0
 
 ## Overzicht
 
@@ -76,6 +76,7 @@ Belangrijke services:
 - `deck-printing-service.js`: deckprinting afstemmen na aankoop;
 - `wanted-service.js`: wanted CRUD en deckrelaties;
 - `discovery-mark-service.js`: permanente markeringen zonder afhankelijkheid van catalogusrijen of catalogusbestand;
+- `card-discovery-context-service.js`: leest markeringen en kaartidentiteiten uit een eventueel uit te sluiten deck voor de catalogusquery;
 - `printing-catalog-service.js`: mogelijke printings/rarities per Oracle-kaart;
 - `card-insight-service.js`: afgeleide en handmatig corrigeerbare mana-/zoekkenmerken;
 - `import-export-service.js`: collectie-export, gecontroleerde collectie-import en deckimport/-export.
@@ -115,6 +116,10 @@ Navigatiestatus voor detailpagina's bewaart bronroute, filters en scrollpositie 
 Sinds 2.12 verbergt de hoofdknop zowel het zijpaneel als de horizontale kleursectie. Tekst en kaartsoort en Effect zijn afzonderlijke native details-secties. Het zijpaneel is op desktop sticky en begrensd tot de schermhoogte, met eigen verticale scrollruimte; op mobiel volgt het de gewone paginascroll. Terugnavigatie bewaart ook de open/dicht-toestand en interne scrollpositie.
 
 Ieder resultaat toont links van de naam het preview-icoon en naast Kaart opzoeken een Markeren-knop. De view bevestigt een markering pas na een geslaagde write-response, blokkeert dubbele klikken en vernieuwt daarna resultaten en facets met de actuele filters. Alleen-lezenmodus blokkeert deze mutatie maar laat het Gemarkeerd-filter bruikbaar. Gemarkeerd telt zelfstandig als inhoudelijk zoekfilter; reset wist geen opgeslagen markeringen.
+
+Sinds 2.13 staat naast Markeren ook Naar deck. De view gebruikt de gedeelde `addCardToDeck`-popup, met het eventueel uitgesloten deck als voorkeuze. Bestaande lokale kaarten worden op lokaal ID toegevoegd; cataloguskaarten gebruiken hun exacte naam, zonder hun catalogus-ID als primair kaart-ID te behandelen. Bij een bekend Oracle-ID controleert de resolver dat de gevonden printing bij het bedoelde kaartconcept hoort. Wanted gebruikt het lokaal opgeloste kaart-ID uit de geslaagde deckresponse en blijft standaard uit. Een geslaagde decktoevoeging kan niet opnieuw worden verstuurd doordat een latere Wanted- of schermverversing faalt.
+
+De horizontale filtersectie bevat Kaarten uit deck verbergen op de plek van de vroegere manabereiktoelichting. De lijst komt uit `GET /api/read/decks`; de managrenzen en suggesties blijven behouden. De keuze staat als `excludeDeckId` in de route en vormt zelfstandig een inhoudelijk filter. Na toevoegen vernieuwt de view resultaten en opties zonder de filtercontrols te vervangen; daardoor blijven hun toestand en scrollpositie behouden. Een verdwenen geselecteerd deck blijft herkenbaar en verwijderbaar in de keuzelijst; de view toont niet stilzwijgend ongefilterde resultaten.
 
 Resultaten bevatten geen primaire database-ID. Een preview-icoon opent via `discovery-preview.js` een dialoog. Het nieuwe `GET /api/read/card-catalog/preview?name=...` resolveert de exacte kaartnaam via de vaste Scryfall named-route en geeft alleen gevalideerde afbeeldings-URL's terug. De resolver gebruikt een begrensde tijdelijke geheugencache, verzoekbundeling en time-outs; zij schrijft geen kaarten of cachegegevens in een database. De browser toont een of twee kaartzijden en meldt ontbrekende of mislukte afbeeldingen in de dialoog. De bestaande Content Security Policy blijft behouden.
 
@@ -157,6 +162,8 @@ De worker leest het JSON-document streaming en krijgt maximaal 256 MiB V8 old-ge
 Sinds 2.11.1 accepteert het bestaande optiesendpoint dezelfde inhoudelijke filters als het zoekendpoint. Iedere facet past alle andere filters toe en laat zijn eigen dimensie weg (disjunctieve facets). Kleuren laten kleuridentiteit en kleurmodus weg; het manabereik laat beide grenzen weg; de effectfacet laat ook de effectafhankelijke token- en tutorwaarden weg. De tokenfacets toetsen overgebleven tokenkenmerken binnen dezelfde rij in `card_tokens`. Opties tellen unieke `catalog_key`-waarden over de volledige dataset, los van paginering en sortering. Alle catalogusqueries blijven read-only en bestaande catalogi vereisen geen herimport.
 
 Sinds 2.12 lezen de zoek- en optieroutes de markeringen via de markeringservice en geven een momentopname als intern argument aan de catalogusrepository. Die repository opent de primaire database niet. `marked=1` beperkt alle facets en de zoekquery vóór telling, deduplicatie, sortering en paginering. Gebonden JSON-lijsten met `json_each` voorkomen een SQL-placeholderlimiet bij grote aantallen markeringen. Zoekresultaten bevatten altijd `markKey` en `marked`; interne markeringenlijsten komen niet in het publieke queryobject terecht.
+
+Sinds 2.13 levert `cardDiscoveryContext` daarnaast bij `excludeDeckId` de kaartidentiteiten van het gekozen deck, inclusief alle rollen en eventuele commander-verwijzingen. De catalogusrepository sluit deze identiteiten uit vóór telling, deduplicatie, sortering en paginering. Iedere facet behoudt de uitsluiting wanneer de eigen filterdimensie wordt weggelaten. Zowel deze kaartidentiteiten als markeringen worden als gebonden JSON-lijsten gebruikt; er zijn geen cross-database-joins en beide databaseschema's blijven ongewijzigd. De gedeelde parser accepteert uitsluitend een positief veilig geheel deck-ID of een lege keuze. Een ontbrekend deck geeft HTTP 404; een ongeldig ID geeft HTTP 400. Beide routes importeren de contextservice pas bij een zoek- of optieverzoek, zodat status en preview hun bestaande isolatie behouden.
 
 Een markering gebruikt bij voorkeur `oracle:<Scryfall Oracle-ID>` en anders `name:<genormaliseerde naam>`. Gelijke bekende Oracle-ID's matchen ongeacht de naam; naamfallback geldt alleen wanneer een van beide kanten geen Oracle-ID heeft. Twee verschillende bekende Oracle-ID's worden niet samengevoegd. Een naammarkering kan bij expliciet markeren met een later beschikbaar Oracle-ID worden opgewaardeerd. Bij verwijderen zonder Oracle-ID worden alle naamaliassen gewist die de betreffende naamkaart als gemarkeerd laten verschijnen. Afwezige kaarten blijven gemarkeerd in de primaire database en verschijnen weer zodra een passende cataloguskaart beschikbaar is. Status en preview blijven zonder gebruik van de primaire database werken.
 

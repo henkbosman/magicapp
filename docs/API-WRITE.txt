@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.12.0
+MAGIC COLLECTION MANAGER WRITE API 2.13.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.12.0"}
+{"status":"ok","writeAvailable":true,"version":"2.13.0"}
 
 POST /api/write/discovery-marks
 
@@ -338,6 +338,8 @@ OUTPUT JSON
 POST /api/write/decks/:id/cards
 
 Voegt een kaart toe aan een deck. Voeg één kaartidentificatie toe. Rollen: commander, partner, companion, main, sideboard, maybeboard.
+
+Kaarten ontdekken gebruikt hetzelfde endpoint met name voor een kaart die nog geen lokaal cardId heeft. De server kiest een lokaal bekende printing of haalt die via de exacte Scryfall-naam op. Er wordt geen fysiek exemplaar aan de collectie toegevoegd. Optioneel expectedOracleId (UUID) controleert of de opgeloste printing hetzelfde Oracle-kaartconcept heeft; een afwijking geeft HTTP 409 vóór de decktoevoeging, ongeldige invoer HTTP 400. Bestaande aanroepen zonder dit veld blijven ongewijzigd.
 
 INPUT JSON
 

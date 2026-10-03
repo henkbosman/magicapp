@@ -14,7 +14,7 @@ services:
       DATA_DIR: /app/data
       DATABASE_FILE: magic-collection.sqlite
       CARD_CATALOG_DATABASE_FILE: mtgjson-atomic.sqlite
-      SCRYFALL_USER_AGENT: "MagicCollectionManager/2.12.0 (local personal app)"
+      SCRYFALL_USER_AGENT: "MagicCollectionManager/2.13.0 (local personal app)"
       SCRYFALL_TIMEOUT_MS: 15000
       SCRYFALL_REQUEST_DELAY_MS: 550
       SCRYFALL_AUTOCOMPLETE_CACHE_TTL_HOURS: 168

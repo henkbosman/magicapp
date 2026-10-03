@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { addCardToDeck } from '../card-actions.js';
 import { cardTextHtml, colorIdentity, manaCost, manaSymbol, pageHeader } from '../components.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { formFilters, replaceRouteQuery, resetFilterForm } from '../live-filters.js';
@@ -119,11 +120,17 @@ function normalizedChoice(value, valid, fallback = '') {
   return valid.includes(String(value || '')) ? String(value) : fallback;
 }
 
+function normalizedDeckId(value) {
+  const id = String(value || '').trim();
+  return /^\d+$/.test(id) && Number.isSafeInteger(Number(id)) && Number(id) > 0 ? String(Number(id)) : id;
+}
+
 export function discoveryFiltersFromQuery(query = new URLSearchParams()) {
   const colors = query.getAll('colorIdentity')
     .flatMap((value) => String(value).split(','));
   return {
     marked: ['1', 'true'].includes(query.get('marked')) ? '1' : '',
+    excludeDeckId: normalizedDeckId(query.get('excludeDeckId')),
     name: query.get('name') || '',
     text: query.get('text') || '',
     ability: query.get('ability') || '',
@@ -164,6 +171,10 @@ export function discoverySearchParams(values = {}) {
   params.delete('marked');
   if (marked) params.set('marked', '1');
 
+  const excludeDeckId = normalizedDeckId(params.get('excludeDeckId'));
+  params.delete('excludeDeckId');
+  if (excludeDeckId) params.set('excludeDeckId', excludeDeckId);
+
   const colors = uniqueColors(params.getAll('colorIdentity').flatMap((value) => String(value).split(',')));
   params.delete('colorIdentity');
   if (colors.length) params.set('colorIdentity', colors.join(','));
@@ -191,7 +202,7 @@ export function discoverySearchParams(values = {}) {
 
 export function hasDiscoveryFilters(values = {}) {
   const params = discoverySearchParams(values);
-  return ['marked', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
+  return ['marked', 'excludeDeckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'colorIdentity', 'manaMin', 'manaMax',
     'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .some((key) => String(params.get(key) || '').trim().length > 0);
 }
@@ -237,11 +248,16 @@ function manaValuesHtml(options) {
   return optionsHtml(options.manaValues || [], '');
 }
 
-function manaHint(options) {
-  const { min, max } = options.manaRange || {};
-  return min === null || min === undefined || max === null || max === undefined
-    ? 'Geen mana values binnen de overige filters. Je kunt zelf een grens invullen.'
-    : `Beschikbare mana values: ${min}–${max}. Je kunt zelf een grens invullen.`;
+function deckExclusionOptionsHtml(decks, selected) {
+  return option('', 'Geen deck uitsluiten', selected)
+    + decks.map((deck) => option(deck.id, deck.name, selected)).join('')
+    + (selected && !decks.some((deck) => String(deck.id) === selected)
+      ? option(selected, `Deck #${selected} (niet beschikbaar)`, selected) : '')
+    + (!decks.length && !selected ? '<option value="" disabled>Geen decks beschikbaar</option>' : '');
+}
+
+function deckExclusionErrorHtml(message = 'Het gekozen deck is niet beschikbaar.') {
+  return emptyState('Deckfilter niet beschikbaar', `${message} Kies een ander deck of selecteer “Geen deck uitsluiten”.`);
 }
 
 function colorIdentityFilterHtml(selectedColors = [], mode = 'subset', options = {}) {
@@ -266,7 +282,7 @@ function colorIdentityFilterHtml(selectedColors = [], mode = 'subset', options =
 }
 
 function activeFilterCount(filters) {
-  return ['marked', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+  return ['marked', 'excludeDeckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .filter((key) => String(filters[key] || '').length > 0).length
     + (filters.colorIdentity.length ? 1 : 0);
 }
@@ -340,6 +356,7 @@ export function renderDiscoveryResults(result, filters = {}) {
         <div class="discovery-card-actions">
           <a class="button primary small" data-discovery-lookup href="#/add?name=${encodeURIComponent(card.name || '')}">Kaart opzoeken</a>
           <button type="button" class="button secondary small discovery-mark-button${card.marked ? ' discovery-marked' : ''}" data-write-action data-discovery-mark="${index}" aria-pressed="${card.marked ? 'true' : 'false'}" title="${card.marked ? 'Markering verwijderen' : 'Kaart markeren'}">${card.marked ? 'Gemarkeerd' : 'Markeren'}</button>
+          <button type="button" class="button secondary small" data-write-action data-discovery-deck="${index}">Naar deck</button>
         </div>
       </footer>
     </article>`;
@@ -400,10 +417,19 @@ export async function renderCardDiscovery(context) {
   const filters = discoveryFiltersFromQuery(context.query);
   const initialParams = discoverySearchParams(filters);
   const initialSearch = hasDiscoveryFilters(initialParams);
+  const deckResponse = await api('/decks');
+  const decks = Array.isArray(deckResponse) ? deckResponse : [];
+  const unavailableDeck = Boolean(filters.excludeDeckId && !decks.some((deck) => String(deck.id) === filters.excludeDeckId));
+  let initialDeckError = unavailableDeck ? 'Het gekozen deck is niet beschikbaar.' : '';
   const [options, rawResult] = await Promise.all([
-    api(`/card-catalog/options?${initialParams}`),
-    initialSearch ? api(`/card-catalog/search?${initialParams}`) : Promise.resolve({ items: [], total: 0, page: 1 })
-  ]);
+    unavailableDeck ? Promise.resolve({}) : api(`/card-catalog/options?${initialParams}`),
+    initialSearch && !unavailableDeck ? api(`/card-catalog/search?${initialParams}`) : Promise.resolve({ items: [], total: 0, page: 1 })
+  ]).catch((error) => {
+    // A deck can disappear between loading the dropdown and querying the catalog.
+    if (!filters.excludeDeckId || ![400, 404].includes(error.status)) throw error;
+    initialDeckError = error.message;
+    return [{}, { items: [], total: 0, page: 1 }];
+  });
   let result = normalizedResult(rawResult, filters.page);
   const filterCount = activeFilterCount(filters);
   const isCompactViewport = globalThis.window?.matchMedia?.('(max-width: 900px)')?.matches === true;
@@ -465,17 +491,17 @@ export async function renderCardDiscovery(context) {
               ${colorIdentityFilterHtml(filters.colorIdentity, filters.colorMode, options)}
               <div class="discovery-mana-filter">
                 <div class="discovery-mana-range">
-                  <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMin)}"></div>
-                  <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="any" list="discovery-mana-values" aria-describedby="discovery-mana-hint" value="${escapeHtml(filters.manaMax)}"></div>
+                  <div class="field"><label for="discovery-mana-min">Mana value vanaf</label><input id="discovery-mana-min" name="manaMin" type="number" min="0" step="any" list="discovery-mana-values" value="${escapeHtml(filters.manaMin)}"></div>
+                  <div class="field"><label for="discovery-mana-max">Tot en met</label><input id="discovery-mana-max" name="manaMax" type="number" min="0" step="any" list="discovery-mana-values" value="${escapeHtml(filters.manaMax)}"></div>
                 </div>
                 <datalist id="discovery-mana-values">${manaValuesHtml(options)}</datalist>
-                <p id="discovery-mana-hint" class="discovery-facet-hint">${escapeHtml(manaHint(options))}</p>
+                <div class="field"><label for="discovery-exclude-deck">Kaarten uit deck verbergen</label><select id="discovery-exclude-deck" name="excludeDeckId">${deckExclusionOptionsHtml(decks, filters.excludeDeckId)}</select></div>
               </div>
               <div class="field"><label for="discovery-legality">Legaliteit</label><select id="discovery-legality" name="legality">${facetOptionsHtml('legality', options, filters.legality)}</select></div>
             </div>
           </details>
           <div class="discovery-results-toolbar">
-            <p id="discovery-result-count" class="result-count" aria-live="polite">${initialSearch ? resultCountHtml(result) : 'Nog geen zoekopdracht'}</p>
+            <p id="discovery-result-count" class="result-count" aria-live="polite">${initialDeckError ? 'Deckfilter niet beschikbaar' : initialSearch ? resultCountHtml(result) : 'Nog geen zoekopdracht'}</p>
             <label class="discovery-sort-control" for="discovery-sort">Sorteren
               <select id="discovery-sort">
                 ${option('relevance', 'Relevantie', filters.sort)}
@@ -484,7 +510,7 @@ export async function renderCardDiscovery(context) {
               </select>
             </label>
           </div>
-          <div id="discovery-results">${initialSearch ? renderDiscoveryResults(result, filters) : discoveryStartHtml()}</div>
+          <div id="discovery-results">${initialDeckError ? deckExclusionErrorHtml(initialDeckError) : initialSearch ? renderDiscoveryResults(result, filters) : discoveryStartHtml()}</div>
           <div id="discovery-pagination-wrap">${initialSearch ? paginationHtml(result) : ''}</div>
         </div>
       </form>`,
@@ -502,7 +528,7 @@ export async function renderCardDiscovery(context) {
       const tokenFields = document.getElementById('discovery-token-fields');
       const tutorFields = document.getElementById('discovery-tutor-fields');
       const manaValues = document.getElementById('discovery-mana-values');
-      const manaDescription = document.getElementById('discovery-mana-hint');
+      const excludeDeck = document.getElementById('discovery-exclude-deck');
       const colorControls = [...form.querySelectorAll('input[name="colorIdentity"]')];
       let currentPage = result.page;
       let resultRequestSequence = 0;
@@ -510,6 +536,7 @@ export async function renderCardDiscovery(context) {
       let debounceTimer = null;
       let currentOptions = options;
       const pendingMarks = new Map();
+      let deckActionPending = false;
 
       filterPanel.scrollTop = Math.max(Number(context.query.get('filterScroll')) || 0, 0);
 
@@ -529,6 +556,15 @@ export async function renderCardDiscovery(context) {
         }
       };
       refreshMarkButtons();
+
+      const refreshDeckButtons = () => {
+        if (form.isConnected === false) return;
+        for (const button of results.querySelectorAll('[data-discovery-deck]')) {
+          button.dataset.writeInitiallyDisabled = deckActionPending ? 'true' : 'false';
+          applyWriteAvailability(button);
+        }
+      };
+      refreshDeckButtons();
 
       const updateColors = () => {
         const colors = new Map(optionEntries(currentOptions.colors).map((entry) => [entry.value, entry]));
@@ -616,7 +652,6 @@ export async function renderCardDiscovery(context) {
         }
         updateColors();
         manaValues.innerHTML = manaValuesHtml(nextOptions);
-        manaDescription.textContent = manaHint(nextOptions);
         updateEffectFields();
       };
 
@@ -657,6 +692,7 @@ export async function renderCardDiscovery(context) {
           updateOptions(nextOptions);
           results.innerHTML = shouldSearch ? renderDiscoveryResults(next, { text: apiParams.get('text') }) : discoveryStartHtml();
           refreshMarkButtons();
+          refreshDeckButtons();
           count.textContent = shouldSearch ? resultCountHtml(next) : 'Nog geen zoekopdracht';
           pagination.innerHTML = shouldSearch ? paginationHtml(next) : '';
           filterToggle.updateActiveCount();
@@ -664,6 +700,14 @@ export async function renderCardDiscovery(context) {
         } catch (error) {
           if (requestSequence === resultRequestSequence && error?.name !== 'AbortError') {
             requestController.abort();
+            if (apiParams.get('excludeDeckId') && [400, 404].includes(error.status)) {
+              result = normalizedResult({ items: [], total: 0, page: 1 });
+              currentPage = 1;
+              results.innerHTML = deckExclusionErrorHtml(error.message);
+              count.textContent = 'Deckfilter niet beschikbaar';
+              pagination.innerHTML = '';
+              filterToggle.updateActiveCount();
+            }
             toast(error.message || 'Zoeken is mislukt.', 'error');
           }
           return false;
@@ -694,6 +738,34 @@ export async function renderCardDiscovery(context) {
       });
 
       results.addEventListener('click', async (event) => {
+        const deckButton = event.target.closest('[data-discovery-deck]');
+        if (deckButton) {
+          const card = result.items[Number(deckButton.dataset.discoveryDeck)];
+          if (!card || deckActionPending || deckButton.disabled || deckButton.getAttribute('aria-disabled') === 'true') return;
+          deckActionPending = true;
+          refreshDeckButtons();
+          const release = () => {
+            deckActionPending = false;
+            refreshDeckButtons();
+          };
+          try {
+            const dialog = await addCardToDeck(card, {
+              deckId: excludeDeck.value || null,
+              onDone: async () => {
+                if (form.isConnected !== false) await loadResults(routeParams());
+              }
+            });
+            if (dialog && form.isConnected === false) {
+              dialog.close();
+              release();
+            } else if (dialog) dialog.addEventListener('close', release, { once: true });
+            else release();
+          } catch (error) {
+            release();
+            if (form.isConnected !== false) toast(error.message || 'De kaart kon niet aan een deck worden toegevoegd.', 'error');
+          }
+          return;
+        }
         const markButton = event.target.closest('[data-discovery-mark]');
         if (markButton) {
           const card = result.items[Number(markButton.dataset.discoveryMark)];

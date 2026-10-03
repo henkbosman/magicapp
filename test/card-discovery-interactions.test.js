@@ -93,6 +93,14 @@ class Element {
   }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
   closest(selector) { return this.matches(selector) ? this : this.parentElement?.closest(selector) || null; }
+  append(child) { child.parentElement = this; this.children.push(child); }
+  remove() {
+    if (this.parentElement) this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+    this.parentElement = null;
+  }
+  showModal() { this.open = true; }
+  close() { this.open = false; this.dispatch('close'); }
+  focus() {}
   addEventListener(type, listener) {
     const listeners = this.listeners.get(type) || [];
     listeners.push(listener);
@@ -136,6 +144,8 @@ class FormValues {
       .map((control) => [control.name, control.value]);
   }
   entries() { return this.values.values(); }
+  get(name) { return this.values.find(([key]) => key === name)?.[1] ?? null; }
+  has(name) { return this.values.some(([key]) => key === name); }
   [Symbol.iterator]() { return this.entries(); }
 }
 
@@ -158,8 +168,9 @@ const result = (name, total = 1, page = 1) => ({
 });
 const response = (data) => new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } });
 const flush = () => new Promise((resolve) => setImmediate(resolve));
+const deckList = [{ id: 1, name: 'Yedora' }, { id: 2, name: 'Second deck' }];
 
-async function mount(t, query = 'type=Creature', initialCards = result('Initial card', 60)) {
+async function mount(t, query = 'type=Creature', initialCards = result('Initial card', 60), decks = deckList) {
   const keys = ['fetch', 'document', 'window', 'history', 'FormData', 'Element', 'HTMLButtonElement', 'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement'];
   const original = keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
   t.after(() => {
@@ -174,6 +185,7 @@ async function mount(t, query = 'type=Creature', initialCards = result('Initial 
   globalThis.fetch = (url, options) => {
     const parsed = new URL(url, 'http://localhost');
     if (parsed.pathname.endsWith('/status')) return Promise.resolve(response({ available: true, cardCount: 100 }));
+    if (initial && parsed.pathname === '/api/read/decks') return Promise.resolve(response(decks));
     const request = {
       kind: parsed.pathname.split('/').at(-1), path: parsed.pathname,
       params: parsed.searchParams, signal: options.signal, method: options.method,
@@ -202,6 +214,8 @@ async function mount(t, query = 'type=Creature', initialCards = result('Initial 
   const document = parseHtml(view.html);
   document.getElementById = (id) => document.querySelector(`#${id}`);
   document.documentElement = document;
+  document.body = document;
+  document.createElement = (tagName) => new Element(tagName);
   globalThis.document = document;
   globalThis.FormData = FormValues;
   for (const name of ['Element', 'HTMLButtonElement', 'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement']) globalThis[name] = Element;
@@ -268,7 +282,8 @@ test('reactieve filters en resultaten worden samen toegepast zonder de invoervel
   assert.equal(colors.find((control) => control.value === 'U').closest('label').querySelector('[data-color-count]').textContent, '2');
   assert.match(ui.get('discovery-mana-values').innerHTML, /value="2"/);
   assert.equal(ui.get('discovery-mana-values').options.length, 1);
-  assert.match(ui.get('discovery-mana-hint').textContent, /2–2/);
+  assert.equal(ui.get('discovery-mana-hint'), null);
+  assert.deepEqual(ui.control('excludeDeckId').options.map((option) => option.value), ['', '1', '2']);
 });
 
 test('typen maakt lopende antwoorden direct ongeldig, ook voordat de debounce afloopt', async (t) => {
@@ -505,6 +520,179 @@ test('Gemarkeerd start zelfstandig zoeken en reset wist ook deze selectie', asyn
   ui.requests.at(-1).resolve(allOptions);
   await flush();
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+});
+
+test('deck uitsluiten zoekt zelfstandig, stuurt gelijke facets en resultaten en reset de selectie', async (t) => {
+  const ui = await mount(t, '');
+  const select = ui.control('excludeDeckId');
+  assert.equal(select.disabled, false);
+  ui.edit('excludeDeckId', '2');
+  const next = ui.pair();
+  assert.equal(next.search.params.get('excludeDeckId'), '2');
+  assert.match(ui.routes.at(-1), /excludeDeckId=2/);
+  await ui.finish(next, instantOptions, result('Card outside deck'));
+  assert.equal(ui.control('excludeDeckId'), select, 'reactive updates keep the deck dropdown mounted');
+  assert.deepEqual(select.options.map((option) => option.value), ['', '1', '2'], 'all decks remain selectable');
+  assert.equal(select.value, '2');
+  assert.match(ui.get('discovery-filter-toggle').textContent, /1/);
+  ui.get('discovery-filter-reset').dispatch('click');
+  assert.equal(select.value, '');
+  assert.equal(ui.requests.at(-1).kind, 'options');
+  assert.equal(ui.requests.at(-1).params.has('excludeDeckId'), false);
+  ui.requests.at(-1).resolve(allOptions);
+  await flush();
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+});
+
+test('deckfilter blijft behouden bij opzoeken en terugkeer, ook zonder schrijftoegang', async (t) => {
+  const ui = await mount(t, 'excludeDeckId=2&type=Instant&colorsOpen=1&textOpen=0&filterScroll=75');
+  setWriteAvailability(false);
+  assert.equal(ui.control('excludeDeckId').value, '2');
+  assert.equal(ui.control('excludeDeckId').disabled, false);
+  const addButton = ui.get('discovery-results').querySelector('[data-discovery-deck]');
+  assert.equal(addButton.disabled, true);
+  const before = ui.requests.length;
+  addButton.dispatch('click');
+  assert.equal(ui.requests.length, before);
+  assert.equal(ui.document.querySelector('dialog'), null);
+  ui.get('discovery-results').querySelector('[data-discovery-lookup]').dispatch('click');
+  const saved = [...ui.session.values()].map((value) => JSON.parse(value)).find((value) => value.hash?.startsWith('#/discover'));
+  const query = new URLSearchParams(saved.hash.split('?')[1]);
+  assert.equal(query.get('excludeDeckId'), '2');
+  assert.equal(query.get('type'), 'Instant');
+  assert.equal(query.get('colorsOpen'), '1');
+  assert.equal(query.get('textOpen'), '0');
+  assert.equal(query.get('filterScroll'), '75');
+});
+
+test('een verwijderd deck blijft zichtbaar en kan worden gewist zonder stilzwijgend alle kaarten te tonen', async (t) => {
+  const ui = await mount(t, 'excludeDeckId=99&type=Instant');
+  assert.equal(ui.control('excludeDeckId').value, '99');
+  assert.match(ui.control('excludeDeckId').textContent, /Deck #99 \(niet beschikbaar\)/);
+  assert.match(ui.get('discovery-results').textContent, /Deckfilter niet beschikbaar/);
+  assert.equal(ui.requests.length, 0);
+  ui.edit('excludeDeckId', '');
+  const next = ui.pair();
+  assert.equal(next.search.params.has('excludeDeckId'), false);
+  assert.equal(next.search.params.get('type'), 'Instant');
+  await ui.finish(next, instantOptions, result('Restored search'));
+  assert.match(ui.get('discovery-results').textContent, /Restored search/);
+});
+
+test('een deck dat tijdens het zoeken verdwijnt toont geen verouderde resultaten en blijft uitzetbaar', async (t) => {
+  const ui = await mount(t, 'excludeDeckId=2&type=Instant');
+  ui.edit('type', 'Creature');
+  const next = ui.pair();
+  next.options.fail(404);
+  next.search.fail(404);
+  await flush();
+  assert.equal(ui.control('excludeDeckId').value, '2');
+  assert.equal(ui.control('type').value, 'Creature');
+  assert.match(ui.get('discovery-results').textContent, /Deckfilter niet beschikbaar/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Initial card/);
+  assert.equal(ui.get('discovery-pagination-wrap').textContent, '');
+  ui.edit('excludeDeckId', '');
+  await ui.finish(ui.pair(), allOptions, result('Recovered search'));
+  assert.match(ui.get('discovery-results').textContent, /Recovered search/);
+});
+
+test('Naar deck opent één popup met het filterdeck en annuleren verandert geen resultaten', async (t) => {
+  const ui = await mount(t, 'excludeDeckId=2&type=Instant');
+  const button = ui.get('discovery-results').querySelector('[data-discovery-deck]');
+  const before = ui.requests.length;
+  button.dispatch('click');
+  const request = ui.requests.at(-1);
+  assert.equal(request.path, '/api/read/decks');
+  assert.equal(button.disabled, true);
+  button.dispatch('click');
+  assert.equal(ui.requests.length, before + 1);
+  request.resolve(deckList);
+  await flush();
+  const dialog = ui.document.querySelector('dialog');
+  assert.ok(dialog?.open);
+  assert.equal(dialog.querySelector('[name="deckId"]').value, '2');
+  assert.equal(dialog.querySelector('[name="addMissingWanted"]').checked, false);
+  assert.equal(button.disabled, true);
+  button.dispatch('click');
+  assert.equal(ui.requests.length, before + 1);
+  dialog.querySelector('.close-dialog').dispatch('click');
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.equal(button.disabled, false);
+  assert.equal(ui.requests.length, before + 1, 'cancelling does not refresh facets or cards');
+  assert.match(ui.get('discovery-results').textContent, /Initial card/);
+});
+
+test('een late deckpopup wordt gesloten als de ontdekpagina intussen verlaten is', async (t) => {
+  const ui = await mount(t);
+  ui.get('discovery-results').querySelector('[data-discovery-deck]').dispatch('click');
+  ui.form.isConnected = false;
+  ui.requests.at(-1).resolve(deckList);
+  await flush();
+  assert.equal(ui.document.querySelector('dialog'), null);
+});
+
+test('toevoegen vanuit ontdekken vernieuwt huidige filters en verwijdert de nu uitgesloten kaart zonder navigatie', async (t) => {
+  const cards = result('Discovery card');
+  cards.items[0].catalogId = 'atomic-17';
+  cards.items[0].scryfallOracleId = '00000000-0000-0000-0000-000000000017';
+  const ui = await mount(t, 'excludeDeckId=2&type=Instant&colorsOpen=1&textOpen=0&filterScroll=75', cards);
+  ui.get('discovery-results').querySelector('[data-discovery-deck]').dispatch('click');
+  ui.requests.at(-1).resolve(deckList);
+  await flush();
+  const dialog = ui.document.querySelector('dialog');
+  dialog.querySelector('form').dispatch('submit');
+  const write = ui.requests.at(-1);
+  assert.equal(write.path, '/api/write/decks/2/cards');
+  assert.equal(write.method, 'POST');
+  assert.equal(write.body.name, 'Discovery card');
+  assert.equal(write.body.expectedOracleId, cards.items[0].scryfallOracleId);
+  assert.equal(Object.hasOwn(write.body, 'cardId'), false);
+  ui.edit('text', 'draw', 'input');
+  write.resolve({ card: { id: 801, usage: { shortage: 1, wanted: 0 } } });
+  await flush();
+  const refresh = ui.pair();
+  assert.equal(refresh.search.params.get('excludeDeckId'), '2');
+  assert.equal(refresh.search.params.get('type'), 'Instant');
+  assert.equal(refresh.search.params.get('text'), 'draw', 'confirmation uses controls as they are now');
+  const beforeTick = ui.requests.length;
+  await ui.tick();
+  assert.equal(ui.requests.length, beforeTick, 'mutation refresh consumes the pending text debounce');
+  await ui.finish(refresh, instantOptions, result('Remaining card outside deck'));
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.match(ui.get('discovery-results').textContent, /Remaining card outside deck/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Discovery card/);
+  assert.equal(ui.control('excludeDeckId').value, '2');
+  assert.equal(ui.control('text').value, 'draw');
+  assert.equal(ui.get('discovery-secondary-filters').open, true);
+  assert.equal(ui.get('discovery-text-filters').open, false);
+  assert.equal(ui.get('discovery-filter-panel').scrollTop, 75);
+  assert.equal(window.scrollY, 640);
+  assert.equal(ui.get('discovery-results').querySelector('[data-discovery-deck]').disabled, false);
+  assert.equal(ui.requests.filter((request) => request.method === 'POST').length, 1, 'Wanted stays opt-in');
+});
+
+test('toevoegen aan het uitgesloten deck herstelt de laatste geldige resultatenpagina', async (t) => {
+  const cards = result('Last card outside deck', 25, 2);
+  cards.items[0].catalogId = 'atomic-last';
+  const ui = await mount(t, 'excludeDeckId=2&page=2', cards);
+  ui.get('discovery-results').querySelector('[data-discovery-deck]').dispatch('click');
+  ui.requests.at(-1).resolve(deckList);
+  await flush();
+  ui.document.querySelector('dialog').querySelector('form').dispatch('submit');
+  ui.requests.at(-1).resolve({ card: { id: 802, usage: {} } });
+  await flush();
+  const refresh = ui.pair();
+  assert.equal(refresh.search.params.get('page'), '2');
+  await ui.finish(refresh, allOptions, { items: [], total: 24, page: 2, limit: 24, totalPages: 1 });
+  const clamped = ui.pair();
+  assert.equal(clamped.search.params.get('page'), '1');
+  assert.equal(clamped.search.params.get('excludeDeckId'), '2');
+  await ui.finish(clamped, allOptions, result('Remaining first page', 24));
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.match(ui.get('discovery-results').textContent, /Remaining first page/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Last card outside deck/);
+  assert.match(ui.get('discovery-result-count').textContent, /24 kaarten gevonden/);
+  assert.equal(ui.get('discovery-pagination-wrap').textContent, '');
 });
 
 test('markeren wordt pas bevestigd door de API en dubbele klikken sturen maar één mutatie', async (t) => {
