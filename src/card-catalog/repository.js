@@ -182,6 +182,21 @@ function facetRows(database, table, filters, {
   `).all(...params).map((row) => ({ value: row.value, label: row.value, count: Number(row.count || 0) }));
 }
 
+function subtypeFacetRows(database, filters) {
+  const alternatives = { ...filters, subtype: '' };
+  const subtypes = facetRows(database, 'card_subtypes', alternatives);
+  // Legendary is stored as a supertype, but is offered in the existing
+  // Subtype control so it can be combined with Creature or another card type.
+  const legendary = facetRows(database, 'card_supertypes', alternatives, {
+    extraConditions: ["facet.value = 'Legendary' COLLATE NOCASE"]
+  });
+  if (legendary.length) {
+    subtypes.push({ ...legendary[0], value: 'Legendary', label: 'Legendary' });
+    subtypes.sort((a, b) => a.value.localeCompare(b.value, 'en', { sensitivity: 'base' }));
+  }
+  return subtypes;
+}
+
 function colorFacetRows(database, filters) {
   const { conditions, params } = queryParts({ ...filters, colorIdentity: [] });
   const colors = Object.keys(COLOR_LABELS);
@@ -291,7 +306,7 @@ export function cardCatalogOptions(input = {}, context = {}) {
       abilities: facetRows(database, 'card_abilities', { ...filters, ability: '' }),
       keywords: facetRows(database, 'card_keywords', { ...filters, keyword: '' }),
       types: facetRows(database, 'card_types', { ...filters, type: '' }),
-      subtypes: facetRows(database, 'card_subtypes', { ...filters, subtype: '' }),
+      subtypes: subtypeFacetRows(database, filters),
       effects,
       tutorTargets,
       colors: colorFacetRows(database, filters),
@@ -409,7 +424,7 @@ function queryParts(filters, { tokenProfileAlias = '' } = {}) {
     [filters.ability, 'card_abilities'],
     [filters.keyword, 'card_keywords'],
     [filters.type, 'card_types'],
-    [filters.subtype, 'card_subtypes']
+    [filters.subtype, filters.subtype.toLowerCase() === 'legendary' ? 'card_supertypes' : 'card_subtypes']
   ]) {
     if (!value) continue;
     conditions.push(`EXISTS (SELECT 1 FROM ${table} facet WHERE facet.card_id = c.id AND facet.value = ? COLLATE NOCASE)`);

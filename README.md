@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.13.2
+# Magic Collection Manager 2.13.3
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -15,6 +15,8 @@ Versie **2.12.0** voegt blijvende markeringen voor interessante kaarten toe, inc
 Versie **2.13.0** voegde rechtstreeks toevoegen aan een deck vanuit **Kaarten ontdekken** toe. Versie **2.13.1** toont bij kaarten uit het gekozen deck een duidelijke aanduiding **Al in deck**. Deze kaarten blijven zichtbaar in de resultaten, ook na toevoegen. De deckdropdown heeft geen zichtbaar label erboven en lijnt uit met de dropdown ernaast. Deze update verandert geen databaseschema en vereist geen herimport.
 
 Versie **2.13.2** activeert **Kleur, mana en legaliteit** pas als er een filter in **Tekst en kaartsoort** is ingevuld. Alleen een deck, kleur of managrens kiezen laadt dus geen kaarten. Vooraf gekozen waarden blijven bewaard en worden toegepast zodra je een naam, kaarttekst, ability, keyword, kaarttype of subtype invult.
+
+Versie **2.13.3** voegt **Legendary** toe aan **Subtype** op **Kaarten ontdekken**. Kies daarnaast **Kaarttype: Creature** voor legendary creatures. De bestaande catalogus is direct bruikbaar; opnieuw importeren is niet nodig.
 
 De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. Markeringen staan vanaf 2.12.0 in `discovery_marks` in de bestaande gebruikersdatabase `magic-collection.sqlite`; bestaande collectie-, wanted- en deckgegevens blijven behouden. Markeringen gebruiken stabiele kaartidentiteiten, geen catalogusrij-ID's of databasepaden. De twee databases worden niet met `ATTACH` of foreign keys gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
 
@@ -203,6 +205,8 @@ Met **Geen deck geselecteerd** wordt geen deck vergeleken. Zijn er ook geen zoek
 Het gekozen deck staat alvast geselecteerd in de toevoegpopup. Na toevoegen worden de huidige resultaten vernieuwd; de kaart blijft staan en krijgt **Al in deck** wanneer de deckvergelijking actief is en je haar aan het geselecteerde deck hebt toegevoegd. **Naar deck** blijft beschikbaar als je nog een exemplaar wilt toevoegen.
 
 De filteropties zijn reactief. Kies je bijvoorbeeld **Instant**, dan tonen abilities, subtypes, effecten, legaliteit en de overige opties alleen waarden die bij instants en je andere filters passen. Ook naam- en kaarttekstzoeken beperken de keuzelijsten. Beschikbare manawaarden worden als suggesties getoond; je kunt zelf een minimum en maximum blijven invullen.
+
+**Subtype** bevat ook **Legendary** als er passende kaarten zijn. Dit is technisch een supertype en wordt gecontroleerd aan de hand van de opgeslagen kaartkenmerken. Met **Kaarttype: Creature** en **Subtype: Legendary** zie je uitsluitend legendary creatures; zonder de Legendary-keuze omvat Creature zowel gewone als legendary creatures.
 
 Elke keuzelijst houdt rekening met de andere filters, maar niet met haar eigen gekozen waarde. Zo blijft een keuze vervangbaar. Aantallen worden over de volledige gefilterde catalogus berekend, niet alleen de zichtbare resultaatpagina. Een al gekozen waarde zonder matches blijft herkenbaar staan met **0 matches**, zodat niets stilzwijgend uit je zoekopdracht verdwijnt. Met de lege optie of **Filters resetten** maak je de zoekopdracht weer ruimer. Bij het wisselen van effect tellen verborgen token- of tutorfilters niet meer mee.
 

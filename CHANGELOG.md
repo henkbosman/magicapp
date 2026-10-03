@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.13.3 - 2026-10-03
+
+### Legendary bij de ontdekfilters
+
+- **Subtype** op **Kaarten ontdekken** biedt nu ook **Legendary** aan. Combineer dit met **Kaarttype: Creature** om legendary creatures te vinden.
+- De optie gebruikt de bestaande supertypegegevens uit de catalogus; een vermelding van legendary in de kaartnaam of kaarttekst is niet voldoende.
+- Beschikbaarheid en aantallen volgen de andere actieve filters. De overige keuzelijsten houden ook rekening met de gekozen Legendary-filter.
+- De bestaande zoek- en optiesendpoints ondersteunen hiervoor `subtype=Legendary`. Geen nieuwe endpoints, databaseschemawijzigingen of herimport nodig.
+
 ## 2.13.2 - 2026-10-03
 
 ### Extra ontdekfilters pas na een zoekcriterium

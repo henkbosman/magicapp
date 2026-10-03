@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.13.2
+# Architectuur - Magic Collection Manager 2.13.3
 
 ## Overzicht
 
@@ -162,6 +162,8 @@ De worker leest het JSON-document streaming en krijgt maximaal 256 MiB V8 old-ge
 ## Cataloguszoekmodel
 
 Sinds 2.11.1 accepteert het bestaande optiesendpoint dezelfde inhoudelijke filters als het zoekendpoint. Iedere facet past alle andere filters toe en laat zijn eigen dimensie weg (disjunctieve facets). Kleuren laten kleuridentiteit en kleurmodus weg; het manabereik laat beide grenzen weg; de effectfacet laat ook de effectafhankelijke token- en tutorwaarden weg. De tokenfacets toetsen overgebleven tokenkenmerken binnen dezelfde rij in `card_tokens`. Opties tellen unieke `catalog_key`-waarden over de volledige dataset, los van paginering en sortering. Alle catalogusqueries blijven read-only en bestaande catalogi vereisen geen herimport.
+
+Sinds 2.13.3 biedt de subtypefacet ook `Legendary` aan. De repository koppelt uitsluitend deze subtypewaarde, zonder hoofdletteronderscheid, aan `card_supertypes`; alle andere waarden blijven op `card_subtypes` filteren. De Legendary-optie telt unieke cataloguskaarten met alle overige filters, terwijl de eigen subtypekeuze wordt weggelaten. De bestaande frontend toont deze optie uit de API-response. Beide databaseschema's en de import blijven ongewijzigd.
 
 Sinds 2.12 lezen de zoek- en optieroutes de markeringen via de markeringservice en geven een momentopname als intern argument aan de catalogusrepository. Die repository opent de primaire database niet. `marked=1` beperkt alle facets en de zoekquery vóór telling, deduplicatie, sortering en paginering. Gebonden JSON-lijsten met `json_each` voorkomen een SQL-placeholderlimiet bij grote aantallen markeringen. Zoekresultaten bevatten altijd `markKey` en `marked`; interne markeringenlijsten komen niet in het publieke queryobject terecht.
 

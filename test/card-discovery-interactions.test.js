@@ -152,7 +152,7 @@ class FormValues {
 const entries = (...values) => values.map((value) => ({ value, label: value, count: 2 }));
 const allOptions = {
   abilities: entries('Landfall', 'Magecraft'), keywords: entries('Flying', 'Trample'),
-  types: entries('Creature', 'Instant'), subtypes: entries('Elf', 'Arcane'),
+  types: entries('Creature', 'Instant'), subtypes: entries('Elf', 'Arcane', 'Legendary'),
   effects: entries('token', 'tutor', 'draw'), legalities: entries('commander', 'modern'),
   colors: entries('W', 'U', 'B', 'R', 'G', 'C'), manaValues: entries('1', '2', '3'), manaRange: { min: 1, max: 3 },
   tokenPowers: entries('1', '2'), tokenToughnesses: entries('1', '2'), tokenTypes: entries('Elf', 'Soldier'),
@@ -246,6 +246,36 @@ async function mount(t, query = 'type=Creature', initialCards = result('Initial 
     async tick() { t.mock.timers.tick(220); await flush(); }
   };
 }
+
+test('Legendary verschijnt als subtype, activeert aanvullende filters en combineert met Creature', async (t) => {
+  const ui = await mount(t, 'deckId=2&colorIdentity=G');
+  const subtype = ui.control('subtype');
+  assert.ok(subtype.options.some((option) => option.value === 'Legendary' && option.textContent === 'Legendary (2)'));
+  assert.equal(ui.requests.some((request) => request.kind === 'search'), false);
+
+  ui.edit('subtype', 'Legendary');
+  const legendary = ui.pair();
+  assert.equal(legendary.search.params.get('subtype'), 'Legendary');
+  assert.equal(legendary.search.params.has('type'), false);
+  assert.equal(legendary.search.params.get('deckId'), '2', 'Legendary is a primary filter that activates the preselected deck');
+  assert.equal(legendary.search.params.get('colorIdentity'), 'G');
+  await ui.finish(legendary, allOptions, result('Legendary match'));
+
+  ui.edit('type', 'Creature');
+  const creatures = ui.pair();
+  assert.equal(creatures.search.params.get('type'), 'Creature');
+  assert.equal(creatures.search.params.get('subtype'), 'Legendary');
+  await ui.finish(creatures, { ...allOptions, subtypes: entries('Elf', 'Legendary') }, result('Legendary creature'));
+  assert.equal(ui.control('subtype'), subtype, 'reactive updates preserve the selected control');
+  assert.equal(subtype.value, 'Legendary');
+  assert.match(ui.get('discovery-results').textContent, /Legendary creature/);
+
+  ui.get('discovery-results').querySelector('[data-discovery-lookup]').dispatch('click');
+  const saved = [...ui.session.values()].map((value) => JSON.parse(value)).find((value) => value.hash?.startsWith('#/discover'));
+  const query = new URLSearchParams(saved.hash.split('?')[1]);
+  assert.equal(query.get('type'), 'Creature');
+  assert.equal(query.get('subtype'), 'Legendary', 'returning from card lookup preserves the combination');
+});
 
 test('reactieve filters en resultaten worden samen toegepast zonder de invoervelden te vervangen', async (t) => {
   const ui = await mount(t);
