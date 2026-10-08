@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.13.3
+MAGIC COLLECTION MANAGER WRITE API 2.14.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.13.3"}
+{"status":"ok","writeAvailable":true,"version":"2.14.0"}
 
 POST /api/write/discovery-marks
 
@@ -583,3 +583,23 @@ INPUT JSON
 OUTPUT JSON
 
 Niet van toepassing. Responsebody is application/octet-stream met bestandsnaam magic-collection-{timestamp}.sqlite.
+
+INTEGRITEITSCONTROLES VANAF 2.13.4
+
+Collectie PATCH /api/write/collection/:id en DELETE /api/write/collection/:id accepteren optioneel expectedRevision in de JSON-body. Neem de exacte revision uit de laatste collectieregelresponse over. Een verouderde versie geeft HTTP 409 zonder mutatie; een ongeldig versietoken geeft 400. Weglaten behoudt het bestaande gedrag voor oudere clients. Voor DELETE mag de body bijvoorbeeld {"expectedRevision":"<64-tekens revision>"} bevatten.
+
+Collectie-PATCH met expliciet lege/null afwerking geeft 400; weglaten behoudt de afwerking. Nieuwe of gewijzigde afwerkingen worden gecontroleerd tegen de bekende printinggegevens. Historische afwijkingen worden niet automatisch gerepareerd.
+
+Toevoegen aan bestaande regels bewaart bestaande en nieuwe notities. Bij verschillende bekende collectie-aankoopprijzen of meer dan 5000 tekens gecombineerde notities volgt 409 zonder gedeeltelijke opslag. Gebruik voor afzonderlijke aankopen een andere locatie, of bewerk de gegevens expliciet. Dezelfde limietcontrole geldt bij decknotitiemerges. Aantallen en IDs moeten veilige gehele getallen zijn; lege waarden of arrays zijn ongeldig.
+
+Een expliciet lokaal kaart-ID dat niet bestaat geeft 404 in plaats van een terugval naar een andere printing. Tegenstrijdige expliciete identifiers worden geweigerd. Deckimport weigert ongeldige aantallen (1–10000 per regel) vóór enige deckmutatie; een verkeerde naam bij een set/nummer verschijnt als importfout. Niet-opgeloste regels behouden het bestaande gedeeltelijke importgedrag.
+
+Wanted-toevoegingen zijn atomair; tekorten voor een deck worden na de printinglookup opnieuw gelezen. Een deckkaart verwijderen met een ID uit een ander deck geeft 404 zonder wijzigingen. Er zijn geen nieuwe endpointpaden of schemawijzigingen.
+
+IDENTITEITSCONTROLE BIJ TOEVOEGEN VANAF 2.13.5
+
+Waar beschikbaar stuurt de interface cardId en scryfallId samen. Alle expliciet opgegeven identifiers moeten dezelfde printing/kaart aanwijzen; tegenstrijdige invoer geeft 409 vóór autoritatieve kaartopslag. Naam, set en collector number worden gezamenlijk gecontroleerd indien opgegeven. Collector-/taallookup controleert ook de taal. Batchverzoeken cachen uitsluitend passende aangevraagde kaarten; andere records blijven unresolved.
+
+sourceWantedId bij collectie-toevoegen moet bestaan en bij dezelfde Oracle-kaart horen. Een ontbrekende bron geeft 404, een bron voor een andere kaart 409. De collectie en bijbehorende gebruikersgegevens blijven dan ongewijzigd.
+
+Een bestaande printing wordt bij toevoegen niet stil ververst. Een bekende Oracle-identiteit kan niet worden gewijzigd of gewist door kaartmetadata-upsert; een identiteitsconflict geeft 409. Er zijn geen nieuwe endpointpaden, verplichte invoervelden of schemawijzigingen.

@@ -4,7 +4,6 @@ import { assert } from '../lib/http-error.js';
 import { normalizeSearchText } from '../lib/text.js';
 import { positiveInteger, requiredString } from '../lib/validation.js';
 import {
-  getCardByScryfallId,
   getCardWithUsage,
   searchCards,
   upsertScryfallCard
@@ -57,10 +56,7 @@ cardsReadRouter.get('/image-cache', async (req, res) => {
 
 cardsReadRouter.get('/preview/:scryfallId', async (req, res) => {
   const scryfallId = requiredString(req.params.scryfallId, 'Scryfall-ID', 100);
-  let card = getCardByScryfallId(scryfallId);
-  if (!card) {
-    card = upsertScryfallCard(await scryfallService.getById(scryfallId));
-  }
+  const card = await ensureCard({ scryfallId });
   res.json({ data: getCardWithUsage(card.id) });
 });
 

@@ -286,13 +286,18 @@ export async function renderCollection(context) {
             </div>`,
             onSubmit: async (data) => {
               await api(`/collection/${item.id}`, { method: 'PATCH', body: {
+                expectedRevision: item.revision,
                 quantity: Number(formValue(data,'quantity')),
                 finish: formValue(data,'finish'), language: formValue(data,'language'),
                 condition: formValue(data,'condition'), location: formValue(data,'location'),
                 purchasePrice: formValue(data,'purchasePrice') || null, notes: formValue(data,'notes')
               }});
               toast(`${item.card.name} is bijgewerkt.`);
-              await loadCurrentResults();
+              try {
+                await loadCurrentResults();
+              } catch (error) {
+                toast(`De wijziging is opgeslagen, maar het overzicht kon niet worden vernieuwd: ${error.message}`, 'warning');
+              }
               return true;
             }
           });
@@ -301,7 +306,7 @@ export async function renderCollection(context) {
 
         const confirmed = await confirmDialog({ title: 'Collectieregel verwijderen', message: `Weet je zeker dat je ${item.card.name} uit de collectie wilt verwijderen?` });
         if (!confirmed) return;
-        await api(`/collection/${item.id}`, { method: 'DELETE' });
+        await api(`/collection/${item.id}`, { method: 'DELETE', body: { expectedRevision: item.revision } });
         toast(`${item.card.name} is verwijderd.`);
         await loadCurrentResults();
       };
@@ -319,7 +324,11 @@ export async function renderCollection(context) {
           if (!button) return;
           const action = button.dataset.collectionCardAction;
           dialog.close();
-          await runCollectionCardAction(action, item);
+          try {
+            await runCollectionCardAction(action, item);
+          } catch (error) {
+            toast(error.message || 'De collectieactie is mislukt.', 'error');
+          }
         });
         return dialog;
       };

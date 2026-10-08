@@ -5,6 +5,7 @@ import { ensureCardsByCollectorLanguage, ensureCardsByIdentifiers } from './card
 import { addCollectionItem } from './card-repository.js';
 import { normalizeSearchText, safeJsonParse } from '../lib/text.js';
 import { HttpError } from '../lib/http-error.js';
+import { cardMatchesRequestedName as matchesCardName } from '../lib/card-identity.js';
 
 const MAX_COLLECTION_IMPORT_ROWS = 1000;
 const MAX_COLLECTION_IMPORT_QUANTITY = 10000;
@@ -36,7 +37,7 @@ export function parseDeckList(text) {
     ['mainboard', 'main'], ['deck', 'main']
   ]);
 
-  for (const rawLine of String(text || '').split(/\r?\n/)) {
+  for (const [index, rawLine] of String(text || '').split(/\r?\n/).entries()) {
     let line = rawLine.trim();
     if (!line || line.startsWith('#') || line.startsWith('//')) continue;
     const normalizedHeading = normalizeSearchText(line.replace(/[:\[\]]/g, ''));
@@ -49,6 +50,8 @@ export function parseDeckList(text) {
       role = 'sideboard';
       line = line.replace(/^SB:\s*/i, '');
     }
+    const checkedQuantity = parseCollectionQuantity(line);
+    if (checkedQuantity.error) throw new HttpError(400, `Regel ${index + 1}: ${checkedQuantity.error}`);
     const match = line.match(/^(\d+)\s*x?\s+(.+)$/i);
     const quantity = match ? Number.parseInt(match[1], 10) : 1;
     let remainder = (match ? match[2] : line).trim();
@@ -62,7 +65,7 @@ export function parseDeckList(text) {
       set = printing[2].toLowerCase();
       collectorNumber = printing[3];
     }
-    if (name) rows.push({ quantity: Math.max(quantity, 1), name, set, collectorNumber, role });
+    if (name) rows.push({ quantity, name, set, collectorNumber, role });
   }
   return rows;
 }
@@ -265,38 +268,8 @@ function cardRawData(card) {
   return safeJsonParse(row?.raw_json, {});
 }
 
-function normalizeImportCardName(value) {
-  return String(value ?? '')
-    // NFKC keeps meaning-bearing marks in scripts such as Japanese and Hindi
-    // while still normalizing equivalent Unicode representations.
-    .normalize('NFKC')
-    .toLocaleLowerCase('en-US')
-    .replace(/[’‘`]/gu, "'")
-    .replace(/[‐‑‒–—―]/gu, '-')
-    .replace(/[^\p{L}\p{N}/' -]+/gu, ' ')
-    .replace(/\s+/gu, ' ')
-    .trim();
-}
-
-function cardNameCandidates(card) {
-  const raw = cardRawData(card);
-  return [
-    card.name,
-    card.printedName,
-    raw.flavor_name,
-    ...(card.cardFaces || []).flatMap((face) => [face.name, face.printed_name, face.flavor_name]),
-    ...(raw.card_faces || []).flatMap((face) => [face.name, face.printed_name, face.flavor_name])
-  ].filter(Boolean);
-}
-
 function cardMatchesRequestedName(card, requestedName) {
-  const requested = normalizeImportCardName(requestedName);
-  if (!requested) return false;
-  return cardNameCandidates(card).some((candidate) => {
-    const names = String(candidate).split(/\s*\/\/\s*/u);
-    return names.some((name) => normalizeImportCardName(name) === requested)
-      || normalizeImportCardName(candidate) === requested;
-  });
+  return matchesCardName(card, requestedName, cardRawData(card));
 }
 
 function cardSupportsPaper(card) {
@@ -602,6 +575,13 @@ export async function importDeckList(deckId, text) {
     const card = cardMap.get(key) || cardMap.get(`${normalizeSearchText(row.name)}|`);
     if (!card) {
       failed.push({ name: row.name, reason: 'Niet gevonden bij Scryfall' });
+      continue;
+    }
+    if (row.set && row.collectorNumber && !cardMatchesRequestedName(card, row.name)) {
+      failed.push({
+        name: row.name,
+        reason: `${row.set.toUpperCase()} #${row.collectorNumber} hoort bij “${card.name}”, niet bij “${row.name}”.`
+      });
       continue;
     }
     try {

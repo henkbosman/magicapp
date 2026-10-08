@@ -1961,13 +1961,40 @@ html.write-unavailable [data-write-only] { display: none !important; }
   }
 }
 
-.deck-quick-actions > .quick-action {
-  align-items: stretch;
+.deck-quick-actions {
+  grid-template-columns: 1fr;
 }
-.deck-quick-actions > .quick-action,
-.deck-quick-actions > .quick-action > div,
+.deck-quick-actions > .quick-action {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  justify-content: initial;
+  text-align: left;
+}
+.deck-quick-actions > .quick-action > div {
+  min-width: 0;
+  text-align: left;
+}
 .deck-quick-actions > .quick-action > span {
   text-align: center;
+}
+
+.deck-export-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.deck-export-controls > .field {
+  flex: 1 1 220px;
+}
+.deck-export-text {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  min-height: 300px;
 }
 
 @media (max-width: 760px) {

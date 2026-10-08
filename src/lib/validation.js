@@ -1,10 +1,11 @@
 import { HttpError } from './http-error.js';
 
 export function positiveInteger(value, field = 'waarde', { allowZero = false } = {}) {
-  const parsed = typeof value === 'number' ? value : Number(String(value).trim());
+  const validType = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
+  const parsed = validType ? Number(value) : NaN;
   const minimum = allowZero ? 0 : 1;
-  if (!Number.isInteger(parsed) || parsed < minimum) {
-    throw new HttpError(400, `${field} moet een geheel getal van minimaal ${minimum} zijn.`);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum) {
+    throw new HttpError(400, `${field} moet een geheel getal tussen ${minimum} en ${Number.MAX_SAFE_INTEGER} zijn.`);
   }
   return parsed;
 }
@@ -12,6 +13,9 @@ export function positiveInteger(value, field = 'waarde', { allowZero = false } =
 
 export function optionalNumber(value, field, fallback = null) {
   if (value === undefined || value === null || value === '') return fallback;
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') {
+    throw new HttpError(400, `${field} moet een geldig getal zijn.`);
+  }
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw new HttpError(400, `${field} moet een geldig getal zijn.`);
   return parsed;

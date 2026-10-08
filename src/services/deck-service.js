@@ -1,5 +1,6 @@
 import { db, transaction } from '../db/database.js';
 import { HttpError } from '../lib/http-error.js';
+import { oneOf, positiveInteger } from '../lib/validation.js';
 import { isBasicLand } from '../lib/card-rules.js';
 import { cardRowToApi } from './card-mapper.js';
 import { enrichCardsWithInsights } from './card-insight-service.js';
@@ -132,15 +133,30 @@ export function deleteDeck(id) {
   return deck;
 }
 
+function mergeDeckNotes(left, right) {
+  const note = [...new Set([left, right].filter(Boolean))].join('\n\n');
+  if (note.length > 5000) {
+    throw new HttpError(409, 'De samengevoegde decknotitie is te lang. Verkort de notities voordat je deze kaarten samenvoegt.');
+  }
+  return note;
+}
+
 function moveOldCommanderToMain(deckId, column, newCardId, role) {
   const deckRow = db.prepare(`SELECT ${column} AS card_id FROM decks WHERE id = ?`).get(deckId);
   const oldCardId = deckRow?.card_id ? Number(deckRow.card_id) : null;
   if (!oldCardId || oldCardId === newCardId) return;
   const oldRoleRow = db.prepare('SELECT * FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = ?').get(deckId, oldCardId, role);
   if (!oldRoleRow) return;
-  const mainRow = db.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = 'main'").get(deckId, oldCardId);
+  const mainRow = db.prepare("SELECT id, quantity, note FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = 'main'").get(deckId, oldCardId);
   if (mainRow) {
-    db.prepare('UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?').run(oldRoleRow.quantity, mainRow.id);
+    const note = mergeDeckNotes(mainRow.note, oldRoleRow.note);
+    const quantity = positiveInteger(Number(mainRow.quantity) + Number(oldRoleRow.quantity), 'Totaalaantal');
+    db.prepare('UPDATE deck_cards SET quantity = ?, note = ? WHERE id = ?')
+      .run(quantity, note, mainRow.id);
+    db.prepare(`
+      INSERT OR IGNORE INTO deck_card_tags (deck_card_id, tag)
+      SELECT ?, tag FROM deck_card_tags WHERE deck_card_id = ?
+    `).run(mainRow.id, oldRoleRow.id);
     reassignDeckCardLinks(deckId, Number(oldRoleRow.id), Number(mainRow.id));
     db.prepare('DELETE FROM deck_cards WHERE id = ?').run(oldRoleRow.id);
   } else {
@@ -167,20 +183,19 @@ export function addDeckCard(deckId, input) {
   return transaction(() => {
     synchronizeCommanderPointers(deckId, card.id, input.role);
     const singletonRole = ['commander', 'partner', 'companion'].includes(input.role);
-    let existing = db.prepare('SELECT id FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = ?')
+    let existing = db.prepare('SELECT id, quantity, note FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = ?')
       .get(deckId, card.id, input.role);
     let deckCardId;
 
     // When a card already sits in the main deck and is promoted to a singleton role,
     // move one copy instead of silently creating an unintended duplicate.
     if (!existing && singletonRole) {
-      const main = db.prepare("SELECT id, quantity FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = 'main'")
+      const main = db.prepare("SELECT id, quantity, note FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = 'main'")
         .get(deckId, card.id);
       if (main) {
         if (Number(main.quantity) === 1) {
-          db.prepare("UPDATE deck_cards SET role = ?, note = CASE WHEN ? <> '' THEN ? ELSE note END WHERE id = ?")
-            .run(input.role, input.note, input.note, main.id);
-          existing = { id: main.id };
+          db.prepare('UPDATE deck_cards SET role = ? WHERE id = ?').run(input.role, main.id);
+          existing = main;
         } else {
           db.prepare('UPDATE deck_cards SET quantity = quantity - 1 WHERE id = ?').run(main.id);
         }
@@ -188,14 +203,16 @@ export function addDeckCard(deckId, input) {
     }
 
     if (existing) {
+      const note = mergeDeckNotes(existing.note, input.note);
       if (singletonRole) {
         db.prepare(`
-          UPDATE deck_cards SET quantity = 1, note = CASE WHEN ? <> '' THEN ? ELSE note END WHERE id = ?
-        `).run(input.note, input.note, existing.id);
+          UPDATE deck_cards SET quantity = 1, note = ? WHERE id = ?
+        `).run(note, existing.id);
       } else {
+        const total = positiveInteger(Number(existing.quantity) + Number(quantity), 'Totaalaantal');
         db.prepare(`
-          UPDATE deck_cards SET quantity = quantity + ?, note = CASE WHEN ? <> '' THEN ? ELSE note END WHERE id = ?
-        `).run(quantity, input.note, input.note, existing.id);
+          UPDATE deck_cards SET quantity = ?, note = ? WHERE id = ?
+        `).run(total, note, existing.id);
       }
       deckCardId = Number(existing.id);
     } else {
@@ -321,6 +338,8 @@ export function updateDeckCard(deckId, deckCardId, input) {
 
 export function deleteDeckCard(deckId, deckCardId) {
   requireDeck(deckId);
+  const row = db.prepare('SELECT id FROM deck_cards WHERE id = ? AND deck_id = ?').get(deckCardId, deckId);
+  if (!row) throw new HttpError(404, 'Kaartregel in deck niet gevonden.');
   const existing = getDeckCard(deckCardId);
   if (!existing) throw new HttpError(404, 'Kaartregel in deck niet gevonden.');
   transaction(() => {
@@ -415,7 +434,7 @@ export function getDeckMissing(deckId) {
 }
 
 export async function addMissingToWanted(deckId) {
-  const deck = requireDeck(deckId);
+  requireDeck(deckId);
   const missing = getDeckMissing(deckId);
   const prepared = [];
   for (const row of missing.items) {
@@ -428,16 +447,25 @@ export async function addMissingToWanted(deckId) {
     }
     prepared.push({ row, printingCardId });
   }
-  const added = transaction(() => prepared.map(({ row, printingCardId }) => upsertWanted({
-    cardId: row.card.id,
-    printingCardId,
-    deckIds: [deckId],
-    quantity: row.wantedGap,
-    priority: 3,
-    maximumPrice: null,
-    notes: `Ontbreekt voor deck: ${deck.name}`
-  }, { matchOracle: true })));
-  return { added, missing: getDeckMissing(deckId) };
+  return transaction(() => {
+    // Printing lookup may yield to another request. Re-read both the deck and
+    // current shortages before writing, so concurrent fills cannot add twice.
+    const currentDeck = requireDeck(deckId);
+    const printingByKey = new Map(prepared.map(({ row, printingCardId }) => [row.card.cardKey, printingCardId]));
+    const currentMissing = getDeckMissing(deckId);
+    const added = currentMissing.items
+      .filter((row) => row.wantedGap > 0 && printingByKey.has(row.card.cardKey))
+      .map((row) => upsertWanted({
+        cardId: row.card.id,
+        printingCardId: printingByKey.get(row.card.cardKey),
+        deckIds: [deckId],
+        quantity: row.wantedGap,
+        priority: 3,
+        maximumPrice: null,
+        notes: `Ontbreekt voor deck: ${currentDeck.name}`
+      }, { matchOracle: true }));
+    return { added, missing: getDeckMissing(deckId) };
+  });
 }
 
 function aggregateExportRows(rows) {
@@ -466,4 +494,44 @@ export function exportDeckText(deckId, { missingOnly = false } = {}) {
     filename: `${deck.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'deck'}${missingOnly ? '-ontbrekend' : ''}.txt`,
     text: rows.map((row) => `${row.quantity} ${row.name}`).join('\n') + (rows.length ? '\n' : '')
   };
+}
+
+function forgeCardName(card) {
+  let name = String(card.name || '');
+  // Forge identifies these cards by their front face. Split cards (including
+  // aftermath and rooms) retain the combined "First // Second" name.
+  if (['transform', 'modal_dfc', 'adventure', 'flip', 'double_faced_token'].includes(card.layout)) {
+    name = String(card.cardFaces?.[0]?.name || '').trim() || name.split(/\s*\/\/\s*/)[0];
+  } else if (card.layout === 'split') {
+    name = name.split(/\s*\/\/\s*/).join(' // ');
+  }
+  return name.replace(/[\r\n]+/g, ' ').trim();
+}
+
+export function exportDeckDck(deckId) {
+  const deck = requireDeck(deckId);
+  const cards = getDeckCards(deckId, { includeMaybeboard: false });
+  const lines = ['[metadata]', `Name=${deck.name.replace(/[\r\n]+/g, ' ').trim()}`];
+  const sections = [
+    ['Commander', ['commander', 'partner']],
+    ['Main', ['main']],
+    // Forge stores companions in the sideboard, not a separate Companion section.
+    ['Sideboard', ['sideboard', 'companion']]
+  ];
+  for (const [section, roles] of sections) {
+    const rows = aggregateExportRows(cards.filter((row) => roles.includes(row.role))
+      .map((row) => ({ quantity: row.quantity, name: forgeCardName(row.card), cardKey: row.card.cardKey })));
+    if (!rows.length && section !== 'Main') continue;
+    lines.push(`[${section}]`, ...rows.map((row) => `${row.quantity} ${row.name}`));
+  }
+  return {
+    filename: `${deck.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'deck'}.dck`,
+    text: `${lines.join('\n')}\n`
+  };
+}
+
+export function exportDeck(deckId, { format = 'txt' } = {}) {
+  const selectedFormat = oneOf(format, ['txt', 'dck'], 'Exportformaat', 'txt');
+  const result = selectedFormat === 'dck' ? exportDeckDck(deckId) : exportDeckText(deckId);
+  return { ...result, format: selectedFormat };
 }

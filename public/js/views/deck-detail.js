@@ -8,6 +8,7 @@ import { prepareDeckSimulatorNavigation, prepareDeckStatsNavigation, preserveCur
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { isBasicLand } from '../card-rules.js';
 import { openCardPreview } from '../card-preview.js';
+import { openDeckExport } from '../deck-export.js';
 import { applyWriteAvailability } from '../write-access.js';
 
 const ROLE_LABELS = {
@@ -31,7 +32,7 @@ const CARD_TYPE_GROUP_LABELS = {
 };
 const DECK_VISUAL_COLUMN_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 const DECK_CARD_SORT_OPTIONS = ['mana', 'name'];
-const DECK_CARD_GROUP_OPTIONS = ['type', 'ability'];
+const DECK_CARD_GROUP_OPTIONS = ['type', 'ability', 'none'];
 const NO_ABILITY_GROUP = 'Geen ability';
 const DECK_CARD_COLLATOR = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
 
@@ -94,7 +95,7 @@ function deckCardSortOptions(current) {
 }
 
 function deckCardGroupOptions(current) {
-  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option>`;
+  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option><option value="none" ${current === 'none' ? 'selected' : ''}>Geen</option>`;
 }
 
 
@@ -674,6 +675,16 @@ export function groupDeckCards(items = [], { groupBy = 'type', sortBy = 'mana' }
   const normalizedGroup = normalizeDeckCardGroup(groupBy);
   const normalizedSort = normalizeDeckCardSort(sortBy);
 
+  if (normalizedGroup === 'none') {
+    return items.length ? [{
+      key: 'none',
+      kind: 'none',
+      value: '',
+      label: '',
+      items: [...items].sort((left, right) => compareDeckCards(left, right, normalizedSort))
+    }] : [];
+  }
+
   if (normalizedGroup === 'ability') {
     const groupsByAbility = new Map();
     for (const item of items) {
@@ -725,16 +736,16 @@ function deckVisualCardHtml(item) {
 function deckGroupAttributes(group) {
   const specificAttribute = group.kind === 'type'
     ? ` data-deck-type-group="${escapeHtml(group.value)}"`
-    : ` data-deck-ability-group="${escapeHtml(group.value)}"`;
+    : group.kind === 'ability' ? ` data-deck-ability-group="${escapeHtml(group.value)}"` : '';
   return `data-deck-card-group data-deck-group-key="${escapeHtml(group.key)}" data-deck-group-kind="${group.kind}"${specificAttribute}`;
 }
 
 function deckListGroupsHtml(groups, hidden = false) {
   return `<div id="deck-card-list" class="card-list" ${hidden ? 'hidden' : ''}>${groups.map((group) => `<section class="deck-list-group" ${deckGroupAttributes(group)}>
-      <header class="deck-list-group-header">
+      ${group.kind !== 'none' ? `<header class="deck-list-group-header">
         <h3>${escapeHtml(group.label)}</h3>
         <span class="deck-visual-group-count" data-deck-group-count>${deckCardQuantity(group.items)}</span>
-      </header>
+      </header>` : ''}
       <div class="deck-list-group-items">${group.items.map(deckCardHtml).join('')}</div>
     </section>`).join('')}</div>`;
 }
@@ -742,10 +753,10 @@ function deckListGroupsHtml(groups, hidden = false) {
 function deckVisualGroupsHtml(groups, columns) {
   return `<div id="deck-card-visual" class="deck-visual-groups" data-columns="${columns}">${groups
     .map((group) => `<section class="deck-visual-group" ${deckGroupAttributes(group)}>
-      <header class="deck-visual-group-header">
+      ${group.kind !== 'none' ? `<header class="deck-visual-group-header">
         <h3>${escapeHtml(group.label)}</h3>
         <span class="deck-visual-group-count" data-deck-group-count>${deckCardQuantity(group.items)}</span>
-      </header>
+      </header>` : ''}
       <div class="deck-visual-grid">${group.items.map(deckVisualCardHtml).join('')}</div>
     </section>`).join('')}</div>`;
 }
@@ -832,7 +843,7 @@ export async function renderDeckDetail(context) {
         eyebrow: deck.format,
         title: deck.name,
         description: deck.description || '',
-        actions: `<a id="deck-simulator-link" class="button secondary" href="#/decks/${deck.id}/simulate">Simulator</a><a id="deck-statistics-link" class="button secondary" href="#/decks/${deck.id}/stats">Statistieken</a><button id="add-deck-card" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</button><button id="edit-deck" class="button secondary" data-write-action>Bewerken</button><button id="more-deck" class="button secondary" data-write-action>Importeren</button>`
+        actions: `<a id="deck-simulator-link" class="button secondary" href="#/decks/${deck.id}/simulate">Simulator</a><a id="deck-statistics-link" class="button secondary" href="#/decks/${deck.id}/stats">Statistieken</a><button id="add-deck-card" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</button><button id="more-deck" class="button ghost" type="button" aria-haspopup="dialog">Meer…</button>`
       })}
       ${commanderStrip}
 
@@ -845,7 +856,7 @@ export async function renderDeckDetail(context) {
               <button type="button" class="deck-view-button ${initialView === 'cards' ? 'active' : ''}" data-deck-view="cards" aria-pressed="${initialView === 'cards'}">Kaarten</button>
             </div>` : ''}
           </div>
-          <div class="deck-panel-actions"><a class="button secondary small" href="${apiPath(`/decks/${deck.id}/export.txt`)}">Exporteren</a> <a class="button secondary small" href="${apiPath(`/decks/${deck.id}/export.txt?missing=true`)}">Tekort exporteren</a></div>
+          <div class="deck-panel-actions"><button id="export-deck" type="button" class="button secondary small" aria-haspopup="dialog">Exporteren</button> <a class="button secondary small" href="${apiPath(`/decks/${deck.id}/export.txt?missing=true`)}">Tekort exporteren</a></div>
         </header>
         <div class="panel-body">
           <div class="deck-filter-heading">
@@ -893,16 +904,18 @@ export async function renderDeckDetail(context) {
       }));
 
 
-      document.getElementById('edit-deck')?.addEventListener('click', () => openDialog({
+      document.getElementById('export-deck')?.addEventListener('click', () => openDeckExport(deck.id));
+
+      const editDeck = () => openDialog({
         title: 'Deck bewerken', submitLabel: 'Opslaan',
         content: `<div class="form-grid"><div class="field full"><label>Naam</label><input name="name" value="${escapeHtml(deck.name)}" required></div><div class="field"><label>Formaat</label><select name="format">${['commander','standard','pioneer','modern','legacy','vintage','pauper','oathbreaker','brawl','other'].map((value) => `<option value="${value}" ${deck.format === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="field full"><label>Beschrijving</label><textarea name="description">${escapeHtml(deck.description)}</textarea></div><div class="field full"><label>Notities</label><textarea name="notes">${escapeHtml(deck.notes)}</textarea></div></div>`,
         onSubmit: async (data) => {
           await api(`/decks/${deck.id}`, { method: 'PATCH', body: { name: formValue(data,'name'), format: formValue(data,'format'), description: formValue(data,'description'), notes: formValue(data,'notes') } });
           toast('Deck bijgewerkt.'); refreshDeckView(); return true;
         }
-      }));
+      });
 
-      document.getElementById('more-deck')?.addEventListener('click', () => openDialog({
+      const importDeck = () => openDialog({
         title: 'Decklijst importeren', submitLabel: 'Importeren', wide: true,
         content: `<p>Plak een lijst in het formaat <strong>1 Card Name</strong>. Moxfield-regels zoals <strong>1 Card Name (SET) 123</strong> worden ook herkend.</p><div class="field"><label>Decklijst</label><textarea name="text" rows="14" placeholder="Commander\n1 Yedora, Grave Gardener\n\nDeck\n1 Sol Ring"></textarea></div>`,
         onSubmit: async (data) => {
@@ -910,7 +923,7 @@ export async function renderDeckDetail(context) {
           toast(`${result.importedCount} regels geïmporteerd${result.failed.length ? `; ${result.failed.length} mislukt` : ''}.`, result.failed.length ? 'warning' : 'success');
           refreshDeckView(); return true;
         }
-      }));
+      });
 
       const runDeckCardAction = async (action, displayItem) => {
         if (!deckCardActionDescriptors(displayItem).some((descriptor) => descriptor.key === action)) return;
@@ -1185,44 +1198,52 @@ export async function renderDeckDetail(context) {
       applyDeckView();
       applyDeckColumns();
 
-      const actions = document.querySelector('.page-actions');
-      if (actions) {
-        const extra = document.createElement('button');
-        extra.className = 'button ghost';
-        extra.textContent = 'Meer…';
-        actions.append(extra);
-        extra.addEventListener('click', () => {
-          const dialog = openDialog({
-            title: 'Deckacties', cancelLabel: 'Sluiten',
-            content: `<div class="quick-actions deck-quick-actions"><button id="duplicate-action" class="quick-action" data-write-action type="button"><span>⧉</span><div>Dupliceren<small>Maak een volledige kopie</small></div></button><a class="quick-action" href="${apiPath(`/decks/${deck.id}/export.txt`)}"><span>⇩</span><div>Exporteren<small>Eenvoudige decklijst</small></div></a><button id="delete-action" class="quick-action text-danger" data-write-action type="button"><span>×</span><div>Verwijderen<small>Deck permanent wissen</small></div></button></div>`
-          });
+      document.getElementById('more-deck')?.addEventListener('click', () => {
+        const dialog = openDialog({
+          title: 'Deckacties', cancelLabel: 'Sluiten',
+          content: `<div class="quick-actions deck-quick-actions">
+            <button id="edit-deck-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">✎</span><div>Bewerken<small>Naam, formaat en beschrijving</small></div></button>
+            <button id="import-deck-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⇧</span><div>Importeren<small>Voeg een kaartlijst toe</small></div></button>
+            <button id="duplicate-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⧉</span><div>Dupliceren<small>Maak een volledige kopie</small></div></button>
+            <button id="delete-action" class="quick-action text-danger" data-write-action type="button"><span aria-hidden="true">×</span><div>Verwijderen<small>Deck permanent wissen</small></div></button>
+          </div>`
+        });
+        applyWriteAvailability(dialog);
 
-          dialog.querySelector('#duplicate-action')?.addEventListener('click', () => {
-            dialog.close();
-            openDialog({
-              title: 'Deck dupliceren',
-              submitLabel: 'Dupliceren',
-              content: `<div class="field"><label>Naam van de kopie</label><input name="name" value="${escapeHtml(`${deck.name} (kopie)`)}" required maxlength="200"></div>`,
-              onSubmit: async (data) => {
-                const copy = await api(`/decks/${deck.id}/duplicate`, { method: 'POST', body: { name: formValue(data, 'name') } });
-                toast('Deck gedupliceerd.');
-                window.location.hash = `#/decks/${copy.id}`;
-                return true;
-              }
-            });
-          });
+        dialog.querySelector('#edit-deck-action')?.addEventListener('click', () => {
+          dialog.close();
+          editDeck();
+        });
+        dialog.querySelector('#import-deck-action')?.addEventListener('click', () => {
+          dialog.close();
+          importDeck();
+        });
 
-          dialog.querySelector('#delete-action')?.addEventListener('click', async () => {
-            dialog.close();
-            const confirmed = await confirmDialog({ title: 'Deck verwijderen', message: `Weet je zeker dat je ${deck.name} wilt verwijderen? De collectie blijft behouden.` });
-            if (confirmed) {
-              await api(`/decks/${deck.id}`, { method: 'DELETE' });
-              toast('Deck verwijderd.');
-              window.location.hash = '#/decks';
+        dialog.querySelector('#duplicate-action')?.addEventListener('click', () => {
+          dialog.close();
+          openDialog({
+            title: 'Deck dupliceren',
+            submitLabel: 'Dupliceren',
+            content: `<div class="field"><label>Naam van de kopie</label><input name="name" value="${escapeHtml(`${deck.name} (kopie)`)}" required maxlength="200"></div>`,
+            onSubmit: async (data) => {
+              const copy = await api(`/decks/${deck.id}/duplicate`, { method: 'POST', body: { name: formValue(data, 'name') } });
+              toast('Deck gedupliceerd.');
+              window.location.hash = `#/decks/${copy.id}`;
+              return true;
             }
           });
         });
-      }
+
+        dialog.querySelector('#delete-action')?.addEventListener('click', async () => {
+          dialog.close();
+          const confirmed = await confirmDialog({ title: 'Deck verwijderen', message: `Weet je zeker dat je ${deck.name} wilt verwijderen? De collectie blijft behouden.` });
+          if (confirmed) {
+            await api(`/decks/${deck.id}`, { method: 'DELETE' });
+            toast('Deck verwijderd.');
+            window.location.hash = '#/decks';
+          }
+        });
+      });
     }
   };
 }

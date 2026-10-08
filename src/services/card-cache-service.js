@@ -1,134 +1,189 @@
+import { db } from '../db/database.js';
+import { cardMatchesRequestedName } from '../lib/card-identity.js';
 import { HttpError } from '../lib/http-error.js';
-import { normalizeSearchText } from '../lib/text.js';
-import { findCardByCollector, findCardByName, getCardByScryfallId, upsertScryfallCard } from './card-repository.js';
+import { safeJsonParse } from '../lib/text.js';
+import { positiveInteger } from '../lib/validation.js';
+import { mapScryfallCard } from './card-mapper.js';
+import { findCardByCollector, findCardByName, getCardById, getCardByScryfallId, upsertScryfallCard } from './card-repository.js';
 import { scryfallService } from './scryfall-service.js';
 
+const rawCardStatement = db.prepare('SELECT raw_json FROM cards WHERE id = ?');
+const normalized = (value) => String(value ?? '').trim().toLowerCase();
+
+function identityMismatch(card, input, { raw = null, checkLanguage = false } = {}) {
+  if (input.scryfallId && normalized(card.scryfallId) !== normalized(input.scryfallId)) return 'scryfallId';
+  if (input.expectedOracleId && normalized(card.oracleId) !== normalized(input.expectedOracleId)) return 'expectedOracleId';
+  if (input.setCode && normalized(card.setCode) !== normalized(input.setCode)) return 'setCode';
+  if (input.collectorNumber && normalized(card.collectorNumber) !== normalized(input.collectorNumber)) return 'collectorNumber';
+  if (checkLanguage && input.language && normalized(card.language) !== normalized(input.language)) return 'language';
+  if (input.name) {
+    const rawData = raw || safeJsonParse(rawCardStatement.get(card.id)?.raw_json, {});
+    if (!cardMatchesRequestedName(card, input.name, rawData)) return 'name';
+  }
+  return '';
+}
+
+function assertCardIdentity(card, input, options) {
+  const mismatch = identityMismatch(card, input, options);
+  if (mismatch === 'scryfallId') {
+    throw new HttpError(409, 'De opgegeven kaart-ID en Scryfall-ID horen niet bij dezelfde printing. Kies de printing opnieuw.');
+  }
+  if (mismatch === 'expectedOracleId') {
+    throw new HttpError(409, 'De gevonden printing hoort niet bij deze cataloguskaart. Kies een specifieke printing via Kaart opzoeken.');
+  }
+  if (mismatch) {
+    throw new HttpError(409, 'De gevonden printing komt niet overeen met de opgegeven kaartnaam, set, kaartnummer of taal. Kies de printing opnieuw.');
+  }
+  return card;
+}
+
+function validRawCard(raw) {
+  return raw && typeof raw === 'object' && typeof raw.id === 'string' && raw.id.trim()
+    && typeof raw.name === 'string' && raw.name.trim();
+}
+
+// Acquiring a card must never refresh another cached printing as a side effect.
+// Check the request and an existing printing before the first database write.
+// Shared internally with automatic Wanted printing selection; request-facing
+// identifier validation remains in ensureCard.
+export function cacheResolvedCard(raw, input, options = {}) {
+  if (!validRawCard(raw)) throw new HttpError(502, 'Scryfall gaf onvolledige kaartgegevens terug.');
+  const mapped = mapScryfallCard(raw);
+  assertCardIdentity(mapped, input, { ...options, raw });
+  const existing = getCardByScryfallId(mapped.scryfallId);
+  if (existing) {
+    assertCardIdentity(existing, input, options);
+    assertCardIdentity(mapped, {
+      scryfallId: existing.scryfallId,
+      expectedOracleId: existing.oracleId,
+      name: existing.name,
+      setCode: existing.setCode,
+      collectorNumber: existing.collectorNumber,
+      language: existing.language
+    }, { raw, checkLanguage: true });
+    return existing;
+  }
+  return upsertScryfallCard(raw);
+}
+
 export async function ensureCard(input) {
-  let expectedOracleId = '';
   if (input.expectedOracleId !== undefined && input.expectedOracleId !== null) {
     if (typeof input.expectedOracleId !== 'string'
       || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.expectedOracleId.trim())) {
       throw new HttpError(400, 'expectedOracleId moet een geldig Scryfall Oracle-ID zijn.');
     }
-    expectedOracleId = input.expectedOracleId.trim().toLowerCase();
   }
-  const card = await resolveCard(input);
-  if (expectedOracleId && String(card.oracleId || '').toLowerCase() !== expectedOracleId) {
-    throw new HttpError(409, 'De gevonden printing hoort niet bij deze cataloguskaart. Kies een specifieke printing via Kaart opzoeken.');
-  }
-  return card;
-}
-
-async function resolveCard(input) {
-  if (input.cardId) {
-    const { getCardById } = await import('./card-repository.js');
-    const local = getCardById(Number(input.cardId));
-    if (local) return local;
+  if (input.cardId !== undefined && input.cardId !== null) {
+    const local = getCardById(positiveInteger(input.cardId, 'Kaart-ID'));
+    if (!local) throw new HttpError(404, 'De gekozen kaartprinting bestaat niet meer. Kies de printing opnieuw.');
+    return assertCardIdentity(local, input);
   }
   if (input.scryfallId) {
-    const local = getCardByScryfallId(input.scryfallId);
-    if (local) return local;
-    return upsertScryfallCard(await scryfallService.getById(input.scryfallId));
+    const scryfallId = String(input.scryfallId).trim();
+    const local = getCardByScryfallId(scryfallId);
+    if (local) return assertCardIdentity(local, input);
+    return cacheResolvedCard(await scryfallService.getById(scryfallId), input);
   }
   if (input.setCode && input.collectorNumber) {
-    const local = findCardByCollector(input.setCode, input.collectorNumber, input.language || '');
-    if (local) return local;
-    const raw = await scryfallService.getByCollectorNumber(input.setCode, input.collectorNumber, input.language || '');
-    return upsertScryfallCard(raw);
+    const setCode = String(input.setCode).trim().toLowerCase();
+    const collectorNumber = String(input.collectorNumber).trim();
+    const language = normalized(input.language);
+    const options = { checkLanguage: true };
+    const local = findCardByCollector(setCode, collectorNumber, language);
+    if (local) return assertCardIdentity(local, input, options);
+    return cacheResolvedCard(await scryfallService.getByCollectorNumber(setCode, collectorNumber, language), input, options);
   }
   if (input.name) {
     const local = findCardByName(input.name, input.setCode || '');
-    if (local) return local;
-    return upsertScryfallCard(await scryfallService.getByName(input.name, input.setCode || ''));
+    if (local) return assertCardIdentity(local, input);
+    return cacheResolvedCard(await scryfallService.getByName(input.name, input.setCode || ''), input);
   }
   throw new HttpError(400, 'Geef een cardId, Scryfall-ID, kaartnaam of set/collector number op.');
+}
+
+function identifierInput(identifier, language = '') {
+  return {
+    scryfallId: identifier.id || identifier.scryfallId,
+    expectedOracleId: identifier.expectedOracleId,
+    name: identifier.name,
+    setCode: identifier.set || identifier.setCode,
+    collectorNumber: identifier.collector_number || identifier.collectorNumber,
+    language: language || identifier.language || identifier.lang
+  };
+}
+
+function matchRemoteCards(identifiers, rawCards, { language = '' } = {}) {
+  const candidates = (rawCards || []).filter(validRawCard).map((raw) => ({ raw, card: mapScryfallCard(raw) }));
+  const resolved = [];
+  const notFound = [];
+  for (const identifier of identifiers) {
+    const input = identifierInput(identifier, language);
+    const options = { checkLanguage: Boolean(input.language) };
+    const hasIdentifier = input.scryfallId || input.name || (input.setCode && input.collectorNumber);
+    const candidate = hasIdentifier && candidates.find(({ raw, card }) => !identityMismatch(card, input, { ...options, raw }));
+    if (!candidate) {
+      notFound.push(identifier);
+      continue;
+    }
+    try {
+      resolved.push({ identifier, card: cacheResolvedCard(candidate.raw, input, options) });
+    } catch (error) {
+      // Batch imports already report unresolved rows separately. A conflicting
+      // cached printing is unresolved too; it must not be overwritten.
+      if (error?.status !== 409) throw error;
+      notFound.push(identifier);
+    }
+  }
+  return { resolved, notFound };
 }
 
 export async function ensureCardsByIdentifiers(identifiers) {
   const resolved = [];
   const missing = [];
-
   for (const identifier of identifiers) {
+    const input = identifierInput(identifier);
     let local = null;
-    if (identifier.id) local = getCardByScryfallId(identifier.id);
-    else if (identifier.set && identifier.collector_number) local = findCardByCollector(identifier.set, identifier.collector_number);
-    else if (identifier.name) local = findCardByName(identifier.name, identifier.set || '');
-    if (local) resolved.push({ identifier, card: local });
+    if (input.scryfallId) local = getCardByScryfallId(input.scryfallId);
+    else if (input.setCode && input.collectorNumber) local = findCardByCollector(input.setCode, input.collectorNumber, input.language || '');
+    else if (input.name) local = findCardByName(input.name, input.setCode || '');
+    if (local && !identityMismatch(local, input, { checkLanguage: Boolean(input.language) })) resolved.push({ identifier, card: local });
     else missing.push(identifier);
   }
-
-  if (missing.length) {
-    const response = await scryfallService.getCollection(missing);
-    const remoteCards = response.cards.map(upsertScryfallCard);
-    const byScryfallId = new Map(remoteCards.map((card) => [card.scryfallId, card]));
-    const byCollector = new Map(remoteCards.map((card) => [`${card.setCode}|${card.collectorNumber}`, card]));
-    const byName = new Map();
-    for (const card of remoteCards) {
-      const key = `${normalizeSearchText(card.name)}|${card.setCode}`;
-      byName.set(key, card);
-      if (!byName.has(`${normalizeSearchText(card.name)}|`)) byName.set(`${normalizeSearchText(card.name)}|`, card);
-    }
-    for (const identifier of missing) {
-      const key = `${normalizeSearchText(identifier.name || '')}|${String(identifier.set || '').toLowerCase()}`;
-      const card = identifier.id
-        ? byScryfallId.get(identifier.id)
-        : identifier.set && identifier.collector_number
-          ? byCollector.get(`${String(identifier.set).toLowerCase()}|${identifier.collector_number}`)
-          : (byName.get(key) || byName.get(`${normalizeSearchText(identifier.name || '')}|`));
-      if (card) resolved.push({ identifier, card });
-    }
-    return { resolved, notFound: response.notFound };
-  }
-
-  return { resolved, notFound: [] };
+  if (!missing.length) return { resolved, notFound: [] };
+  const response = await scryfallService.getCollection(missing);
+  const remote = matchRemoteCards(missing, response.cards);
+  return { resolved: [...resolved, ...remote.resolved], notFound: remote.notFound };
 }
 
 export async function ensureCardsByCollectorLanguage(identifiers, language = 'en') {
-  const normalizedLanguage = String(language || 'en').toLowerCase();
+  const normalizedLanguage = normalized(language || 'en');
   const resolved = [];
   const missingBySet = new Map();
-
   for (const identifier of identifiers) {
-    const setCode = String(identifier.set || identifier.setCode || '').toLowerCase();
-    const collectorNumber = String(identifier.collector_number || identifier.collectorNumber || '');
-    const normalizedIdentifier = { set: setCode, collector_number: collectorNumber };
+    const setCode = normalized(identifier.set || identifier.setCode);
+    const collectorNumber = String(identifier.collector_number || identifier.collectorNumber || '').trim();
+    const normalizedIdentifier = { ...identifier, set: setCode, collector_number: collectorNumber };
+    const input = identifierInput(normalizedIdentifier, normalizedLanguage);
     const local = findCardByCollector(setCode, collectorNumber, normalizedLanguage);
-    if (local) {
+    if (local && !identityMismatch(local, input, { checkLanguage: true })) {
       resolved.push({ identifier: normalizedIdentifier, card: local });
       continue;
     }
     if (!missingBySet.has(setCode)) missingBySet.set(setCode, []);
     missingBySet.get(setCode).push(normalizedIdentifier);
   }
-
   const notFound = [];
   if (normalizedLanguage === 'en' && missingBySet.size) {
     const missing = [...missingBySet.values()].flat();
     const response = await scryfallService.getCollection(missing);
-    const byPrinting = new Map((response.cards || [])
-      .filter((card) => String(card.lang || 'en').toLowerCase() === 'en')
-      .map((card) => [
-        `${String(card.set || '').toLowerCase()}|${String(card.collector_number || '').toLowerCase()}`,
-        card
-      ]));
-    for (const identifier of missing) {
-      const key = `${identifier.set}|${String(identifier.collector_number).toLowerCase()}`;
-      const raw = byPrinting.get(key);
-      if (raw) resolved.push({ identifier, card: upsertScryfallCard(raw) });
-      else notFound.push(identifier);
-    }
-    return { resolved, notFound };
+    const remote = matchRemoteCards(missing, response.cards, { language: normalizedLanguage });
+    return { resolved: [...resolved, ...remote.resolved], notFound: remote.notFound };
   }
-
   for (const [setCode, missing] of missingBySet) {
     const rawCards = await scryfallService.cardsBySetAndLanguage(setCode, normalizedLanguage);
-    const byCollector = new Map(rawCards.map((card) => [String(card.collector_number).toLowerCase(), card]));
-    for (const identifier of missing) {
-      const raw = byCollector.get(String(identifier.collector_number).toLowerCase());
-      if (raw) resolved.push({ identifier, card: upsertScryfallCard(raw) });
-      else notFound.push(identifier);
-    }
+    const remote = matchRemoteCards(missing, rawCards, { language: normalizedLanguage });
+    resolved.push(...remote.resolved);
+    notFound.push(...remote.notFound);
   }
-
   return { resolved, notFound };
 }

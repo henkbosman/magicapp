@@ -145,19 +145,28 @@ collectionWriteRouter.patch('/:id', (req, res) => {
   const id = positiveInteger(req.params.id, 'Collectie-ID');
   const current = getCollectionItem(id);
   if (!current) throw new HttpError(404, 'Collectieregel niet gevonden.');
+  const body = req.body || {};
+  // Only omission means "keep the finish". An explicitly empty finish must
+  // never silently change an owned foil into the default nonfoil variant.
+  if (Object.hasOwn(body, 'finish')) oneOf(body.finish, ['nonfoil', 'foil', 'etched'], 'Afwerking');
   const merged = {
-    quantity: req.body.quantity ?? current.quantity,
-    finish: req.body.finish ?? current.finish,
-    language: req.body.language ?? current.language,
-    condition: req.body.condition ?? current.condition,
-    location: req.body.location ?? current.location,
-    notes: req.body.notes ?? current.notes,
-    purchasePrice: req.body.purchasePrice !== undefined ? req.body.purchasePrice : current.purchasePrice,
+    quantity: body.quantity ?? current.quantity,
+    finish: body.finish ?? current.finish,
+    language: body.language ?? current.language,
+    condition: body.condition ?? current.condition,
+    location: body.location ?? current.location,
+    notes: body.notes ?? current.notes,
+    purchasePrice: body.purchasePrice !== undefined ? body.purchasePrice : current.purchasePrice,
     reconcileWanted: false
   };
-  res.json({ data: updateCollectionItem(id, collectionInput(merged, { allowZero: true })) });
+  res.json({ data: updateCollectionItem(id, {
+    ...collectionInput(merged, { allowZero: true }),
+    expectedRevision: body.expectedRevision
+  }) });
 });
 
 collectionWriteRouter.delete('/:id', (req, res) => {
-  res.json({ data: deleteCollectionItem(positiveInteger(req.params.id, 'Collectie-ID')) });
+  res.json({ data: deleteCollectionItem(positiveInteger(req.params.id, 'Collectie-ID'), {
+    expectedRevision: req.body?.expectedRevision
+  }) });
 });

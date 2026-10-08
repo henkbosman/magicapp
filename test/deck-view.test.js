@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { parseHtml } from './support/dom.js';
 
 import {
   compareDeckCards,
@@ -172,6 +173,7 @@ test('decksortering en -groepering normaliseren naar veilige standaardwaarden', 
   assert.equal(normalizeDeckCardGroup(), 'type');
   assert.equal(normalizeDeckCardGroup('type'), 'type');
   assert.equal(normalizeDeckCardGroup('ability'), 'ability');
+  assert.equal(normalizeDeckCardGroup('none'), 'none');
   assert.equal(normalizeDeckCardGroup('onbekend'), 'type');
 });
 
@@ -186,6 +188,7 @@ test('deckquery bewaart filters, kaartview en kolomkeuze samen', () => {
     cardGroup: 'ability'
   }), 'cardSearch=Llanowar+Elves&role=sideboard&cardType=Creature&view=cards&cardColumns=7&cardSort=name&cardGroup=ability');
   assert.equal(deckDetailQueryString({ view: 'cards' }), 'view=cards');
+  assert.equal(deckDetailQueryString({ cardGroup: 'none', cardSort: 'name', cardSearch: 'Forest', view: 'cards' }), 'cardSearch=Forest&view=cards&cardSort=name&cardGroup=none');
   assert.equal(deckDetailQueryString({ cardColumns: '5', cardSort: 'mana', cardGroup: 'type' }), '');
   assert.equal(deckDetailQueryString({ cardColumns: '9', cardSort: 'anders', cardGroup: 'anders' }), '');
 });
@@ -224,6 +227,68 @@ test('typegroepering behoudt de vaste typevolgorde en sorteert binnen iedere gro
   const groups = groupDeckCards(input, { groupBy: 'type', sortBy: 'name' });
   assert.deepEqual(groups.map((group) => group.value), ['Creature', 'Land', 'Instant', 'Overig']);
   assert.deepEqual(input.map((item) => item.id), [123, 124, 122, 121]);
+});
+
+test('zonder groepering sorteren kaarten over alle types en abilities heen zonder de invoer te wijzigen', () => {
+  const cards = [
+    deckCard({ deckCardId: 131, cardId: 91, name: 'Alpha Creature', cardTypes: ['Creature'], typeLine: 'Creature', manaValue: 5, keywords: ['Flying'] }),
+    deckCard({ deckCardId: 132, cardId: 92, name: 'Zeta Land', cardTypes: ['Land'], typeLine: 'Land', manaValue: 0 }),
+    deckCard({ deckCardId: 133, cardId: 93, name: 'Beta Instant', cardTypes: ['Instant'], typeLine: 'Instant', manaValue: 2 })
+  ];
+  const original = structuredClone(cards);
+  const manaGroups = groupDeckCards(cards, { groupBy: 'none', sortBy: 'mana' });
+  assert.equal(manaGroups.length, 1);
+  assert.equal(manaGroups[0].kind, 'none');
+  assert.deepEqual(manaGroups[0].items.map((card) => card.id), [132, 133, 131]);
+  assert.deepEqual(groupDeckCards(cards, { groupBy: 'none', sortBy: 'name' })[0].items.map((card) => card.id), [131, 133, 132]);
+  assert.deepEqual(groupDeckCards([], { groupBy: 'none' }), []);
+  assert.deepEqual(cards, original);
+});
+
+test('Geen toont één lijst en één kaartgrid zonder groepskoppen en behoudt gecombineerde basic lands', async () => {
+  const deck = { id: 7, name: 'Testdeck', format: 'commander', description: '', notes: '', commander: null, secondCommander: null };
+  const cards = [
+    deckCard({ deckCardId: 141, cardId: 101, name: 'Alpha Creature', cardTypes: ['Creature'], typeLine: 'Creature', manaValue: 5 }),
+    deckCard({ deckCardId: 142, cardId: 102, name: 'Forest', cardTypes: ['Land'], supertypes: ['Basic'], typeLine: 'Basic Land — Forest', manaValue: 0, quantity: 2 }),
+    deckCard({ deckCardId: 143, cardId: 103, name: 'Beta Instant', cardTypes: ['Instant'], typeLine: 'Instant', manaValue: 2 }),
+    deckCard({ deckCardId: 144, cardId: 104, name: 'Forest', cardTypes: ['Land'], supertypes: ['Basic'], typeLine: 'Basic Land — Forest', manaValue: 0, quantity: 3 }),
+    deckCard({ deckCardId: 145, cardId: 105, name: 'Forest', cardTypes: ['Land'], supertypes: ['Basic'], typeLine: 'Basic Land — Forest', manaValue: 0, quantity: 1, role: 'sideboard' })
+  ];
+  const original = structuredClone(cards);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => new Response(JSON.stringify({ data: String(url).endsWith('/cards') ? cards : deck }), {
+    headers: { 'content-type': 'application/json' }
+  });
+  try {
+    for (const viewName of ['list', 'cards']) {
+      const view = await renderDeckDetail({ params: { id: '7' }, query: new URLSearchParams(`cardGroup=none&view=${viewName}&cardColumns=6`) });
+      const document = parseHtml(view.html);
+      assert.equal(document.querySelector('#deck-card-group').value, 'none');
+      assert.equal(document.querySelectorAll('.deck-list-group').length, 1);
+      assert.equal(document.querySelectorAll('.deck-visual-group').length, 1);
+      assert.equal(document.querySelectorAll('.deck-list-group-header, .deck-visual-group-header').length, 0);
+      assert.equal(document.querySelectorAll('[data-deck-type-group], [data-deck-ability-group]').length, 0);
+      assert.equal(document.querySelector('#deck-card-visual').dataset.columns, '6');
+      assert.equal(document.querySelector('#deck-card-list').hidden, viewName !== 'list');
+      assert.equal(document.querySelector('#deck-card-visual-container').hidden, viewName !== 'cards');
+      for (const viewId of ['#deck-card-list', '#deck-card-visual']) {
+        const rows = document.querySelector(viewId).querySelectorAll('[data-deck-filter-card]');
+        assert.deepEqual(rows.map((row) => row.dataset.displayId), ['142', '145', '143', '141']);
+        assert.deepEqual(rows.map((row) => row.dataset.quantity), ['5', '1', '1', '1']);
+        assert.deepEqual(rows.map((row) => row.dataset.role), ['main', 'sideboard', 'main', 'main']);
+        assert.ok(rows.every((row) => row.dataset.search && row.dataset.types));
+      }
+      const header = document.querySelector('.page-actions');
+      assert.match(header.textContent, /Meer…/);
+      assert.doesNotMatch(header.textContent, /Bewerken|Importeren/);
+      const exportButton = document.querySelector('#export-deck');
+      assert.equal(exportButton.tagName, 'BUTTON');
+      assert.equal(exportButton.getAttribute('data-write-action'), null);
+    }
+    assert.deepEqual(cards, original);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('abilitygroepering kiest per kaart één primaire keyword en zet kaarten zonder ability als laatste', () => {

@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.13.3
+# Magic Collection Manager 2.14.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -20,6 +20,12 @@ Versie **2.13.3** voegt **Legendary** toe aan **Subtype** op **Kaarten ontdekken
 
 De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `mtgjson-atomic.sqlite`. Markeringen staan vanaf 2.12.0 in `discovery_marks` in de bestaande gebruikersdatabase `magic-collection.sqlite`; bestaande collectie-, wanted- en deckgegevens blijven behouden. Markeringen gebruiken stabiele kaartidentiteiten, geen catalogusrij-ID's of databasepaden. De twee databases worden niet met `ATTACH` of foreign keys gekoppeld. De kaarttekst-, lijst-, deck- en importverbeteringen uit 2.6 tot en met 2.10.4 blijven onderdeel van deze release.
 
+Versie **2.13.4** herstelt fouten rond afwerkingskeuze, verouderde bewerkformulieren, dubbele toevoegingen en verlies van gegevens bij samenvoegen. Beide databaseschema’s blijven gelijk; bestaande gegevens worden niet automatisch gecorrigeerd. Zie [het integriteitsonderzoek](docs/DATA-INTEGRITY-AUDIT.md) voor bevindingen, tests en upgrade-instructies.
+
+Versie **2.13.5** schermt **Kaart toevoegen** verder af: late antwoorden kunnen een nieuwe kaartselectie niet vervangen, kaartidentiteit wordt vóór opslag gecontroleerd en ongerelateerde collectie-, Wanted- en deckgegevens blijven behouden. Zie [de gerichte toevoegcontrole](docs/ADD-CARD-ISOLATION.md).
+
+Versie **2.14.0** bundelt de deckacties in **Meer…**, voegt een exportpopup met kopiëren en downloaden in TXT- of Forge/Neo Forge-DCK-formaat toe en biedt **Geen** als groepering in beide deckweergaven.
+
 ## Belangrijkste mogelijkheden
 
 - Snel lokaal zoeken en direct zien of een kaart in bezit is, hoeveel exemplaren beschikbaar zijn, in welke decks deze voorkomt en of de kaart op Wanted staat.
@@ -37,7 +43,7 @@ De MTGJSON-catalogus staat bewust in de volledig zelfstandige SQLite-database `m
 - Wanted-list met prioriteit, rarity, mogelijke printings, gekozen printing, prijsinformatie en deckfilter.
 - Basic lands worden niet als ontbrekend beschouwd en komen niet op Wanted.
 - Handmatig corrigeerbare kaartkenmerken voor mana-productie en library-searchfuncties.
-- CSV-export voor de collectie, gecontroleerde tekstimport voor meerdere fysieke kaarten en tekstimport/-export voor decks.
+- CSV-export voor de collectie, gecontroleerde tekstimport voor meerdere fysieke kaarten en tekstimport voor decks, met kopieerbare TXT- en DCK-export.
 - Gescheiden REST API-zones voor lezen en schrijven, zodat een reverse proxy `/api/write` tot het LAN kan beperken.
 - Automatische alleen-lezeninterface: muterende acties worden grijs en uitgeschakeld wanneer de schrijf-API niet bereikbaar is, zonder storende statusmelding.
 - Databaseback-up en onderhoudsfuncties.
@@ -265,13 +271,17 @@ Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaa
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Direct daarnaast staan keuzelijsten voor sorteren op **Mana kosten** of **Naam kaart** en groeperen op **Type** of **Ability**. Standaard wordt op manakosten gesorteerd en op kaarttype gegroepeerd. Bij abilitygroepering bepaalt het primaire herkende kaartkeyword de groep. Heeft een kaart geen keyword, dan worden in vaste volgorde de al aanwezige functionele kaartinzichten voor mana produceren, land zoeken en creature zoeken gebruikt; pas daarna valt de kaart onder **Geen ability**. Elke kaart staat daarbij in precies één groep. Met **Lijst** en **Kaarten** kan worden gewisseld tussen de beheerlijst en een grote visuele weergave. Beide weergaven gebruiken dezelfde filters, sortering en groepering; de kaartweergave, de gekozen sortering en groepering, het gekozen aantal kaarten per rij en de filters worden in de URL bewaard. In de kaartweergave biedt **Kaarten per rij** de expliciete keuzes 1 tot en met 8, met **5** als standaard; de eerdere keuze **Automatisch** is verwijderd. Op kleinere schermen wordt het gekozen aantal responsief begrensd en blijven kaartafbeeldingen volledig zichtbaar zonder aan de zijkanten te worden afgesneden.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Direct daarnaast staan keuzelijsten voor sorteren op **Mana kosten** of **Naam kaart** en groeperen op **Type**, **Ability** of **Geen**. Met **Geen** staan alle kaarten in één doorlopende lijst of één raster, gesorteerd volgens de gekozen sortering. Standaard wordt op manakosten gesorteerd en op kaarttype gegroepeerd. Bij abilitygroepering bepaalt het primaire herkende kaartkeyword de groep. Heeft een kaart geen keyword, dan worden in vaste volgorde de al aanwezige functionele kaartinzichten voor mana produceren, land zoeken en creature zoeken gebruikt; pas daarna valt de kaart onder **Geen ability**. Elke kaart staat daarbij in precies één groep. Met **Lijst** en **Kaarten** kan worden gewisseld tussen de beheerlijst en een grote visuele weergave. Beide weergaven gebruiken dezelfde filters, sortering en groepering; de kaartweergave, de gekozen sortering en groepering, het gekozen aantal kaarten per rij en de filters worden in de URL bewaard. In de kaartweergave biedt **Kaarten per rij** de expliciete keuzes 1 tot en met 8, met **5** als standaard; de eerdere keuze **Automatisch** is verwijderd. Op kleinere schermen wordt het gekozen aantal responsief begrensd en blijven kaartafbeeldingen volledig zichtbaar zonder aan de zijkanten te worden afgesneden.
 
 In de lijst opent de compacte knop **Acties** één menu met de beschikbare acties **Naar Wanted**, **Bewerken**, **Kenmerken**, **Combo's/synergieën** en **Verwijderen**. Bij samengevoegde basic lands worden alleen acties aangeboden die veilig op de groep kunnen worden uitgevoerd; via het printingoverzicht blijven de afzonderlijke printings beheerbaar. De kaartafbeelding is in deze lijst 92 pixels breed en opent de grote preview; de kaartnaam zelf is gewone tekst. Binnen `.card-list-content` krijgt de naam flexibel de resterende ruimte en staan de manakosten rechts uitgelijnd, zodat lange namen minder snel over twee regels lopen terwijl de mana per rij netjes blijft staan. Daarna staat de kaarttekst met gerenderde symbolen tussen de kaartsamenvatting en **Acties**. Kaarttekst en inline symbolen zijn duidelijk leesbaar; generieke, numerieke, gekleurde, kleurloze en tapsymbolen gebruiken dezelfde verticale basislijn. Alleen de exacte abilitynaam of het herkende keyword wordt gemarkeerd; de overige tekst blijft normaal weergegeven.
 
 In de kaartweergave staan geen zichtbare ellipsis- of actieknoppen op de kaarten. De beschikbare kaartacties blijven bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`; een normale klik opent eerst de grote preview. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Commander-thumbnails zijn daar verdubbeld van 52 × 73 naar 104 × 146 pixels. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. De optie om ontbrekende exemplaren ook aan Wanted toe te voegen staat standaard uit. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven. De tekstexport bundelt gelijke Oracle-kaarten over verschillende printings en exporteert bijvoorbeeld één regel `24 Forest` in plaats van meerdere losse Forest-regels.
+
+**Meer…** opent het deckmenu met **Bewerken**, **Importeren**, **Dupliceren** en **Verwijderen**. De knoppen hebben dezelfde uitlijning. **Exporteren** opent een aparte popup met de volledige decklijst. Kies **Tekst (.txt)** of **Forge / Neo Forge (.dck)**, gebruik **Kopiëren** of selecteer zelf tekst, of sla de getoonde inhoud op met **Downloaden**. **Tekort exporteren** blijft een rechtstreekse TXT-download.
+
+De TXT-export houdt dezelfde inhoud als voorheen. De DCK-export gebruikt `[metadata]` met de decknaam, `[Commander]` voor beide commanders, `[Main]` voor het hoofddeck en `[Sideboard]` voor sideboard en companion. Maybeboard wordt in beide formaten overgeslagen. Printings van dezelfde Oracle-kaart worden voor DCK binnen elke sectie samengevoegd. Er worden aantallen en Engelse kaartnamen geëxporteerd, geen specifieke printing of afwerking. Zie [de exportbeschrijving](docs/DECK-EXPORT.md).
 
 ## Deckstatistieken
 

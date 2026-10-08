@@ -1,5 +1,50 @@
 # Changelog
 
+## 2.14.0 - 2026-10-08
+
+### Deckmenu, export en groepering
+
+- **Bewerken** en **Importeren** staan voortaan bij **Meer…**, samen met **Dupliceren** en **Verwijderen**. Alle menuacties gebruiken dezelfde uitlijning; **Exporteren** is uit dit menu verwijderd.
+- **Exporteren** opent een popup met leesbare, selecteerbare tekst, **Kopiëren**, **Downloaden** en een formaatkeuze: **Tekst (.txt)** of **Forge / Neo Forge (.dck)**. Late antwoorden na wisselen van formaat of sluiten van de popup worden genegeerd.
+- TXT behoudt de bestaande exportinhoud. DCK verdeelt de kaarten over Commander, Main en Sideboard; companion komt in Sideboard en maybeboard wordt overgeslagen. Aantallen worden per Oracle-kaart binnen de sectie opgeteld.
+- **Groeperen: Geen** geeft in lijst- en kaartenweergave één doorlopende, gesorteerde reeks zonder groepskoppen. Filters, weergavekeuze en basic-landbundeling blijven werken.
+- Nieuw: read-only `GET /api/read/decks/:id/export?format=txt|dck` voor de exportpopup en `GET /api/read/decks/:id/export.dck` voor rechtstreeks downloaden. Het bestaande TXT-endpoint blijft beschikbaar.
+- Geen databaseschemawijzigingen, catalogusherimport of nieuwe schrijf-endpoints. Herstart Node/systemd na vervangen van de code om de nieuwe leesroutes te laden.
+
+## 2.13.5 - 2026-10-08
+
+### Isolatie bij kaart toevoegen
+
+- Vertraagde gebruiks- en taalantwoorden kunnen een nieuw geselecteerde kaart niet meer vervangen. Toevoegacties uit oude formulieren worden geweigerd.
+- Toevoegacties sturen waar beschikbaar zowel lokaal kaart-ID als Scryfall-ID; de server controleert of die bij dezelfde printing horen.
+- Externe kaartgegevens worden vóór opslag gecontroleerd tegen de gevraagde identiteit. Dit geldt ook voor preview, batchimport en automatische printingkeuze bij Wanted. Ongevraagde of afwijkende antwoorden schrijven geen andere kaartmetadata over.
+- Een bestaande printing die tijdens toevoegen opnieuw wordt gevonden, wordt gelezen zonder metadatarefresh. Een bekende Oracle-identiteit kan niet via upsert worden vervangen of gewist.
+- Een verdwenen of niet-passend `sourceWantedId` blokkeert toevoegen vóór de eerste collectiewijziging.
+- Printingmerges schonen alleen de betrokken combo-/synergiegroepen op; ongerelateerde historische groepen blijven behouden.
+- Nieuwe isolatietests vergelijken volledige databasegegevens vóór en na toevoegen, inclusief andere afwerkingen en printings, kaarten, decks, Wanted, kenmerken, markeringen en combo's.
+- Geen schemawijzigingen of nieuwe endpointpaden. Zie `docs/ADD-CARD-ISOLATION.md` voor de controle en de bedoelde neveneffecten van toevoegen.
+
+## 2.13.4 - 2026-10-08
+
+### Collectie en gegevensintegriteit
+
+- Een expliciete foil/nonfoil-keuze blijft behouden wanneer je via een taalvariant met slechts één afwerking terugkeert naar een taal die de gekozen afwerking ondersteunt.
+- Collectieregels krijgen een `revision`. De interface stuurt die als `expectedRevision` mee bij wijzigen en verwijderen; een tussentijds gewijzigde regel geeft 409 in plaats van gegevens te overschrijven.
+- Een expliciet lege afwerking bij PATCH wordt geweigerd, in plaats van terug te vallen op nonfoil. Nieuwe of gewijzigde afwerkingen moeten passen bij de bekende printinggegevens.
+- Dubbel indienen tijdens opslaan wordt geblokkeerd, ook wanneer dezelfde printing opnieuw wordt aangeklikt. Een mislukte verversing na een bevestigde toevoeging opent de toevoeging niet opnieuw.
+- Toevoegen en samenvoegen bewaren bestaande opmerkingen. Verschillende bekende aankoopprijzen of te lange gecombineerde notities geven een conflict zonder gedeeltelijke wijzigingen.
+- Expliciete kaart-ID's, kaartnamen en set/nummercombinaties worden strikter gecontroleerd; een verdwenen printing wordt niet stil vervangen. Digitale printings uit de lokale cache verschijnen niet meer in de fysieke printingkeuze.
+- Ongeldige of onveilig grote aantallen worden afgewezen. Lege aantallen kunnen niet meer als nul worden uitgelegd en zo een collectieregel verwijderen.
+- Verwijderen van een deckkaart vereist dat de regel bij het opgegeven deck hoort. Commander- en printingmerges bewaren tags, notities en koppelingen.
+- Wanted-toevoegingen zijn atomair. Ontbrekende aantallen worden na externe lookup opnieuw berekend om dubbel aanvullen bij gelijktijdige aanvragen te voorkomen.
+- Na een mislukte databasecommit blijft de transactieteller correct, zodat volgende geneste mutaties atomair blijven.
+
+### Compatibiliteit en onderzoek
+
+- Geen databaseschemawijziging, catalogusherimport of automatische correctie van bestaande collectiegegevens.
+- Bestaande endpointpaden blijven gelijk. `revision`/`expectedRevision` breiden het collectiecontract uit; oudere clients zonder `expectedRevision` blijven werken, maar hebben geen bescherming tegen verouderde snapshots.
+- Het onderzoek en de beperkingen staan in `docs/DATA-INTEGRITY-AUDIT.md`. De productiegegevens van de gebruiker zijn niet onderzocht; een bewezen codefout is geen bewijs dat die de concrete gemelde kaarten heeft gewijzigd.
+
 ## 2.13.3 - 2026-10-03
 
 ### Legendary bij de ontdekfilters

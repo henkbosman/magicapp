@@ -180,7 +180,17 @@ export function reassignDeckCardLinks(deckId, oldDeckCardId, newDeckCardId) {
     insert.run(membership.group_id, newDeckCardId, membership.position);
   }
   db.prepare('DELETE FROM deck_card_group_members WHERE deck_card_id = ?').run(oldDeckCardId);
-  cleanupDeckCardLinkGroups(deckId);
+  // Merging two members can leave their group with fewer than two cards.
+  // Only those affected groups belong to this operation: an acquisition must
+  // not delete unrelated historical groups elsewhere in the same deck.
+  const removeCollapsedGroup = db.prepare(`
+    DELETE FROM deck_card_groups
+    WHERE deck_id = ? AND id = ?
+      AND (SELECT COUNT(*) FROM deck_card_group_members m WHERE m.group_id = deck_card_groups.id) < 2
+  `);
+  for (const membership of memberships) {
+    removeCollapsedGroup.run(deckId, membership.group_id);
+  }
 }
 
 export function copyDeckCardLinks(sourceDeckId, targetDeckId, deckCardIdMap) {

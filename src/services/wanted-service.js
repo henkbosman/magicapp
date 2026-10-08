@@ -1,5 +1,6 @@
-import { db } from '../db/database.js';
+import { db, transaction } from '../db/database.js';
 import { HttpError } from '../lib/http-error.js';
+import { positiveInteger } from '../lib/validation.js';
 import { isBasicLand } from '../lib/card-rules.js';
 import { normalizeSearchText } from '../lib/text.js';
 import {
@@ -189,6 +190,10 @@ function linkWantedToDecks(wantedItemId, deckIds = []) {
 }
 
 export function upsertWanted(input, { matchOracle = true } = {}) {
+  return transaction(() => saveWanted(input, { matchOracle }));
+}
+
+function saveWanted(input, { matchOracle }) {
   const card = requireCardById(input.cardId);
   if (isBasicLand(card)) {
     throw new HttpError(400, 'Basic lands worden als standaard beschikbaar beschouwd en niet aan Wanted toegevoegd.');
@@ -198,22 +203,27 @@ export function upsertWanted(input, { matchOracle = true } = {}) {
   let existing;
   if (matchOracle) {
     existing = db.prepare(`
-      SELECT w.id FROM wanted_items w JOIN cards c ON c.id = w.card_id
+      SELECT w.id, w.quantity, w.notes FROM wanted_items w JOIN cards c ON c.id = w.card_id
       WHERE COALESCE(c.oracle_id, c.scryfall_id) = ?
       ORDER BY CASE WHEN c.id = ? THEN 0 ELSE 1 END, w.id LIMIT 1
     `).get(card.cardKey, card.id);
   } else {
-    existing = db.prepare('SELECT id FROM wanted_items WHERE card_id = ?').get(card.id);
+    existing = db.prepare('SELECT id, quantity, notes FROM wanted_items WHERE card_id = ?').get(card.id);
   }
 
   let id;
   if (existing) {
+    const quantity = positiveInteger(Number(existing.quantity) + Number(input.quantity), 'Totaalaantal');
+    const notes = [...new Set([existing.notes, input.notes].filter(Boolean))].join('\n\n');
+    if (notes.length > 5000) {
+      throw new HttpError(409, 'De samengevoegde Wanted-notities zijn te lang. Verkort de notities voordat je extra exemplaren toevoegt.');
+    }
     db.prepare(`
-      UPDATE wanted_items SET quantity = quantity + ?, priority = MIN(priority, ?),
+      UPDATE wanted_items SET quantity = ?, priority = MIN(priority, ?),
         maximum_price = COALESCE(?, maximum_price),
-        notes = CASE WHEN ? <> '' THEN ? ELSE notes END
+        notes = ?
       WHERE id = ?
-    `).run(input.quantity, input.priority, input.maximumPrice, input.notes, input.notes, existing.id);
+    `).run(quantity, input.priority, input.maximumPrice, notes, existing.id);
     if (printing) {
       db.prepare('UPDATE wanted_items SET printing_card_id = ? WHERE id = ?').run(printing.id, existing.id);
     }

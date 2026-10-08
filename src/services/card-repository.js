@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import { db, transaction } from '../db/database.js';
 import { HttpError, assert } from '../lib/http-error.js';
+import { positiveInteger } from '../lib/validation.js';
 import { isBasicLand } from '../lib/card-rules.js';
 import { normalizeSearchText, safeJsonParse } from '../lib/text.js';
 import { cardRowToApi, mapScryfallCard } from './card-mapper.js';
@@ -123,6 +125,14 @@ function mappedValues(mapped) {
 export function upsertScryfallCard(rawCard) {
   const mapped = mapScryfallCard(rawCard);
   assert(mapped.scryfallId && mapped.name, 502, 'Scryfall gaf onvolledige kaartgegevens terug.');
+  const existing = db.prepare('SELECT oracle_id FROM cards WHERE scryfall_id = ?').get(mapped.scryfallId);
+  // Changing an established Oracle identity would also redirect the ownership,
+  // Wanted and deck records that point at this printing. Treat that as a
+  // conflicting response, not as an ordinary metadata refresh.
+  if (existing?.oracle_id
+    && String(existing.oracle_id).toLowerCase() !== String(mapped.oracleId || '').toLowerCase()) {
+    throw new HttpError(409, 'Deze printing heeft afwijkende kaartidentiteitsgegevens. De bestaande kaartgegevens zijn niet gewijzigd.');
+  }
   const result = upsertCardStatement.get(...mappedValues(mapped));
   return getCardById(Number(result.id));
 }
@@ -367,6 +377,24 @@ function normalizeCollectionColors(value) {
     .filter((entry) => COLLECTION_COLOR_CODES.has(entry)))];
 }
 
+function withCollectionRevision(item) {
+  const revision = createHash('sha256').update(JSON.stringify([
+    item.id, item.card.id, item.quantity, item.finish, item.language,
+    item.condition, item.location, item.notes, item.purchasePrice
+  ])).digest('hex');
+  return { ...item, revision };
+}
+
+function assertCollectionRevision(item, expectedRevision) {
+  if (expectedRevision === undefined) return;
+  if (typeof expectedRevision !== 'string' || !/^[a-f0-9]{64}$/.test(expectedRevision)) {
+    throw new HttpError(400, 'De versie van de collectieregel is ongeldig. Vernieuw de collectie en probeer opnieuw.');
+  }
+  if (item.revision !== expectedRevision) {
+    throw new HttpError(409, 'Deze collectieregel is ondertussen gewijzigd. Vernieuw de collectie voordat je de wijziging opnieuw uitvoert.');
+  }
+}
+
 export function listCollection(filters = {}) {
   const conditions = [];
   const params = [];
@@ -526,7 +554,7 @@ export function listCollection(filters = {}) {
 
   const cards = enrichCardsWithInsights(rows.map((row) => cardRowToApi(row)));
   const maps = usageMapsForKeys(cards.map((card) => card.cardKey));
-  const items = rows.map((row, index) => ({
+  const items = rows.map((row, index) => withCollectionRevision({
     id: Number(row.collection_item_id),
     quantity: Number(row.collection_quantity),
     finish: row.collection_finish,
@@ -612,22 +640,59 @@ function reconcileWantedForKey(cardKey, acquiredQuantity) {
   }
 }
 
+function assertSupportedCollectionFinish(card, finish) {
+  // Missing legacy cache metadata is not evidence that a finish is invalid.
+  // Available finishes describe the printing; the owned finish remains on ci.
+  if (card.finishes.length && !card.finishes.includes(finish)) {
+    throw new HttpError(400, `Deze printing is niet beschikbaar als ${finish}. Kies een passende afwerking of printing.`);
+  }
+}
+
+function mergedCollectionDetails(existing, input) {
+  const pricesConflict = existing.purchase_price !== null
+    && input.purchasePrice !== null
+    && input.purchasePrice !== undefined
+    && Number(existing.purchase_price) !== Number(input.purchasePrice);
+  if (pricesConflict) {
+    throw new HttpError(409, 'Deze collectieregel heeft een andere aankoopprijs. Gebruik een andere locatie om beide aankoopprijzen te bewaren.');
+  }
+  const notes = [...new Set([existing.notes, input.notes].map((value) => String(value || '')).filter(Boolean))].join('\n\n');
+  if (notes.length > 5000) {
+    throw new HttpError(409, 'De samengevoegde opmerkingen zijn te lang. Gebruik een andere locatie om beide opmerkingen te bewaren.');
+  }
+  return { notes, purchasePrice: input.purchasePrice ?? existing.purchase_price };
+}
+
 export function addCollectionItem(input) {
   const card = requireCardById(input.cardId);
+  assertSupportedCollectionFinish(card, input.finish);
   return transaction(() => {
+    if (input.sourceWantedId !== undefined && input.sourceWantedId !== null) {
+      const sourceWantedId = positiveInteger(input.sourceWantedId, 'Wanted-ID');
+      const source = db.prepare(`
+        SELECT COALESCE(c.oracle_id, c.scryfall_id) AS card_key
+        FROM wanted_items w JOIN cards c ON c.id = w.card_id
+        WHERE w.id = ?
+      `).get(sourceWantedId);
+      if (!source) throw new HttpError(404, 'Het gekozen Wanted-item bestaat niet meer. Vernieuw de lijst voordat je toevoegt.');
+      if (source.card_key !== card.cardKey) {
+        throw new HttpError(409, 'Het gekozen Wanted-item hoort bij een andere kaart. Er is niets aan de collectie toegevoegd.');
+      }
+    }
     const existing = db.prepare(`
-      SELECT id FROM collection_items
+      SELECT id, quantity, notes, purchase_price FROM collection_items
       WHERE card_id = ? AND finish = ? AND language = ? AND condition = ? AND location = ?
     `).get(card.id, input.finish, input.language, input.condition, input.location);
 
     let itemId;
     if (existing) {
+      const details = mergedCollectionDetails(existing, input);
+      const quantity = positiveInteger(Number(existing.quantity) + Number(input.quantity), 'Aantal');
       db.prepare(`
         UPDATE collection_items
-        SET quantity = quantity + ?, notes = CASE WHEN ? <> '' THEN ? ELSE notes END,
-            purchase_price = COALESCE(?, purchase_price)
+        SET quantity = ?, notes = ?, purchase_price = ?
         WHERE id = ?
-      `).run(input.quantity, input.notes, input.notes, input.purchasePrice, existing.id);
+      `).run(quantity, details.notes, details.purchasePrice, existing.id);
       itemId = Number(existing.id);
     } else {
       const result = db.prepare(`
@@ -665,22 +730,25 @@ export function getCollectionItem(id) {
   `).get(id);
   if (!row) return null;
   const card = getCardWithUsage(Number(row.card_record_id));
-  return {
+  return withCollectionRevision({
     id: Number(row.collection_item_id), quantity: Number(row.collection_quantity), finish: row.collection_finish,
     language: row.collection_language, condition: row.collection_condition, location: row.collection_location,
     notes: row.collection_notes, purchasePrice: row.collection_purchase_price === null ? null : Number(row.collection_purchase_price), card
-  };
+  });
 }
 
 export function updateCollectionItem(id, input) {
-  const existing = getCollectionItem(id);
-  if (!existing) throw new HttpError(404, 'Collectieregel niet gevonden.');
-
   return transaction(() => {
+    const existing = getCollectionItem(id);
+    if (!existing) throw new HttpError(404, 'Collectieregel niet gevonden.');
+    assertCollectionRevision(existing, input.expectedRevision);
     if (input.quantity === 0) {
       db.prepare('DELETE FROM collection_items WHERE id = ?').run(id);
       return null;
     }
+
+    // Preserve historic entries on unrelated edits; never silently rewrite them.
+    if (input.finish !== existing.finish) assertSupportedCollectionFinish(existing.card, input.finish);
 
     const duplicate = db.prepare(`
       SELECT id, quantity, notes, purchase_price
@@ -690,14 +758,13 @@ export function updateCollectionItem(id, input) {
     `).get(existing.card.id, input.finish, input.language, input.condition, input.location, id);
 
     if (duplicate) {
-      const notes = [...new Set([duplicate.notes, input.notes].map((value) => String(value || '').trim()).filter(Boolean))]
-        .join('\n\n')
-        .slice(0, 5000);
+      const details = mergedCollectionDetails(duplicate, input);
+      const quantity = positiveInteger(Number(duplicate.quantity) + Number(input.quantity), 'Aantal');
       db.prepare(`
         UPDATE collection_items
-        SET quantity = ?, notes = ?, purchase_price = COALESCE(?, purchase_price)
+        SET quantity = ?, notes = ?, purchase_price = ?
         WHERE id = ?
-      `).run(Number(duplicate.quantity) + Number(input.quantity), notes, input.purchasePrice, duplicate.id);
+      `).run(quantity, details.notes, details.purchasePrice, duplicate.id);
       db.prepare('DELETE FROM collection_items WHERE id = ?').run(id);
       return getCollectionItem(Number(duplicate.id));
     }
@@ -711,9 +778,12 @@ export function updateCollectionItem(id, input) {
   });
 }
 
-export function deleteCollectionItem(id) {
-  const existing = getCollectionItem(id);
-  if (!existing) throw new HttpError(404, 'Collectieregel niet gevonden.');
-  db.prepare('DELETE FROM collection_items WHERE id = ?').run(id);
-  return existing;
+export function deleteCollectionItem(id, { expectedRevision } = {}) {
+  return transaction(() => {
+    const existing = getCollectionItem(id);
+    if (!existing) throw new HttpError(404, 'Collectieregel niet gevonden.');
+    assertCollectionRevision(existing, expectedRevision);
+    db.prepare('DELETE FROM collection_items WHERE id = ?').run(id);
+    return existing;
+  });
 }

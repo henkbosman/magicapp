@@ -1,18 +1,33 @@
 import { config } from '../config.js';
 import { db, transaction } from '../db/database.js';
 import { cardRowToApi } from './card-mapper.js';
+import { safeJsonParse } from '../lib/text.js';
 import {
   getCardById,
-  getCardByScryfallId,
-  getPrintingsByName,
-  upsertScryfallCard
+  getCardByScryfallId
 } from './card-repository.js';
+import { cacheResolvedCard } from './card-cache-service.js';
 import { groupPrintings, summarizeLocalPrinting } from './printing-service.js';
 import { scryfallService } from './scryfall-service.js';
 
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'mythic', 'special', 'bonus'];
 const syncInFlight = new Map();
 const INCOMPLETE_RETRY_MS = 15 * 60 * 1000;
+
+function localPaperPrintingsByName(name) {
+  // The remote search is limited to physical cards. Apply the same restriction
+  // to cached cards so a previously fetched Arena printing cannot reappear in
+  // the physical printing selector (including when Scryfall is unavailable).
+  return db.prepare(`
+    SELECT * FROM cards
+    WHERE name = ? COLLATE NOCASE
+      AND (
+        NOT EXISTS (SELECT 1 FROM json_each(cards.raw_json, '$.games'))
+        OR EXISTS (SELECT 1 FROM json_each(cards.raw_json, '$.games') WHERE value = 'paper')
+      )
+    ORDER BY released_at DESC, set_code, collector_number
+  `).all(name).map(cardRowToApi);
+}
 
 function sortPrintings(printings) {
   return [...printings].sort((a, b) =>
@@ -33,13 +48,40 @@ function parseSummary(row) {
   }
 }
 
+function physicalCatalogPrintings(printings) {
+  const byScryfallId = db.prepare('SELECT * FROM cards WHERE scryfall_id = ?');
+  const byCardId = db.prepare('SELECT * FROM cards WHERE id = ?');
+  return printings.flatMap((printing) => {
+    const variants = printing.variants?.length ? printing.variants : [printing];
+    const checked = variants.map((variant) => {
+      // Scryfall IDs are stable across database restores; a cached local ID is
+      // only useful when the summary has no external printing identifier.
+      const row = variant.scryfallId
+        ? byScryfallId.get(variant.scryfallId)
+        : variant.cardId ? byCardId.get(variant.cardId) : null;
+      const games = safeJsonParse(row?.raw_json, {})?.games;
+      return { variant, row, physical: !Array.isArray(games) || !games.length || games.includes('paper') };
+    });
+    if (checked.every((item) => item.physical)) return [printing];
+    // Catalogs saved by older versions may still contain digital variants.
+    // Rebuild the group so its selected printing, languages and finish union
+    // cannot retain the removed variant's foil or image metadata.
+    return groupPrintings(checked.filter((item) => item.physical).map(({ variant, row }) => ({
+      ...printing,
+      ...(row ? summarizeLocalPrinting(cardRowToApi(row)) : {}),
+      ...variant
+    })));
+  });
+}
+
 export function getCatalogPrintings(cardKey) {
   if (!cardKey) return [];
-  return sortPrintings(db.prepare(`
+  const printings = db.prepare(`
     SELECT * FROM card_printing_catalog
     WHERE card_key = ?
     ORDER BY released_at DESC, set_name COLLATE NOCASE, collector_number
-  `).all(cardKey).map(parseSummary).filter(Boolean));
+  `).all(cardKey).map(parseSummary).filter(Boolean);
+  return sortPrintings(physicalCatalogPrintings(printings));
 }
 
 export function printingCatalogState(cardKey) {
@@ -149,7 +191,7 @@ export async function loadGroupedPrintingsForCard(card, { force = false } = {}) 
   if (syncInFlight.has(key)) return syncInFlight.get(key);
 
   const task = (async () => {
-    const local = getPrintingsByName(card.name).map(summarizeLocalPrinting);
+    const local = localPaperPrintingsByName(card.name).map(summarizeLocalPrinting);
     try {
       const remote = await scryfallService.printings(card.name, { force });
       const grouped = mergePrintings(local, remote);
@@ -184,7 +226,7 @@ export async function loadGroupedPrintingsForCard(card, { force = false } = {}) 
 }
 
 export async function loadGroupedPrintingsByName(name, { force = false } = {}) {
-  const localCards = getPrintingsByName(name);
+  const localCards = localPaperPrintingsByName(name);
   if (localCards.length) return loadGroupedPrintingsForCard(localCards[0], { force });
 
   const remote = await scryfallService.printings(name, { force });
@@ -330,6 +372,10 @@ export async function resolveSinglePrintingCard(card) {
   if (existing?.cardKey === card.cardKey) return existing;
   if (!scryfallId) return null;
 
-  const cached = upsertScryfallCard(await scryfallService.getById(scryfallId));
+  const cached = cacheResolvedCard(await scryfallService.getById(scryfallId), {
+    scryfallId,
+    name: card.name,
+    expectedOracleId: card.oracleId || undefined
+  });
   return cached.cardKey === card.cardKey ? cached : null;
 }

@@ -50,6 +50,7 @@ export async function addCardToCollection(card, { onDone = refreshView, sourceWa
   const language = defaultLanguage(printing, card);
   const variant = variantForLanguage(printing, language, card);
   const defaultFinish = variant?.finishes?.includes('nonfoil') ? 'nonfoil' : variant?.finishes?.[0];
+  let completed = false;
 
   const dialog = openDialog({
     title: `${card.name} aan collectie toevoegen`,
@@ -65,13 +66,14 @@ export async function addCardToCollection(card, { onDone = refreshView, sourceWa
       <label class="checkbox-field full"><input type="checkbox" name="reconcileWanted" checked> Wanted-aantal automatisch verminderen</label>
     </div>`,
     onSubmit: async (data) => {
+      if (completed) return true;
       const selectedLanguage = formValue(data, 'language', language);
       const selectedVariant = variantForLanguage(printing, selectedLanguage, card);
       const identifier = selectedVariant?.cardId
-        ? { cardId: Number(selectedVariant.cardId) }
+        ? { cardId: Number(selectedVariant.cardId), ...(selectedVariant.scryfallId ? { scryfallId: selectedVariant.scryfallId } : {}) }
         : selectedVariant?.scryfallId
           ? { scryfallId: selectedVariant.scryfallId }
-          : { cardId: card.id };
+          : { cardId: card.id, ...(card.scryfallId ? { scryfallId: card.scryfallId } : {}) };
 
       const addedItem = await api('/collection', { method: 'POST', body: {
         ...identifier,
@@ -85,20 +87,29 @@ export async function addCardToCollection(card, { onDone = refreshView, sourceWa
         reconcileWanted: data.has('reconcileWanted'),
         sourceWantedId: sourceWantedId || null
       }});
+      completed = true;
       const aligned = Number(addedItem.deckPrintingAlignment?.updatedDeckCards || 0);
       toast(aligned
         ? `${card.name} is toegevoegd; ${aligned} deckkaart${aligned === 1 ? '' : 'en'} gebruikt nu deze printing.`
         : `${card.name} is aan je collectie toegevoegd.`);
-      await onDone?.();
+      try {
+        await onDone?.();
+      } catch (error) {
+        toast(`De kaart is toegevoegd, maar het overzicht kon niet worden vernieuwd: ${error.message}`, 'warning');
+      }
       return true;
     }
   });
 
   const languageSelect = dialog.querySelector('[name="language"]');
   const finishSelect = dialog.querySelector('[name="finish"]');
+  let preferredFinish = finishSelect.value;
+  finishSelect.addEventListener('change', () => { preferredFinish = finishSelect.value; });
   languageSelect?.addEventListener('change', () => {
     const selectedVariant = variantForLanguage(printing, languageSelect.value, card);
-    finishSelect.innerHTML = finishOptions(selectedVariant?.finishes, finishSelect.value);
+    // A language with only one finish must not erase the user's explicit choice
+    // when returning to a language that offers that finish again.
+    finishSelect.innerHTML = finishOptions(selectedVariant?.finishes, preferredFinish);
   });
   return dialog;
 }
@@ -109,6 +120,7 @@ export function addCardToWanted(card, { onDone = refreshView, quantity = 1, note
     return null;
   }
 
+  let completed = false;
   return openDialog({
     title: `${card.name} op Wanted zetten`,
     submitLabel: 'Toevoegen',
@@ -119,18 +131,25 @@ export function addCardToWanted(card, { onDone = refreshView, quantity = 1, note
       <div class="field full"><label>Opmerkingen</label><textarea name="notes">${escapeHtml(notes)}</textarea></div>
     </div>`,
     onSubmit: async (data) => {
+      if (completed) return true;
       const wantedItem = await api('/wanted', { method: 'POST', body: {
         cardId: card.id,
+        ...(card.scryfallId ? { scryfallId: card.scryfallId } : {}),
         quantity: Number(formValue(data, 'quantity', '1')),
         priority: Number(formValue(data, 'priority', '3')),
         maximumPrice: formValue(data, 'maximumPrice') || null,
         notes: formValue(data, 'notes'),
         deckIds: [...new Set([...(Array.isArray(deckIds) ? deckIds : []), deckId].filter(Boolean).map(Number))]
       }});
+      completed = true;
       toast(wantedItem.printingSelected
         ? `${card.name} staat op je wanted-list; de enige beschikbare printing is automatisch gekozen.`
         : `${card.name} staat op je wanted-list.`, 'success', toastOptions);
-      await onDone?.();
+      try {
+        await onDone?.();
+      } catch (error) {
+        toast(`De kaart staat op Wanted, maar het overzicht kon niet worden vernieuwd: ${error.message}`, 'warning', toastOptions);
+      }
       return true;
     }
   });
@@ -148,7 +167,7 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
   const localCardId = !Object.hasOwn(card, 'catalogId') && Number.isSafeInteger(Number(card.id)) && Number(card.id) > 0
     ? Number(card.id) : null;
   const identifier = localCardId
-    ? { cardId: localCardId }
+    ? { cardId: localCardId, ...(card.scryfallId ? { scryfallId: card.scryfallId } : {}) }
     : !Object.hasOwn(card, 'catalogId') && card.scryfallId
       ? { scryfallId: card.scryfallId }
       : { name: card.name, ...(card.scryfallOracleId ? { expectedOracleId: card.scryfallOracleId } : {}) };

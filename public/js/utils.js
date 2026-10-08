@@ -80,8 +80,9 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
     </form>`;
   document.body.append(dialog);
   const form = dialog.querySelector('form');
+  let submitting = false;
   const close = () => {
-    if (dialog.dataset.preventClose === 'true') return;
+    if (submitting || dialog.dataset.preventClose === 'true') return;
     dialog.close();
   };
   dialog.querySelectorAll('.close-dialog').forEach((button) => button.addEventListener('click', close));
@@ -89,14 +90,22 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
     if (event.target === dialog) close();
   });
   dialog.addEventListener('cancel', (event) => {
-    if (dialog.dataset.preventClose === 'true') event.preventDefault();
+    if (submitting || dialog.dataset.preventClose === 'true') event.preventDefault();
   });
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
   if (onSubmit) {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const button = form.querySelector('[type="submit"]');
+      // Disabling a button does not guard submit events, and an API response can
+      // update write availability while the callback is still processing.
+      if (submitting || !dialog.open || button.disabled || button.getAttribute('aria-disabled') === 'true') return;
+      submitting = true;
+      if (writeAction && button.dataset.writeInitiallyDisabled === undefined) {
+        button.dataset.writeInitiallyDisabled = 'false';
+      }
       button.disabled = true;
+      form.setAttribute('aria-busy', 'true');
       const original = button.textContent;
       button.textContent = 'Bezig…';
       try {
@@ -105,8 +114,11 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
       } catch (error) {
         toast(error.message || 'Actie mislukt.', 'error');
       } finally {
+        submitting = false;
+        form.removeAttribute('aria-busy');
         if (dialog.open) {
-          button.disabled = false;
+          button.disabled = button.getAttribute('aria-disabled') === 'true'
+            || button.dataset.writeInitiallyDisabled === 'true';
           button.textContent = original;
         }
       }

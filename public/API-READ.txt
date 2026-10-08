@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.13.3
+MAGIC COLLECTION MANAGER READ API 2.14.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -16,7 +16,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.13.3"}
+{"status":"ok","version":"2.14.0"}
 
 GET /api/read/card-catalog/status
 
@@ -459,6 +459,8 @@ Niet van toepassing. Responsebody is text/csv met kolommen name,setcode,setname,
 
 GET /api/read/collection?q={text}&cardKey={key}&type={type}&color={comma-separated W,U,B,R,G,C}&colorMode={and|or}&subtype={subtype}&manaValue={0..6|7+}&ability={keyword|Mana produceren|Tutor land|Tutor creature}&commanderLegal={legal|not_legal}&set={code}&rarity={rarity}&finish={nonfoil|foil|etched}&deckId={id}&availability={free|used|shortage}&limit={1..1000}&offset={integer}
 
+Sinds 2.13.4 bevatten collectieregels in lijst-, detail- en mutatieresponses ook revision: een ondoorzichtige 64-tekens versiehash van de fysieke collectieregel. Stuur deze bij PATCH/DELETE als expectedRevision om verouderde invoer te weigeren. Het verversen van kaartmetadata verandert deze versie niet.
+
 Geeft gefilterde, gepagineerde collectieregels. Alle queryparameters zijn optioneel. ability accepteert een exact kaartkeyword of de synthetische waarden Mana produceren, Tutor land en Tutor creature. De tutorfilters respecteren automatische library-searchherkenning en Oracle-brede handmatige correcties. colorMode=and is standaard en vereist exact de gekozen kleuridentiteit: color=G toont mono-groen en color=G,W exact groen-wit. colorMode=or toont kaarten die minimaal één gekozen kleur gebruiken; C neemt kleurloze kaarten als alternatief mee. Herhaalde color-parameters worden ook geaccepteerd.
 
 INPUT JSON
@@ -693,6 +695,38 @@ OUTPUT JSON
   }
 }
 
+GET /api/read/decks/:id/export?format={txt|dck}
+
+Geeft de volledige deckexport als JSON voor bekijken, kopiëren en downloaden. format is standaard txt; andere waarden dan txt en dck geven 400. Een onbekend deck geeft 404. Deze route wijzigt geen gegevens en doet geen externe lookup.
+
+TXT is inhoudelijk gelijk aan export.txt zonder missing. DCK bevat metadata met de decknaam, Commander (commander en partner), Main en indien gevuld Sideboard (sideboard en companion). Maybeboard ontbreekt in beide exports. Gelijke Oracle-kaarten worden in DCK binnen elke sectie samengevoegd. Export bevat aantallen en Engelse kaartnamen, geen printing- of afwerkingskeuze. Zie docs/DECK-EXPORT.md voor naamconversie.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{
+  "data": {
+    "filename": "voorbeeld-deck.txt",
+    "text": "1 Sol Ring\n",
+    "format": "txt"
+  }
+}
+
+GET /api/read/decks/:id/export.dck
+
+Downloadt dezelfde DCK-inhoud als export?format=dck, met bestandsnaam in Content-Disposition. Read-only.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+Niet van toepassing. Responsebody is text/plain met een .dck-bestandsnaam.
+
 GET /api/read/decks/:id/export.txt?missing={true|false}
 
 Exporteert het hele deck of alleen missende kaarten als tekst. missing is standaard false. Gelijke Oracle-kaarten uit verschillende printings of deckregels worden tot een regel met een opgeteld aantal samengevoegd.
@@ -776,7 +810,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.13.3",
+    "applicationVersion": "2.14.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

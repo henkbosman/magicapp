@@ -45,12 +45,10 @@ export function transaction(work) {
 
   try {
     const result = work();
-    transactionDepth -= 1;
     if (outermost) db.exec('COMMIT');
     else db.exec(`RELEASE SAVEPOINT ${savepoint}`);
     return result;
   } catch (error) {
-    transactionDepth -= 1;
     if (outermost) {
       db.exec('ROLLBACK');
     } else {
@@ -58,6 +56,10 @@ export function transaction(work) {
       db.exec(`RELEASE SAVEPOINT ${savepoint}`);
     }
     throw error;
+  } finally {
+    // A failed COMMIT also enters catch. Decrement exactly once so a failed
+    // write cannot break nesting and atomicity for subsequent requests.
+    transactionDepth -= 1;
   }
 }
 

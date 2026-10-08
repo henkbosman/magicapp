@@ -1,4 +1,6 @@
 import { db } from '../db/database.js';
+import { HttpError } from '../lib/http-error.js';
+import { positiveInteger } from '../lib/validation.js';
 import { reassignDeckCardLinks } from './deck-link-service.js';
 
 const SINGLETON_ROLES = new Set(['commander', 'partner', 'companion']);
@@ -42,8 +44,12 @@ function matchingDeckRows(card, sourceWantedId = null) {
 }
 
 function mergeNotes(left, right) {
-  const values = [...new Set([left, right].map((value) => String(value || '').trim()).filter(Boolean))];
-  return values.join('\n\n').slice(0, 5000);
+  const values = [...new Set([left, right].map((value) => String(value || '')).filter(Boolean))];
+  const note = values.join('\n\n');
+  if (note.length > 5000) {
+    throw new HttpError(409, 'De samengevoegde decknotitie is te lang. Verkort de notities voordat je deze printing toevoegt.');
+  }
+  return note;
 }
 
 function copyTags(sourceId, targetId) {
@@ -63,7 +69,7 @@ function alignDeckCard(row, newCardId) {
   if (target) {
     const quantity = SINGLETON_ROLES.has(row.role)
       ? 1
-      : Number(target.quantity) + Number(row.quantity);
+      : positiveInteger(Number(target.quantity) + Number(row.quantity), 'Totaalaantal');
     db.prepare(`
       UPDATE deck_cards SET quantity = ?, note = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?

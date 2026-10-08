@@ -7,6 +7,8 @@ import {
   deleteDeck,
   deleteDeckCard,
   duplicateDeck,
+  exportDeck,
+  exportDeckDck,
   exportDeckText,
   getDeck,
   getDeckCards,
@@ -162,6 +164,17 @@ decksWriteRouter.post('/:id/import', async (req, res) => {
 
 decksReadRouter.get('/:id/export.txt', (req, res) => {
   const result = exportDeckText(positiveInteger(req.params.id, 'Deck-ID'), { missingOnly: booleanValue(req.query.missing, false) });
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+  res.send(result.text);
+});
+
+decksReadRouter.get('/:id/export', (req, res) => {
+  res.json({ data: exportDeck(positiveInteger(req.params.id, 'Deck-ID'), { format: req.query.format }) });
+});
+
+decksReadRouter.get('/:id/export.dck', (req, res) => {
+  const result = exportDeckDck(positiveInteger(req.params.id, 'Deck-ID'));
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
   res.send(result.text);
