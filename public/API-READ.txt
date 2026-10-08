@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.14.0
+MAGIC COLLECTION MANAGER READ API 2.14.1
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -16,7 +16,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.14.0"}
+{"status":"ok","version":"2.14.1"}
 
 GET /api/read/card-catalog/status
 
@@ -699,7 +699,7 @@ GET /api/read/decks/:id/export?format={txt|dck}
 
 Geeft de volledige deckexport als JSON voor bekijken, kopiëren en downloaden. format is standaard txt; andere waarden dan txt en dck geven 400. Een onbekend deck geeft 404. Deze route wijzigt geen gegevens en doet geen externe lookup.
 
-TXT is inhoudelijk gelijk aan export.txt zonder missing. DCK bevat metadata met de decknaam, Commander (commander en partner), Main en indien gevuld Sideboard (sideboard en companion). Maybeboard ontbreekt in beide exports. Gelijke Oracle-kaarten worden in DCK binnen elke sectie samengevoegd. Export bevat aantallen en Engelse kaartnamen, geen printing- of afwerkingskeuze. Zie docs/DECK-EXPORT.md voor naamconversie.
+TXT is inhoudelijk gelijk aan export.txt zonder missing. DCK bevat metadata met de decknaam, Commander (commander en partner), Main en indien gevuld Sideboard (sideboard en companion). Maybeboard ontbreekt in beide exports. DCK bevat per regel aantal Naam|SET|[collectornummer], op basis van de opgeslagen deckprinting. Alleen identieke naam/set/collectornummer-vermeldingen worden binnen een sectie samengevoegd. Verschillende printings blijven apart. Collector numbers blijven tekst, inclusief voorloopnullen, letters en koppeltekens. Er worden geen foil- of taalflags toegevoegd. Ontbrekende of ongeldige printinggegevens geven 400 met de betrokken kaartnaam; TXT blijft beschikbaar. Zie docs/DECK-EXPORT.md voor naamconversie.
 
 INPUT JSON
 
@@ -810,7 +810,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.14.0",
+    "applicationVersion": "2.14.1",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

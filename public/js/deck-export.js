@@ -27,6 +27,7 @@ export function openDeckExport(deckId) {
         <button type="button" class="button secondary" data-export-copy disabled>Kopiëren</button>
       </div>
     </div>
+    <p class="help-text" data-export-printings hidden>Gebruikt de printings die in dit deck zijn gekozen. Forge / Neo Forge moet deze kaartversies ondersteunen.</p>
     <div class="field">
       <label for="${prefix}-text">Decklijst</label>
       <textarea id="${prefix}-text" class="deck-export-text" data-export-text rows="18" readonly spellcheck="false" aria-describedby="${prefix}-status"></textarea>
@@ -39,6 +40,7 @@ export function openDeckExport(deckId) {
   const status = dialog.querySelector('[data-export-status]');
   const download = dialog.querySelector('[data-export-download]');
   const copy = dialog.querySelector('[data-export-copy]');
+  const printingNote = dialog.querySelector('[data-export-printings]');
   let generation = 0;
   let controller;
   let currentExport = null;
@@ -48,6 +50,7 @@ export function openDeckExport(deckId) {
     controller?.abort();
     controller = new AbortController();
     const format = formatSelect.value === 'dck' ? 'dck' : 'txt';
+    printingNote.hidden = format !== 'dck';
     currentExport = null;
     text.value = '';
     text.setAttribute('aria-busy', 'true');

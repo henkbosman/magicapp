@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.14.1 - 2026-10-08
+
+### DCK-export met gekozen printings
+
+- Elke kaartregel in DCK bevat nu de setcode en het letterlijke collectornummer: `1 Yedora, Grave Gardener|DSC|[209]`, conform het aangeleverde Neo Forge-bestand.
+- De export gebruikt de printing die bij de deckregel hoort. Verschillende sets of collectornummers blijven afzonderlijke regels, ook bij basic lands en andere kaarten met dezelfde Oracle-identiteit. Alleen identieke printingvermeldingen binnen een sectie worden opgeteld.
+- Voorloopnullen, letterachtervoegsels en nummers zoals `WWK-96` blijven behouden. De bestaande naamconversie voor kaarten met meerdere kaartzijden blijft actief.
+- Ontbrekende of ongeldige printinggegevens blokkeren DCK met een gerichte foutmelding. De TXT-export behoudt de bestaande inhoud.
+- Geen nieuwe endpointpaden, databasewijzigingen of automatische aanpassingen aan collectie, afwerking of deckregels.
+
 ## 2.14.0 - 2026-10-08
 
 ### Deckmenu, export en groepering

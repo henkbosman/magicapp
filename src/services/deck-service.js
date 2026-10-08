@@ -508,6 +508,31 @@ function forgeCardName(card) {
   return name.replace(/[\r\n]+/g, ' ').trim();
 }
 
+function forgeCardPrinting(card) {
+  const name = forgeCardName(card);
+  const rawSetCode = String(card.setCode ?? '');
+  const setCode = rawSetCode.trim().toUpperCase();
+  const collectorNumber = String(card.collectorNumber ?? '').trim();
+  // Forge's bracketed collector number identifies the actual printing. Never
+  // substitute an art index or silently fall back to a different card image.
+  if (!setCode || !collectorNumber) {
+    const missing = [!setCode && 'setcode', !collectorNumber && 'collectornummer'].filter(Boolean).join(' en ');
+    throw new HttpError(400, `DCK-export niet mogelijk voor "${name}": ${missing} ontbreekt. Kies een volledige printing of gebruik TXT.`);
+  }
+  // A numeric-only token is an art index in Forge, not an edition code.
+  if (!/^[A-Za-z0-9]+$/.test(rawSetCode.trim()) || !/[A-Z]/.test(setCode)
+    || /[\u0000-\u001f\u007f]/.test(rawSetCode)) {
+    throw new HttpError(400, `DCK-export niet mogelijk voor "${name}": ongeldige setcode. Kies een volledige printing of gebruik TXT.`);
+  }
+  if (/[|\[\]\u0000-\u001f\u007f]/.test(String(card.collectorNumber))) {
+    throw new HttpError(400, `DCK-export niet mogelijk voor "${name}": ongeldig collectornummer. Kies een volledige printing of gebruik TXT.`);
+  }
+  if (!name || /[|\u0000-\u001f\u007f]/.test(name)) {
+    throw new HttpError(400, `DCK-export niet mogelijk voor "${name}": ongeldige kaartnaam. Gebruik TXT.`);
+  }
+  return `${name}|${setCode}|[${collectorNumber}]`;
+}
+
 export function exportDeckDck(deckId) {
   const deck = requireDeck(deckId);
   const cards = getDeckCards(deckId, { includeMaybeboard: false });
@@ -520,7 +545,11 @@ export function exportDeckDck(deckId) {
   ];
   for (const [section, roles] of sections) {
     const rows = aggregateExportRows(cards.filter((row) => roles.includes(row.role))
-      .map((row) => ({ quantity: row.quantity, name: forgeCardName(row.card), cardKey: row.card.cardKey })));
+      .map((row) => {
+        const printing = forgeCardPrinting(row.card);
+        // An Oracle ID may span many printings, each with its own artwork.
+        return { quantity: row.quantity, name: printing, cardKey: printing };
+      }));
     if (!rows.length && section !== 'Main') continue;
     lines.push(`[${section}]`, ...rows.map((row) => `${row.quantity} ${row.name}`));
   }

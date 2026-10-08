@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.14.0
+# Magic Collection Manager 2.14.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -25,6 +25,8 @@ Versie **2.13.4** herstelt fouten rond afwerkingskeuze, verouderde bewerkformuli
 Versie **2.13.5** schermt **Kaart toevoegen** verder af: late antwoorden kunnen een nieuwe kaartselectie niet vervangen, kaartidentiteit wordt vóór opslag gecontroleerd en ongerelateerde collectie-, Wanted- en deckgegevens blijven behouden. Zie [de gerichte toevoegcontrole](docs/ADD-CARD-ISOLATION.md).
 
 Versie **2.14.0** bundelt de deckacties in **Meer…**, voegt een exportpopup met kopiëren en downloaden in TXT- of Forge/Neo Forge-DCK-formaat toe en biedt **Geen** als groepering in beide deckweergaven.
+
+Versie **2.14.1** neemt in DCK ook de gekozen set en het collectornummer op, bijvoorbeeld `1 Yedora, Grave Gardener|DSC|[209]`. Verschillende printings blijven afzonderlijke exportregels.
 
 ## Belangrijkste mogelijkheden
 
@@ -281,7 +283,7 @@ Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen
 
 **Meer…** opent het deckmenu met **Bewerken**, **Importeren**, **Dupliceren** en **Verwijderen**. De knoppen hebben dezelfde uitlijning. **Exporteren** opent een aparte popup met de volledige decklijst. Kies **Tekst (.txt)** of **Forge / Neo Forge (.dck)**, gebruik **Kopiëren** of selecteer zelf tekst, of sla de getoonde inhoud op met **Downloaden**. **Tekort exporteren** blijft een rechtstreekse TXT-download.
 
-De TXT-export houdt dezelfde inhoud als voorheen. De DCK-export gebruikt `[metadata]` met de decknaam, `[Commander]` voor beide commanders, `[Main]` voor het hoofddeck en `[Sideboard]` voor sideboard en companion. Maybeboard wordt in beide formaten overgeslagen. Printings van dezelfde Oracle-kaart worden voor DCK binnen elke sectie samengevoegd. Er worden aantallen en Engelse kaartnamen geëxporteerd, geen specifieke printing of afwerking. Zie [de exportbeschrijving](docs/DECK-EXPORT.md).
+De TXT-export houdt dezelfde inhoud als voorheen. De DCK-export gebruikt `[metadata]` met de decknaam, `[Commander]` voor beide commanders, `[Main]` voor het hoofddeck en `[Sideboard]` voor sideboard en companion. Maybeboard wordt in beide formaten overgeslagen. DCK bevat per regel `aantal Naam|SET|[collectornummer]`, op basis van de printing die in het deck is gekozen. Alleen identieke printingvermeldingen worden binnen een sectie samengevoegd; verschillende Forest-printings blijven dus apart. Foil wordt niet afgeleid uit de collectie, omdat een deckregel geen fysieke afwerking selecteert. Als printinggegevens ontbreken of niet veilig in DCK kunnen worden geschreven, geeft de export een melding met de kaartnaam. Zie [de exportbeschrijving](docs/DECK-EXPORT.md).
 
 ## Deckstatistieken
 

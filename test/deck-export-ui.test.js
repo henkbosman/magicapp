@@ -13,7 +13,7 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 const txt = { format: 'txt', filename: 'mijn-deck.txt', text: '1 Llanowar Elves\n2 Forest\n' };
-const dck = { format: 'dck', filename: 'mijn-deck.dck', text: '[metadata]\nName=Mijn deck\n[Main]\n1 Llanowar Elves\n2 Forest\n' };
+const dck = { format: 'dck', filename: 'mijn-deck.dck', text: '[metadata]\nName=Mijn deck\n[Main]\n1 Llanowar Elves|FDN|[227]\n2 Forest|TRK|[325]\n' };
 
 function mount(t, { clipboard, execCommand } = {}) {
   const globalKeys = ['document', 'navigator', 'Element', 'HTMLButtonElement',
@@ -92,6 +92,7 @@ test('deck export stays read-only and copies/downloads the exact default TXT pre
   assert.equal(ui.dialog.querySelector('[data-write-action]'), null);
   assert.equal(ui.dialog.querySelector('[type="submit"]'), null);
   assert.equal(ui.format.value, 'txt');
+  assert.equal(ui.dialog.querySelector('[data-export-printings]').hidden, true);
   assert.equal(ui.download.disabled, true);
   assert.equal(ui.copy.disabled, true);
   assert.equal(ui.text.getAttribute('readonly'), '');
@@ -120,6 +121,7 @@ test('deck export stays read-only and copies/downloads the exact default TXT pre
 test('format switching blocks stale actions and ignores an older response arriving last', async (t) => {
   const ui = mount(t);
   ui.change('dck');
+  assert.equal(ui.dialog.querySelector('[data-export-printings]').hidden, false);
   assert.equal(ui.requests[0].options.signal.aborted, true);
   assert.equal(ui.requests[1].url, '/api/read/decks/17/export?format=dck');
   ui.download.click();
@@ -133,6 +135,7 @@ test('format switching blocks stale actions and ignores an older response arrivi
   assert.equal(ui.downloads[0].filename, dck.filename);
   assert.equal(await ui.downloads[0].blob.text(), dck.text);
   ui.change('txt');
+  assert.equal(ui.dialog.querySelector('[data-export-printings]').hidden, true);
   assert.equal(ui.text.value, '');
   assert.equal(ui.download.disabled, true);
   assert.equal(ui.copy.disabled, true);

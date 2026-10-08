@@ -12,11 +12,13 @@ process.env.DATABASE_FILE = 'export.sqlite';
 const { db, closeDatabase } = await import('../src/db/database.js');
 const { exportDeck, exportDeckDck, exportDeckText } = await import('../src/services/deck-service.js');
 
-function card(id, name, { oracleId = `oracle-${id}`, layout = 'normal', faces = [] } = {}) {
+function card(id, name, {
+  oracleId = `oracle-${id}`, layout = 'normal', faces = [], setCode = 'tst', collectorNumber = String(id)
+} = {}) {
   db.prepare(`INSERT INTO cards
     (id, scryfall_id, oracle_id, name, search_name, set_code, collector_number, layout, card_faces_json, raw_json)
-    VALUES (?, ?, ?, ?, ?, 'tst', ?, ?, ?, '{}')`)
-    .run(id, `printing-${id}`, oracleId, name, name.toLowerCase(), String(id), layout, JSON.stringify(faces));
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')`)
+    .run(id, `printing-${id}`, oracleId, name, name.toLowerCase(), setCode, collectorNumber, layout, JSON.stringify(faces));
 }
 
 function add(cardId, quantity, role = 'main', deckId = 1) {
@@ -70,17 +72,98 @@ test('TXT export preserves its existing flat text, ordering, Oracle aggregation 
   });
 });
 
-test('DCK keeps both commanders and aggregates printings only within their deck section', () => {
+test('DCK keeps both commanders and aggregates only identical printings within their deck section', () => {
   // The same card can legitimately have separate quantities in Main and Sideboard.
   // A companion also lives in Sideboard in Forge's deck format.
   add(5, 2, 'sideboard');
   const expected = {
     filename: 'forge-neo-forge.dck',
-    text: '[metadata]\nName=Forge & Neo Forge\n[Commander]\n1 Ardenn, Intrepid Archaeologist\n1 Rograkh, Son of Rohgahh\n[Main]\n5 Lightning Bolt\n[Sideboard]\n3 Lurrus of the Dream-Den\n1 Lightning Bolt\n'
+    text: '[metadata]\nName=Forge & Neo Forge\n[Commander]\n1 Ardenn, Intrepid Archaeologist|TST|[1]\n1 Rograkh, Son of Rohgahh|TST|[2]\n[Main]\n3 Lightning Bolt|TST|[3]\n2 Lightning Bolt|TST|[4]\n[Sideboard]\n3 Lurrus of the Dream-Den|TST|[5]\n1 Lightning Bolt|TST|[3]\n'
   };
   assert.deepEqual(exportDeckDck(1), expected);
   assert.deepEqual(exportDeck(1, { format: 'dck' }), { ...expected, format: 'dck' });
   assert.doesNotMatch(expected.text, /Opt|printing-|oracle-|\|tst|\[Companion\]/);
+});
+
+test('DCK reproduces printing references from the supplied Neo Forge deck', () => {
+  db.exec('DELETE FROM deck_cards');
+  // Representative rows from the user's New deck.dck, including The List's
+  // original-set collector number and a commander outside the Main section.
+  card(10, 'Avenger of Zendikar', { setCode: 'plst', collectorNumber: 'WWK-96' });
+  card(11, 'Forest', { setCode: 'trk', collectorNumber: '325' });
+  card(12, 'Yedora, Grave Gardener', { setCode: 'dsc', collectorNumber: '209' });
+  add(10, 1);
+  add(11, 35);
+  add(12, 1, 'commander');
+  assert.equal(exportDeckDck(1).text,
+    '[metadata]\nName=Forge & Neo Forge\n[Commander]\n1 Yedora, Grave Gardener|DSC|[209]\n[Main]\n1 Avenger of Zendikar|PLST|[WWK-96]\n35 Forest|TRK|[325]\n');
+});
+
+test('DCK preserves distinct land printings, string collector numbers and quantities', () => {
+  db.exec('DELETE FROM deck_cards');
+  const variants = [
+    ['znr', '275', 4],
+    ['znr', '276', 7],
+    ['m21', '275', 2],
+    ['znr', '275a', 3],
+    ['znr', '0275', 5],
+    ['plst', 'ZEN-249', 6],
+    ['sld', '123★', 1],
+    // Another cached record for the exact same exported printing may be merged.
+    ['ZNR', '275', 8]
+  ];
+  variants.forEach(([setCode, collectorNumber, quantity], index) => {
+    card(10 + index, 'Forest', { oracleId: 'oracle-forest', setCode, collectorNumber });
+    add(10 + index, quantity);
+  });
+  const lines = exportDeckDck(1).text.split('\n');
+  const expected = ['12 Forest|ZNR|[275]', '7 Forest|ZNR|[276]', '2 Forest|M21|[275]',
+    '3 Forest|ZNR|[275a]', '5 Forest|ZNR|[0275]', '6 Forest|PLST|[ZEN-249]', '1 Forest|SLD|[123★]'];
+  assert.deepEqual(lines.filter((line) => /^\d+ /.test(line)).sort(), expected.sort());
+  assert.equal(lines.filter((line) => /^\d+ /.test(line)).reduce((sum, line) => sum + Number(line.split(' ')[0]), 0), 36);
+  assert.equal(exportDeckText(1).text, '36 Forest\n');
+});
+
+test('DCK does not substitute collection printings or infer foil status', () => {
+  card(10, 'Lightning Bolt', { oracleId: 'oracle-bolt', setCode: 'lea', collectorNumber: '161' });
+  db.prepare('INSERT INTO collection_items (card_id, quantity, finish) VALUES (10, 6, ?)').run('foil');
+  const text = exportDeckDck(1).text;
+  assert.match(text, /3 Lightning Bolt\|TST\|\[3\]/);
+  assert.match(text, /2 Lightning Bolt\|TST\|\[4\]/);
+  assert.doesNotMatch(text, /LEA|Lightning Bolt\+/);
+});
+
+test('DCK rejects missing or unsafe printing data instead of silently choosing different artwork', () => {
+  const invalid = [
+    ['set_code', '', 'setcode'],
+    ['collector_number', '', 'collectornummer'],
+    ['set_code', '  ', 'setcode'],
+    ['collector_number', '  ', 'collectornummer'],
+    ['set_code', '123', 'setcode'],
+    ['set_code', 'ß', 'setcode'],
+    ['set_code', 'ZNR|1', 'setcode'],
+    ['set_code', 'ZN\nR', 'setcode'],
+    ['set_code', 'ZNR\r', 'setcode'],
+    ['collector_number', '12|[13]', 'collectornummer'],
+    ['collector_number', '12]\n[Sideboard]', 'collectornummer'],
+    ['collector_number', '12\r', 'collectornummer'],
+    ['collector_number', '12\u0000', 'collectornummer'],
+    ['name', 'Lightning Bolt|LEA|[161]', 'kaartnaam']
+  ];
+  for (const [column, value, label] of invalid) {
+    db.prepare('UPDATE cards SET name = ?, set_code = ?, collector_number = ? WHERE id = 3').run('Lightning Bolt', 'tst', '3');
+    db.prepare(`UPDATE cards SET ${column} = ? WHERE id = 3`).run(value);
+    const before = databaseSnapshot();
+    assert.throws(() => exportDeckDck(1), (error) =>
+      error.status === 400 && error.message.includes('Lightning Bolt') && error.message.includes(label), `${column}: ${JSON.stringify(value)}`);
+    assert.deepEqual(databaseSnapshot(), before);
+  }
+  db.prepare('UPDATE cards SET name = ?, set_code = ?, collector_number = ? WHERE id = 3').run('Lightning Bolt', '', '');
+  assert.match(exportDeckText(1).text, /6 Lightning Bolt\n/);
+  // Maybeboard cards are excluded, so incomplete data there cannot block export.
+  db.prepare('UPDATE cards SET set_code = ?, collector_number = ? WHERE id = 3').run('tst', '3');
+  db.prepare('UPDATE cards SET set_code = ?, collector_number = ? WHERE id = 6').run('', '');
+  assert.doesNotThrow(() => exportDeckDck(1));
 });
 
 test('an empty deck produces an empty TXT and a valid DCK with a Main section', () => {
@@ -104,15 +187,16 @@ test('Forge export uses front-face names for double-faced, adventure and flip ca
   ];
   let id = 10;
   for (const [layout, name, expected] of examples) {
+    const collectorNumber = String(id);
     // Both a complete Scryfall record and an older record without card_faces
     // must export the same playable card name without changing cached data.
     for (const faces of [[], [{ name: name.split(/\s*\/\/\s*/)[0] }]]) {
-      card(id, name, { layout, faces, oracleId: `oracle-${name}` });
+      card(id, name, { layout, faces, oracleId: `oracle-${name}`, collectorNumber });
       add(id, 1);
       id += 1;
     }
     const lines = exportDeckDck(1).text.split('\n');
-    assert.ok(lines.includes(`2 ${expected}`), `${layout}: ${expected}`);
+    assert.ok(lines.includes(`2 ${expected}|TST|[${collectorNumber}]`), `${layout}: ${expected}`);
   }
   const txt = exportDeckText(1).text.split('\n');
   for (const [, name] of examples) assert.ok(txt.includes(`2 ${name}`), 'TXT naming remains unchanged');

@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.14.0
+# Architectuur - Magic Collection Manager 2.14.1
 
 ## Overzicht
 
@@ -243,3 +243,5 @@ De frontend bindt async antwoorden aan formulier, printing, taal en selectierond
 Het deckmenu bundelt bewerken, importeren, dupliceren en verwijderen in gelijk uitgelijnde acties. Export heeft een eigen read-only popup in `public/js/deck-export.js`, met formaatkeuze, kopieerbare tekst en downloaden van dezelfde getoonde inhoud. Een verzoekvolgnummer voorkomt dat een vertraagd antwoord de later gekozen export overschrijft.
 
 De nieuwe leesroute `/api/read/decks/:id/export?format=txt|dck` levert bestandsnaam, tekst en formaat als JSON. `/export.txt` houdt het bestaande contract en `/export.dck` downloadt het nieuwe formaat. De serializers lezen uitsluitend de bestaande deckgegevens; er zijn geen schemawijzigingen of mutaties. Zie `DECK-EXPORT.md` voor de Forge-secties en de omgang met printings en kaartnamen.
+
+Vanaf 2.14.1 bevat elke DCK-kaartregel de gekozen setcode en het collectornummer tussen blokhaken. Deze waarden worden rechtstreeks uit de aan de deckregel gekoppelde kaart gelezen. DCK bundelt alleen identieke exportvermeldingen binnen een sectie; de Oracle-brede TXT-aggregatie blijft gelijk. Ontbrekende printingvelden of ongeldige scheidingstekens geven een duidelijke 400-fout in plaats van een export die stilzwijgend een andere printing kan kiezen.
