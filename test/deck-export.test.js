@@ -13,17 +13,41 @@ const { db, closeDatabase } = await import('../src/db/database.js');
 const { exportDeck, exportDeckDck, exportDeckText } = await import('../src/services/deck-service.js');
 
 function card(id, name, {
-  oracleId = `oracle-${id}`, layout = 'normal', faces = [], setCode = 'tst', collectorNumber = String(id)
+  oracleId = `oracle-${id}`, layout = 'normal', faces = [], setCode = 'tst', collectorNumber = String(id),
+  cardTypes = [], supertypes = []
 } = {}) {
   db.prepare(`INSERT INTO cards
-    (id, scryfall_id, oracle_id, name, search_name, set_code, collector_number, layout, card_faces_json, raw_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')`)
-    .run(id, `printing-${id}`, oracleId, name, name.toLowerCase(), setCode, collectorNumber, layout, JSON.stringify(faces));
+    (id, scryfall_id, oracle_id, name, search_name, set_code, collector_number, layout, card_faces_json, card_types_json, supertypes_json, raw_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')`)
+    .run(id, `printing-${id}`, oracleId, name, name.toLowerCase(), setCode, collectorNumber, layout, JSON.stringify(faces), JSON.stringify(cardTypes), JSON.stringify(supertypes));
 }
 
 function add(cardId, quantity, role = 'main', deckId = 1) {
   db.prepare('INSERT INTO deck_cards (deck_id, card_id, quantity, role) VALUES (?, ?, ?, ?)')
     .run(deckId, cardId, quantity, role);
+}
+
+function basic(id, name = 'Forest', overrides = {}) {
+  card(id, name, { cardTypes: ['Land'], supertypes: ['Basic'], ...overrides });
+}
+
+function own(cardId, quantity, { finish = 'nonfoil', location = '' } = {}) {
+  db.prepare('INSERT INTO collection_items (card_id, quantity, finish, location) VALUES (?, ?, ?, ?)')
+    .run(cardId, quantity, finish, location);
+}
+
+function dckSections(text) {
+  const sections = {};
+  let section;
+  for (const line of text.split('\n')) {
+    const header = line.match(/^\[(.+)\]$/);
+    if (header) { section = header[1]; sections[section] = {}; }
+    else if (/^\d+ /.test(line)) {
+      const [, quantity, printing] = line.match(/^(\d+) (.+)$/);
+      sections[section][printing] = Number(quantity);
+    }
+  }
+  return sections;
 }
 
 function databaseSnapshot() {
@@ -124,13 +148,122 @@ test('DCK preserves distinct land printings, string collector numbers and quanti
   assert.equal(exportDeckText(1).text, '36 Forest\n');
 });
 
-test('DCK does not substitute collection printings or infer foil status', () => {
+test('DCK does not substitute nonbasic collection printings or infer foil status', () => {
   card(10, 'Lightning Bolt', { oracleId: 'oracle-bolt', setCode: 'lea', collectorNumber: '161' });
   db.prepare('INSERT INTO collection_items (card_id, quantity, finish) VALUES (10, 6, ?)').run('foil');
   const text = exportDeckDck(1).text;
   assert.match(text, /3 Lightning Bolt\|TST\|\[3\]/);
   assert.match(text, /2 Lightning Bolt\|TST\|\[4\]/);
   assert.doesNotMatch(text, /LEA|Lightning Bolt\+/);
+});
+
+test('DCK draws owned basic printings by remaining quantity across all deck sections without database writes', () => {
+  db.exec('DELETE FROM deck_cards');
+  // Deck copies may have no useful printing metadata; actual owned copies do.
+  basic(10, 'Forest', { setCode: '', collectorNumber: '' });
+  basic(11, 'Forest', { setCode: 'znr', collectorNumber: '275' });
+  basic(12, 'Forest', { setCode: 'm21', collectorNumber: '274' });
+  own(11, 2);
+  own(11, 1, { finish: 'foil', location: 'Foil binder' });
+  own(12, 2);
+  add(10, 3);
+  add(10, 2, 'sideboard');
+  const before = databaseSnapshot();
+  const result = exportDeck(1, { format: 'dck', random: () => 0.99 });
+  const sections = dckSections(result.text);
+  assert.deepEqual(sections.Main, { 'Forest|M21|[274]': 2, 'Forest|ZNR|[275]': 1 });
+  assert.deepEqual(sections.Sideboard, { 'Forest|ZNR|[275]': 2 });
+  assert.doesNotMatch(result.text, /Forest\+/);
+  assert.equal(exportDeckText(1).text, '5 Forest\n');
+  assert.deepEqual(databaseSnapshot(), before);
+});
+
+test('different random draws select different owned basic printings and inventory is read fresh', () => {
+  db.exec('DELETE FROM deck_cards');
+  basic(10);
+  basic(11, 'Forest', { setCode: 'znr', collectorNumber: '275' });
+  basic(12, 'Forest', { setCode: 'm21', collectorNumber: '274' });
+  own(11, 3);
+  own(12, 1);
+  add(10, 1);
+  assert.deepEqual(dckSections(exportDeckDck(1, { random: () => 0 }).text).Main, { 'Forest|ZNR|[275]': 1 });
+  assert.deepEqual(dckSections(exportDeckDck(1, { random: () => 0.5 }).text).Main, { 'Forest|ZNR|[275]': 1 }, 'selection is weighted by copies, not uniform by printing');
+  assert.deepEqual(dckSections(exportDeckDck(1, { random: () => 0.99 }).text).Main, { 'Forest|M21|[274]': 1 });
+  db.prepare('UPDATE collection_items SET quantity = 0 WHERE card_id = 12').run();
+  assert.deepEqual(dckSections(exportDeckDck(1, { random: () => 0.99 }).text).Main, { 'Forest|ZNR|[275]': 1 });
+});
+
+test('randomized basic lands never cross exact names or use cache-only, zero-owned, Wanted or deck-only cards', () => {
+  db.exec('DELETE FROM deck_cards');
+  basic(10, 'Forest');
+  basic(11, 'Snow-Covered Forest');
+  basic(12, 'Wastes');
+  basic(13, 'Island');
+  basic(20, 'Forest', { setCode: 'znr', collectorNumber: '275' });
+  basic(21, 'Forest', { setCode: 'm21', collectorNumber: '274' });
+  basic(22, 'Forest', { setCode: 'lea', collectorNumber: '280' });
+  basic(23, 'Forest', { setCode: 'neo', collectorNumber: '301' });
+  basic(24, 'Forest', { setCode: 'fdn', collectorNumber: '291' });
+  basic(25, 'Snow-Covered Forest', { setCode: 'khm', collectorNumber: '284' });
+  basic(26, 'Wastes', { setCode: 'ogw', collectorNumber: '183' });
+  // A card with the same name but no Basic supertype is also ineligible.
+  card(27, 'Forest', { cardTypes: ['Land'], setCode: 'sld', collectorNumber: '999' });
+  own(20, 3);
+  own(21, 0);
+  own(25, 2);
+  own(26, 1);
+  own(27, 100);
+  db.prepare('INSERT INTO wanted_items (card_id, quantity) VALUES (23, 20)').run();
+  db.prepare('INSERT INTO decks (id, name) VALUES (2, ?)').run('Other deck');
+  add(24, 20, 'main', 2);
+  add(10, 3);
+  add(11, 2);
+  add(12, 1);
+  add(13, 4);
+  const before = databaseSnapshot();
+  assert.deepEqual(dckSections(exportDeckDck(1, { random: () => 0.99 }).text).Main, {
+    'Forest|ZNR|[275]': 3,
+    'Island|TST|[13]': 4,
+    'Snow-Covered Forest|KHM|[284]': 2,
+    'Wastes|OGW|[183]': 1
+  });
+  assert.deepEqual(databaseSnapshot(), before);
+});
+
+test('a basic shortage reuses owned printings in complete rounds without losing deck quantities', () => {
+  db.exec('DELETE FROM deck_cards');
+  basic(10);
+  basic(11, 'Forest', { setCode: 'znr', collectorNumber: '275' });
+  basic(12, 'Forest', { setCode: 'm21', collectorNumber: '274' });
+  own(11, 2);
+  own(12, 1);
+  add(10, 8);
+  const sections = dckSections(exportDeckDck(1, { random: () => 0.99 }).text);
+  assert.deepEqual(sections.Main, { 'Forest|ZNR|[275]': 5, 'Forest|M21|[274]': 3 });
+  assert.equal(Object.values(sections.Main).reduce((sum, value) => sum + value, 0), 8);
+});
+
+test('huge complete and partial inventory rounds use bounded work and preserve totals', () => {
+  db.exec('DELETE FROM deck_cards');
+  basic(10);
+  basic(11, 'Forest', { setCode: 'znr', collectorNumber: '275' });
+  basic(12, 'Forest', { setCode: 'm21', collectorNumber: '274' });
+  own(11, 2);
+  own(12, 1);
+  add(10, 3000001);
+  let calls = 0;
+  const random = () => { calls++; assert.ok(calls <= 3, 'does not draw millions of individual copies'); return 0.99; };
+  assert.deepEqual(dckSections(exportDeckDck(1, { random }).text).Main, {
+    'Forest|ZNR|[275]': 2000000,
+    'Forest|M21|[274]': 1000001
+  });
+  db.prepare('UPDATE collection_items SET quantity = 1000000').run();
+  db.prepare('UPDATE deck_cards SET quantity = 1000001 WHERE card_id = 10').run();
+  calls = 0;
+  const partial = dckSections(exportDeckDck(1, { random }).text).Main;
+  assert.equal(Object.values(partial).reduce((sum, value) => sum + value, 0), 1000001);
+  assert.ok(Object.values(partial).every((count) => count <= 1000000));
+  assert.ok(calls <= 1, 'large partial round shuffles printing buckets');
 });
 
 test('DCK rejects missing or unsafe printing data instead of silently choosing different artwork', () => {

@@ -1,4 +1,4 @@
-# Deckexport — versie 2.14.1
+# Deckexport — versie 2.15.0
 
 Klik op **Exporteren** op de deckpagina. De popup opent met **Tekst (.txt)**. De tekst is selecteerbaar en kan met **Kopiëren** naar het klembord worden gekopieerd. Als de browser geen klembordtoegang geeft, wordt de tekst geselecteerd en verschijnt een aanwijzing voor handmatig kopiëren. **Downloaden** bewaart exact de getoonde inhoud in een bestand met de passende extensie.
 
@@ -17,7 +17,7 @@ DCK begint met `[metadata]` en de decknaam en gebruikt deze secties:
 | Sideboard en companion | `[Sideboard]` |
 | Maybeboard | Niet opgenomen |
 
-`[Main]` is altijd aanwezig. Lege andere secties worden weggelaten. Elke kaartregel bevat de printinggegevens uit het deck:
+`[Main]` is altijd aanwezig. Lege andere secties worden weggelaten. Elke kaartregel bevat de gekozen printinggegevens, inclusief set en collectornummer:
 
 ```text
 1 Yedora, Grave Gardener|DSC|[209]
@@ -29,7 +29,13 @@ De setcode wordt in hoofdletters geschreven; het collectornummer blijft een teks
 
 Alleen gelijke naam/set/collectornummer-vermeldingen worden binnen een sectie opgeteld. Verschillende printings van dezelfde kaart blijven afzonderlijk, ook wanneer de deckweergave basic lands samen toont. Main en Sideboard blijven gescheiden.
 
-De export gebruikt de printing die bij de deckregel is gekozen. Hij vervangt die niet door een andere kaartversie uit de collectie en kiest geen foil of taal: deckregels wijzen naar een printing, niet naar een specifiek fysiek exemplaar. De juiste afbeelding vereist dat de gebruikte Forge- of Neo Forge-versie de gekozen set en kaart ondersteunt.
+Vanaf 2.15.0 krijgen basic lands willekeurig gekozen printings uit je collectie. Alleen eigen kaarten met een positief aantal en het type **Basic Land** komen in aanmerking, met exact dezelfde kaartnaam als het land in het deck. Forest, Snow-Covered Forest, Island en Wastes worden nooit onderling vervangen.
+
+De geregistreerde aantallen vormen een voorraadronde: elk exemplaar wordt binnen die ronde maximaal één keer gebruikt, ook over meerdere deckregels of exportsecties. Moeten er meer landjes worden geëxporteerd dan je hebt geregistreerd, dan wordt je eigen voorraad opnieuw gebruikt. Zo blijft het deckaantal volledig behouden. Zijn er van dat land geen eigen exemplaren, dan blijft de oorspronkelijke deckprinting staan.
+
+De randomisatie verandert alleen de exporttekst. De opgeslagen deckregels en je collectie worden niet gewijzigd. Niet-basic kaarten behouden hun gekozen deckprinting. Er wordt geen foil of taal gekozen: deckregels wijzen naar een printing, niet naar een specifiek fysiek exemplaar. De juiste afbeelding vereist dat de gebruikte Forge- of Neo Forge-versie de gekozen set en kaart ondersteunt.
+
+Een nieuwe DCK-aanvraag kan een andere verdeling geven. **Kopiëren** en **Downloaden** gebruiken altijd exact de getoonde tekst; downloaden randomiseert dus niet opnieuw.
 
 Bij ontbrekende setcode of collectornummer, of ongeldige scheidingstekens, stopt de DCK-export met een melding waarin de kaart wordt genoemd. Zo wordt niet stilzwijgend een willekeurige printing geëxporteerd. TXT blijft beschikbaar.
 
@@ -43,7 +49,7 @@ Voor transform-, modal-DFC-, adventure- en flipkaarten gebruikt DCK de naam van 
 - De export leest bestaande gegevens zonder externe kaartlookup of databasewijziging. Er zijn geen schemawijzigingen of nieuwe schrijf-endpoints.
 - Tijdens laden zijn kopiëren en downloaden uitgeschakeld. Wisselen van formaat annuleert het vorige verzoek; laat binnenkomende antwoorden worden genegeerd. Sluiten van de popup annuleert eveneens het verzoek.
 
-Regressietests controleren TXT-behoud, secties en aantallen, verschillende printings van dezelfde kaart, bijzondere collectornummers, kaartnamen, ontbrekende gegevens, lege decks, bestandsnamen, ongewijzigde database-inhoud en het wisselen, kopiëren en downloaden in de popup. Voor deze versie slaagden 315 tests en de syntaxcontrole van 113 JavaScript-bestanden. Daarnaast zijn alle 66 printingregels (100 kaarten) uit het aangeleverde Neo Forge-voorbeeld in een tijdelijke testdatabase nagebouwd en opnieuw geëxporteerd; namen, setcodes, collectornummers, aantallen en secties bleven exact behouden. De database werd tijdens export niet gewijzigd. Zes HTTP-tests zijn overgeslagen omdat Express in de ontwikkelomgeving niet is geïnstalleerd. Browserweergave kon hier niet worden getest omdat browserbinaries ontbreken. Een echte import in Forge of Neo Forge is in deze ontwikkelomgeving niet uitgevoerd.
+Regressietests controleren TXT-behoud, secties en aantallen, afzonderlijke printings, bijzondere collectornummers, kaartnamen, ontbrekende gegevens, lege decks, bestandsnamen, ongewijzigde database-inhoud en het wisselen, kopiëren en downloaden in de popup. Randomisatietests controleren eigen voorraad, scheiding van landnamen, opnieuw gebruiken bij tekort, het ontbreken van voorraad, verdeling over secties en grote aantallen. De volledige testset voor 2.15.0 telt 335 tests: 329 geslaagd en 6 HTTP-tests overgeslagen omdat Express in de ontwikkelomgeving niet beschikbaar is. De syntaxcontrole slaagt voor 114 JavaScript-bestanden. Een echte import in Forge of Neo Forge is hier niet uitgevoerd.
 
 ## Geraadpleegde formaatreferenties
 
@@ -58,4 +64,4 @@ De indeling is gecontroleerd tegen de officiële Forge-code en meegeleverde deck
 
 ## Installeren
 
-Vervang de applicatiecode, behoud `.env` en `data/` en herstart het Node.js-proces of de systemd-service. De nieuwe exportpopup heeft de nieuwe backendroutes nodig. `/api/read/health` moet daarna versie `2.14.1` tonen.
+Vervang de applicatiecode, behoud `.env` en `data/` en herstart het Node.js-proces of de systemd-service. De aangepaste backend moet opnieuw worden geladen om de nieuwe exportverdeling te gebruiken. `/api/read/health` moet daarna versie `2.15.0` tonen.

@@ -132,6 +132,7 @@ export function discoveryFiltersFromQuery(query = new URLSearchParams()) {
     .flatMap((value) => String(value).split(','));
   return {
     marked: ['1', 'true'].includes(query.get('marked')) ? '1' : '',
+    owned: ['1', 'true'].includes(query.get('owned')) ? '1' : '',
     deckId: normalizedDeckId(query.has('deckId') ? query.get('deckId') : query.get('excludeDeckId')),
     name: query.get('name') || '',
     text: query.get('text') || '',
@@ -174,9 +175,11 @@ export function discoveryRouteParams(values = {}) {
     }
   }
 
-  const marked = ['1', 'true'].includes(params.get('marked'));
-  params.delete('marked');
-  if (marked) params.set('marked', '1');
+  for (const field of ['marked', 'owned']) {
+    const selected = ['1', 'true'].includes(params.get(field));
+    params.delete(field);
+    if (selected) params.set(field, '1');
+  }
 
   const deckId = normalizedDeckId(deckValue);
   params.delete('excludeDeckId');
@@ -225,7 +228,7 @@ export function discoverySearchParams(values = {}) {
 
 export function hasDiscoveryFilters(values = {}) {
   const params = discoverySearchParams(values);
-  return [...PRIMARY_FILTER_FIELDS, 'marked', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+  return [...PRIMARY_FILTER_FIELDS, 'marked', 'owned', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .some((key) => String(params.get(key) || '').trim().length > 0);
 }
 
@@ -299,7 +302,7 @@ function colorIdentityFilterHtml(selectedColors = [], options = {}, active = tru
 }
 
 function activeFilterCount(filters) {
-  return ['marked', 'deckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
+  return ['marked', 'owned', 'deckId', 'name', 'text', 'ability', 'keyword', 'type', 'subtype', 'manaMin', 'manaMax', 'legality', 'effect', 'tokenPower', 'tokenToughness', 'tokenType', 'tutorTarget']
     .filter((key) => String(filters[key] || '').trim().length > 0).length
     + (filters.colorIdentity.length ? 1 : 0);
 }
@@ -472,7 +475,10 @@ export async function renderCardDiscovery(context) {
         <aside id="discovery-filter-panel" class="panel discovery-filter-panel" ${filtersOpen ? '' : 'hidden'}>
           <header class="panel-header"><h2>Zoekfilters</h2></header>
           <div class="discovery-filter-form panel-body">
-            <label class="discovery-marked-filter"><input type="checkbox" name="marked" value="1" ${filters.marked ? 'checked' : ''}> Gemarkeerd</label>
+            <div class="discovery-personal-filters">
+              <label class="discovery-marked-filter"><input type="checkbox" name="marked" value="1" ${filters.marked ? 'checked' : ''}> Gemarkeerd</label>
+              <label class="discovery-marked-filter"><input type="checkbox" name="owned" value="1" ${filters.owned ? 'checked' : ''}> In bezit</label>
+            </div>
             <details id="discovery-text-filters" class="discovery-filter-section"${textFiltersOpen ? ' open' : ''}>
               <summary>Tekst en kaartsoort</summary>
               <div class="discovery-filter-section-body">

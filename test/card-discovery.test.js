@@ -65,10 +65,10 @@ test('ontdekquery normaliseert kleuridentiteit, pagina en effectafhankelijke fil
 });
 
 test('alleen inhoudelijke filters starten een zoekopdracht', () => {
-  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false', 'deckId=', 'deckId=%20', 'manaMin=0', 'colorIdentity=C', 'deckId=17', 'excludeDeckId=17', 'legality=modern&manaMax=3']) {
+  for (const query of ['', 'sort=mana&page=2', 'colorMode=exact', 'text=%20%20', 'tokenPower=2&tutorTarget=land', 'marked=0', 'marked=false', 'owned=0', 'owned=false', 'deckId=', 'deckId=%20', 'manaMin=0', 'colorIdentity=C', 'deckId=17', 'excludeDeckId=17', 'legality=modern&manaMax=3']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), false, query);
   }
-  for (const query of ['text=draw', 'type=Instant', 'type=Instant&manaMin=0', 'effect=token&tokenPower=2', 'marked=1', 'marked=true']) {
+  for (const query of ['text=draw', 'type=Instant', 'type=Instant&manaMin=0', 'effect=token&tokenPower=2', 'marked=1', 'marked=true', 'owned=1', 'owned=true']) {
     assert.equal(hasDiscoveryFilters(new URLSearchParams(query)), true, query);
   }
 });
@@ -94,8 +94,8 @@ test('elk tekst- of kaartsoortfilter activeert de bewaarde horizontale keuzes, w
   }
 });
 
-test('zelfstandige Effect- en Gemarkeerd-filters negeren horizontale keuzes tot een tekstfilter actief is', () => {
-  for (const query of ['marked=1', 'effect=token&tokenPower=2&tokenType=Elf', 'effect=tutor&tutorTarget=land']) {
+test('zelfstandige Effect-, Gemarkeerd- en In bezit-filters negeren horizontale keuzes tot een tekstfilter actief is', () => {
+  for (const query of ['marked=1', 'owned=1', 'owned=1&marked=1', 'effect=token&tokenPower=2&tokenType=Elf', 'effect=tutor&tutorTarget=land']) {
     const input = new URLSearchParams(`${query}&deckId=17&colorIdentity=G&manaMin=0&manaMax=4&legality=commander`);
     assert.equal(hasDiscoveryFilters(input), true);
     const search = discoverySearchParams(input);
@@ -137,18 +137,22 @@ test('een opgeslagen horizontale selectie houdt het startscherm leeg en begrenst
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test('Gemarkeerd normaliseert echte selecties en laat uitgeschakelde waarden weg', () => {
-  for (const value of ['1', 'true']) {
-    const filters = discoveryFiltersFromQuery(new URLSearchParams({ marked: value }));
-    assert.equal(Boolean(filters.marked), true);
-    assert.equal(discoverySearchParams(filters).get('marked'), '1');
+test('Gemarkeerd en In bezit normaliseren echte selecties en laten uitgeschakelde waarden weg', () => {
+  for (const field of ['marked', 'owned']) {
+    for (const value of ['1', 'true']) {
+      const filters = discoveryFiltersFromQuery(new URLSearchParams({ [field]: value }));
+      assert.equal(Boolean(filters[field]), true);
+      assert.equal(discoverySearchParams(filters).get(field), '1');
+      assert.equal(discoveryRouteParams(filters).get(field), '1');
+    }
+    for (const value of ['', '0', 'false']) {
+      assert.equal(Boolean(discoveryFiltersFromQuery(new URLSearchParams({ [field]: value }))[field]), false);
+      assert.equal(discoverySearchParams({ [field]: value }).has(field), false);
+      assert.equal(discoveryRouteParams({ [field]: value }).has(field), false);
+    }
+    assert.equal(discoverySearchParams({ [field]: true }).get(field), '1');
+    assert.equal(discoverySearchParams({ [field]: false }).has(field), false);
   }
-  for (const value of ['', '0', 'false']) {
-    assert.equal(Boolean(discoveryFiltersFromQuery(new URLSearchParams({ marked: value })).marked), false);
-    assert.equal(discoverySearchParams({ marked: value }).has('marked'), false);
-  }
-  assert.equal(discoverySearchParams({ marked: true }).get('marked'), '1');
-  assert.equal(discoverySearchParams({ marked: false }).has('marked'), false);
 });
 
 test('deckselectie normaliseert geldige IDs en bewaart ongeldige waarden om zichtbaar te kunnen herstellen', () => {

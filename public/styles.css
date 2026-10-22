@@ -2140,6 +2140,7 @@ html.write-unavailable [data-write-only] { display: none !important; }
   scrollbar-gutter: stable;
 }
 .discovery-filter-form { display: grid; gap: 18px; }
+.discovery-personal-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .discovery-marked-filter { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: .84rem; font-weight: 650; }
 .discovery-marked-filter input { width: auto; margin: 0; accent-color: var(--primary); }
 .discovery-secondary-filters { margin-bottom: 14px; }

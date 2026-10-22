@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.15.0 - 2026-10-22
+
+### Ontdekken met eigen kaarten
+
+- Naast **Gemarkeerd** staat nu **In bezit**. Deze optie toont alleen kaarten waarvan minstens één exemplaar in de collectie staat, ook als je een andere printing bezit.
+- Het bezitfilter werkt zelfstandig en in combinatie met de bestaande filters. Resultaataantallen, paginering en alle reactieve filteropties volgen de selectie. Alleen gecachete kaarten, deckkaarten, Wanted-regels en collectieregels met aantal nul tellen niet als bezit.
+- Filterkeuze blijft bewaard in de route en bij terugkeer vanuit Kaart opzoeken; resetten wist de keuze. Kleur, mana, legaliteit en deckkeuze blijven afhankelijk van een criterium in Tekst en kaartsoort.
+- De bestaande cataloguszoek- en optiesroutes ondersteunen `owned=1` of `owned=true`; geen nieuwe endpointpaden of databaseschemawijzigingen.
+
+### Willekeurige basic-landprintings in DCK
+
+- DCK verdeelt basic lands willekeurig over printings met een positief aantal in je collectie. Alleen exact dezelfde kaartnaam komt in aanmerking: Forest en Snow-Covered Forest blijven bijvoorbeeld gescheiden.
+- Binnen een voorraadronde wordt ieder geregistreerd exemplaar maximaal één keer gebruikt, ook over meerdere deckregels en exportsecties. Bij onvoldoende voorraad wordt de eigen voorraad opnieuw gebruikt; zonder passende eigen basic lands blijft de oorspronkelijke deckprinting behouden. Aantallen en rollen veranderen niet.
+- Andere kaarten behouden hun deckprinting. TXT blijft ongewijzigd. Randomisatie wijzigt uitsluitend de exporttekst, niet de collectie, deckregels of afwerking.
+- Kopiëren en downloaden gebruiken dezelfde getoonde export. Opnieuw een DCK-export opvragen kan een andere verdeling geven.
+
 ## 2.14.1 - 2026-10-08
 
 ### DCK-export met gekozen printings

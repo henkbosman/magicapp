@@ -27,7 +27,7 @@ export function openDeckExport(deckId) {
         <button type="button" class="button secondary" data-export-copy disabled>Kopiëren</button>
       </div>
     </div>
-    <p class="help-text" data-export-printings hidden>Gebruikt de printings die in dit deck zijn gekozen. Forge / Neo Forge moet deze kaartversies ondersteunen.</p>
+    <p class="help-text" data-export-printings hidden>Basic lands krijgen willekeurig een eigen printing van dezelfde kaart. Bij tekort worden eigen printings hergebruikt; zonder eigen exemplaren blijft de deckprinting staan. Overige kaarten behouden hun gekozen printing. Forge / Neo Forge moet deze kaartversies ondersteunen.</p>
     <div class="field">
       <label for="${prefix}-text">Decklijst</label>
       <textarea id="${prefix}-text" class="deck-export-text" data-export-text rows="18" readonly spellcheck="false" aria-describedby="${prefix}-status"></textarea>

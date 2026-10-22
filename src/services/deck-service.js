@@ -533,9 +533,95 @@ function forgeCardPrinting(card) {
   return `${name}|${setCode}|[${collectorNumber}]`;
 }
 
-export function exportDeckDck(deckId) {
+function ownedBasicLandPools(deckCards) {
+  const names = [...new Set(deckCards.filter((row) => isBasicLand(row.card)).map((row) => row.card.name))];
+  const pools = new Map();
+  if (!names.length) return pools;
+  // Only actual positive collection quantities count. Cached printings, Wanted
+  // and other decks are not inventory. JSON keeps the query to one parameter.
+  const rows = db.prepare(`
+    SELECT c.*, SUM(ci.quantity) AS owned_quantity
+    FROM cards c JOIN collection_items ci ON ci.card_id = c.id
+    WHERE ci.quantity > 0 AND c.name IN (SELECT value FROM json_each(?))
+    GROUP BY c.id ORDER BY c.id
+  `).all(JSON.stringify(names));
+  for (const row of rows) {
+    const card = cardRowToApi(row);
+    if (!isBasicLand(card)) continue;
+    const printing = forgeCardPrinting(card);
+    if (!pools.has(card.name)) pools.set(card.name, { entries: new Map(), total: 0, remaining: 0 });
+    const pool = pools.get(card.name);
+    if (!pool.entries.has(printing)) pool.entries.set(printing, { printing, quantity: 0, remaining: 0 });
+    const entry = pool.entries.get(printing);
+    const quantity = Number(row.owned_quantity);
+    entry.quantity += quantity;
+    entry.remaining += quantity;
+    pool.total += quantity;
+    pool.remaining += quantity;
+  }
+  return pools;
+}
+
+function sampleBasicLandPrintings(pool, quantity, random) {
+  const result = new Map();
+  const entries = [...pool.entries.values()];
+  const take = (entry, count) => {
+    if (!count) return;
+    result.set(entry.printing, (result.get(entry.printing) || 0) + count);
+    entry.remaining -= count;
+    pool.remaining -= count;
+    quantity -= count;
+  };
+  while (quantity > 0) {
+    if (!pool.remaining) {
+      for (const entry of entries) entry.remaining = entry.quantity;
+      pool.remaining = pool.total;
+    }
+    if (quantity >= pool.remaining) {
+      // Consume the remainder once, then add whole inventory cycles in bulk.
+      // Reusing a small collection for a large virtual deck never needs an
+      // array or one iteration per physical/virtual copy.
+      for (const entry of entries) take(entry, entry.remaining);
+      const cycles = Math.floor(quantity / pool.total);
+      if (cycles) {
+        for (const entry of entries) {
+          result.set(entry.printing, (result.get(entry.printing) || 0) + entry.quantity * cycles);
+        }
+        quantity -= pool.total * cycles;
+      }
+      continue;
+    }
+    if (quantity > 10000) {
+      // For unusually huge partial rounds, shuffle printing buckets and take
+      // bounded chunks. Normal decks use exact weighted draws below; this
+      // fallback is O(printings), still preserves inventory limits and totals.
+      const shuffled = entries.filter((entry) => entry.remaining > 0);
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      for (const entry of shuffled) {
+        take(entry, Math.min(quantity, entry.remaining));
+        if (!quantity) break;
+      }
+      continue;
+    }
+    let ticket = Math.floor(random() * pool.remaining);
+    for (const entry of entries) {
+      if (ticket < entry.remaining) {
+        take(entry, 1);
+        break;
+      }
+      ticket -= entry.remaining;
+    }
+  }
+  return [...result].map(([printing, count]) => ({ quantity: count, name: printing, cardKey: printing }));
+}
+
+export function exportDeckDck(deckId, { random = Math.random } = {}) {
   const deck = requireDeck(deckId);
   const cards = getDeckCards(deckId, { includeMaybeboard: false });
+  const basicLandPools = ownedBasicLandPools(cards);
   const lines = ['[metadata]', `Name=${deck.name.replace(/[\r\n]+/g, ' ').trim()}`];
   const sections = [
     ['Commander', ['commander', 'partner']],
@@ -545,10 +631,13 @@ export function exportDeckDck(deckId) {
   ];
   for (const [section, roles] of sections) {
     const rows = aggregateExportRows(cards.filter((row) => roles.includes(row.role))
-      .map((row) => {
+      .flatMap((row) => {
+        const pool = isBasicLand(row.card) ? basicLandPools.get(row.card.name) : null;
+        if (pool) return sampleBasicLandPrintings(pool, row.quantity, random);
+        // Without owned copies of this exact basic name, keep the deck printing.
+        // Nonbasic cards always keep their selected printing as well.
         const printing = forgeCardPrinting(row.card);
-        // An Oracle ID may span many printings, each with its own artwork.
-        return { quantity: row.quantity, name: printing, cardKey: printing };
+        return [{ quantity: row.quantity, name: printing, cardKey: printing }];
       }));
     if (!rows.length && section !== 'Main') continue;
     lines.push(`[${section}]`, ...rows.map((row) => `${row.quantity} ${row.name}`));
@@ -559,8 +648,8 @@ export function exportDeckDck(deckId) {
   };
 }
 
-export function exportDeck(deckId, { format = 'txt' } = {}) {
+export function exportDeck(deckId, { format = 'txt', random = Math.random } = {}) {
   const selectedFormat = oneOf(format, ['txt', 'dck'], 'Exportformaat', 'txt');
-  const result = selectedFormat === 'dck' ? exportDeckDck(deckId) : exportDeckText(deckId);
+  const result = selectedFormat === 'dck' ? exportDeckDck(deckId, { random }) : exportDeckText(deckId);
   return { ...result, format: selectedFormat };
 }

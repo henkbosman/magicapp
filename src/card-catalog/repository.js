@@ -76,12 +76,14 @@ function contextualFilters(filters, context) {
   return {
     ...filters,
     _marks: identityContext(context.marks || []),
+    _ownedCards: identityContext(filters.owned ? context.ownedCards || [] : []),
     _deckCards: identityContext(filters.deckId === null ? [] : context.selectedDeck.cards)
   };
 }
 
 function registerIdentityNameFunction(database, filters) {
-  const needsNames = filters.marked && filters._marks.allNames.size;
+  const needsNames = (filters.marked && filters._marks.allNames.size)
+    || (filters.owned && filters._ownedCards.allNames.size);
   if (!needsNames || identityFunctionsRegistered.has(database)) return;
   database.function('discovery_identity_name', { deterministic: true }, (name) => normalizeSearchText(name));
   identityFunctionsRegistered.add(database);
@@ -101,7 +103,7 @@ function identityMatch(identities, params) {
     alternatives.push("(COALESCE(trim(c.scryfall_oracle_id), '') = '' AND discovery_identity_name(c.name) IN (SELECT value FROM json_each(?)))");
     params.push(identities.namesJson);
   }
-  // Bound JSON lists avoid SQLite's variable limit with many marked cards.
+  // Bound JSON lists avoid SQLite's variable limit with many marked/owned cards.
   return alternatives.length ? `(${alternatives.join(' OR ')})` : '0 = 1';
 }
 
@@ -334,6 +336,10 @@ function normalizedFilters(input = {}) {
   if (!['', '0', '1', 'false', 'true'].includes(markedValue)) {
     throw new HttpError(400, 'Gemarkeerd moet 1, 0, true of false zijn.');
   }
+  const ownedValue = scalar(input.owned, 'In bezit', 10).toLowerCase();
+  if (!['', '0', '1', 'false', 'true'].includes(ownedValue)) {
+    throw new HttpError(400, 'In bezit moet 1, 0, true of false zijn.');
+  }
   const colorIdentityRaw = scalar(input.colorIdentity, 'Kleuridentiteit', 80);
   const colorTokens = colorIdentityRaw.split(/[\s,;]+/u).filter(Boolean);
   if (colorTokens.some((color) => !/^[WUBRGC]$/iu.test(color))) {
@@ -382,6 +388,7 @@ function normalizedFilters(input = {}) {
     type,
     subtype,
     marked: markedValue === '1' || markedValue === 'true',
+    owned: ownedValue === '1' || ownedValue === 'true',
     deckId: discoverySelectedDeckId(input),
     colorIdentity,
     colorMode,
@@ -406,6 +413,9 @@ function queryParts(filters, { tokenProfileAlias = '' } = {}) {
 
   if (filters.marked) {
     conditions.push(identityMatch(filters._marks, params));
+  }
+  if (filters.owned) {
+    conditions.push(identityMatch(filters._ownedCards, params));
   }
   if (filters.name) {
     const normalizedName = normalizeSearchText(filters.name);

@@ -678,6 +678,69 @@ test('Gemarkeerd start zelfstandig zoeken en reset wist ook deze selectie', asyn
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
 });
 
+test('In bezit zoekt zelfstandig, behoudt paginering, combineert met Gemarkeerd en wordt gewist bij reset', async (t) => {
+  const ui = await mount(t, 'deckId=2&colorIdentity=G&manaMax=4&legality=commander');
+  assert.equal(ui.requests.filter((request) => request.kind === 'search').length, 0);
+  const owned = ui.control('owned');
+  const marked = ui.control('marked');
+  setWriteAvailability(false);
+  assert.equal(owned.disabled, false, 'ownership filtering stays available without write access');
+  owned.checked = true;
+  owned.dispatch('change');
+  const first = ui.pair();
+  assert.equal(first.search.params.get('owned'), '1');
+  for (const field of ['deckId', 'colorIdentity', 'manaMax', 'legality']) {
+    assert.equal(first.search.params.has(field), false, `${field} still requires a text/type criterion`);
+  }
+  assert.match(ui.routes.at(-1), /owned=1/);
+  await ui.finish(first, allOptions, result('Owned card', 60));
+  ui.get('discovery-pagination-wrap').querySelector('[data-discovery-page="2"]').dispatch('click');
+  const secondPage = ui.pair();
+  assert.equal(secondPage.search.params.get('owned'), '1');
+  assert.equal(secondPage.search.params.get('page'), '2');
+  await ui.finish(secondPage, allOptions, result('Second owned card', 60, 2));
+  marked.checked = true;
+  marked.dispatch('change');
+  const combined = ui.pair();
+  assert.equal(combined.search.params.get('owned'), '1');
+  assert.equal(combined.search.params.get('marked'), '1');
+  assert.equal(combined.search.params.get('page'), '1', 'a changed filter resets the page');
+  await ui.finish(combined, allOptions, result('Owned and marked'));
+  const searchesBeforeReset = ui.requests.filter((request) => request.kind === 'search').length;
+  ui.get('discovery-filter-reset').dispatch('click');
+  assert.equal(owned.checked, false);
+  assert.equal(marked.checked, false);
+  const reset = ui.requests.at(-1);
+  assert.equal(reset.kind, 'options');
+  assert.equal(reset.params.has('owned'), false);
+  assert.equal(reset.params.has('marked'), false);
+  assert.equal(ui.requests.filter((request) => request.kind === 'search').length, searchesBeforeReset);
+  reset.resolve(allOptions);
+  await flush();
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+});
+
+test('snel uitzetten van In bezit voorkomt dat een laat antwoord het lege startscherm overschrijft', async (t) => {
+  const ui = await mount(t, '');
+  const owned = ui.control('owned');
+  owned.checked = true;
+  owned.dispatch('change');
+  const stale = ui.pair();
+  owned.checked = false;
+  owned.dispatch('change');
+  const latest = ui.requests.at(-1);
+  assert.equal(stale.search.signal.aborted, true);
+  assert.equal(stale.options.signal.aborted, true);
+  assert.equal(latest.kind, 'options');
+  assert.equal(latest.params.has('owned'), false);
+  latest.resolve(allOptions);
+  await flush();
+  await ui.finish(stale, instantOptions, result('Stale owned card'));
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Stale owned card/);
+  assert.equal(owned.checked, false);
+});
+
 test('deck vergelijken wacht op een tekstfilter, stuurt daarna gelijke queries en reset de selectie', async (t) => {
   const ui = await mount(t, '');
   const select = ui.control('deckId');
@@ -707,7 +770,9 @@ test('deck vergelijken wacht op een tekstfilter, stuurt daarna gelijke queries e
 test('oude deckselectie blijft behouden bij opzoeken en terugkeer, ook zonder schrijftoegang', async (t) => {
   const cards = result('Already in deck');
   cards.items[0].inDeck = true;
-  const ui = await mount(t, 'excludeDeckId=2&type=Instant&colorsOpen=1&textOpen=0&filterScroll=75', cards);
+  const ui = await mount(t, 'owned=1&excludeDeckId=2&type=Instant&colorsOpen=1&textOpen=0&filterScroll=75', cards);
+  assert.equal(ui.control('owned').checked, true);
+  assert.equal(ui.pair().search.params.get('owned'), '1');
   assert.equal(ui.pair().search.params.get('deckId'), '2');
   assert.equal(ui.pair().search.params.has('excludeDeckId'), false);
   setWriteAvailability(false);
@@ -727,6 +792,7 @@ test('oude deckselectie blijft behouden bij opzoeken en terugkeer, ook zonder sc
   assert.equal(query.get('deckId'), '2');
   assert.equal(query.has('excludeDeckId'), false);
   assert.equal(query.get('type'), 'Instant');
+  assert.equal(query.get('owned'), '1');
   assert.equal(query.get('colorsOpen'), '1');
   assert.equal(query.get('textOpen'), '0');
   assert.equal(query.get('filterScroll'), '75');

@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.14.1
+# Architectuur - Magic Collection Manager 2.15.0
 
 ## Overzicht
 
@@ -245,3 +245,10 @@ Het deckmenu bundelt bewerken, importeren, dupliceren en verwijderen in gelijk u
 De nieuwe leesroute `/api/read/decks/:id/export?format=txt|dck` levert bestandsnaam, tekst en formaat als JSON. `/export.txt` houdt het bestaande contract en `/export.dck` downloadt het nieuwe formaat. De serializers lezen uitsluitend de bestaande deckgegevens; er zijn geen schemawijzigingen of mutaties. Zie `DECK-EXPORT.md` voor de Forge-secties en de omgang met printings en kaartnamen.
 
 Vanaf 2.14.1 bevat elke DCK-kaartregel de gekozen setcode en het collectornummer tussen blokhaken. Deze waarden worden rechtstreeks uit de aan de deckregel gekoppelde kaart gelezen. DCK bundelt alleen identieke exportvermeldingen binnen een sectie; de Oracle-brede TXT-aggregatie blijft gelijk. Ontbrekende printingvelden of ongeldige scheidingstekens geven een duidelijke 400-fout in plaats van een export die stilzwijgend een andere printing kan kiezen.
+
+
+## Bezitfilter en basic-landexport vanaf 2.15.0
+
+`cardDiscoveryContext` leest voor `owned=1` de stabiele kaartidentiteiten uit positieve collectieregels. De zelfstandige catalogus krijgt alleen deze identiteiten, zonder ATTACH, primary-databasepad of schemawijziging. De gedeelde query-opbouw past `identityMatch` voor bezit toe vóór aantallen, paginering en alle facets. De frontend behandelt bezit als een zelfstandige zoekaanleiding, maar behoudt de bestaande voorwaarde voor secundaire filters.
+
+DCK-export leest de basic-landvoorraad uit de collectie en kiest alleen printings van dezelfde kaartnaam. Aantallen worden binnen een ronde zonder terugleggen getrokken en bij tekort hergebruikt; voorraad wordt gedeeld over secties. Grote volledige voorraadrondes worden in bulk verwerkt. Zonder passende voorraad blijft de deckprinting behouden. Alle andere deckkaarten, TXT-export en databases blijven intact. De popup gebruikt een vast ontvangen exportresultaat voor kopiëren en downloaden.

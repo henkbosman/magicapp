@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.14.1
+# Magic Collection Manager 2.15.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -28,6 +28,8 @@ Versie **2.14.0** bundelt de deckacties in **Meer…**, voegt een exportpopup me
 
 Versie **2.14.1** neemt in DCK ook de gekozen set en het collectornummer op, bijvoorbeeld `1 Yedora, Grave Gardener|DSC|[209]`. Verschillende printings blijven afzonderlijke exportregels.
 
+Versie **2.15.0** voegt **In bezit** toe aan Kaarten ontdekken en verdeelt basic lands bij DCK-export willekeurig over eigen printings van dezelfde kaart.
+
 ## Belangrijkste mogelijkheden
 
 - Snel lokaal zoeken en direct zien of een kaart in bezit is, hoeveel exemplaren beschikbaar zijn, in welke decks deze voorkomt en of de kaart op Wanted staat.
@@ -35,6 +37,7 @@ Versie **2.14.1** neemt in DCK ook de gekozen set en het collectornummer op, bij
 - Scryfall-autocomplete, printingselectie en lokaal opgeslagen kaartmetadata.
 - Een aparte ontdekpagina om kaarten op gecombineerde regels, kleuren en effecten te vinden, bijvoorbeeld Landfall-kaarten die een 2/2 creature token maken of groene kaarten met een tutor-effect.
 - Interessante kaarten markeren en via **Gemarkeerd** terugvinden, ook na het vervangen van de MTGJSON-catalogus.
+- Met **In bezit** uitsluitend cataloguskaarten vinden waarvan minstens één exemplaar in je collectie staat; alle reactieve filteropties volgen deze selectie.
 - Ontdekte kaarten rechtstreeks aan een deck toevoegen en meteen herkennen welke kaarten al in het gekozen deck zitten.
 - Een onderhoudsimport van de officiële MTGJSON AtomicCards-catalogus naar een volledig losse, opnieuw opbouwbare SQLite-database.
 - Persistente SQLite-cache voor externe Scryfall-resultaten en een lokale schijfcache voor kaartafbeeldingen.
@@ -283,7 +286,7 @@ Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen
 
 **Meer…** opent het deckmenu met **Bewerken**, **Importeren**, **Dupliceren** en **Verwijderen**. De knoppen hebben dezelfde uitlijning. **Exporteren** opent een aparte popup met de volledige decklijst. Kies **Tekst (.txt)** of **Forge / Neo Forge (.dck)**, gebruik **Kopiëren** of selecteer zelf tekst, of sla de getoonde inhoud op met **Downloaden**. **Tekort exporteren** blijft een rechtstreekse TXT-download.
 
-De TXT-export houdt dezelfde inhoud als voorheen. De DCK-export gebruikt `[metadata]` met de decknaam, `[Commander]` voor beide commanders, `[Main]` voor het hoofddeck en `[Sideboard]` voor sideboard en companion. Maybeboard wordt in beide formaten overgeslagen. DCK bevat per regel `aantal Naam|SET|[collectornummer]`, op basis van de printing die in het deck is gekozen. Alleen identieke printingvermeldingen worden binnen een sectie samengevoegd; verschillende Forest-printings blijven dus apart. Foil wordt niet afgeleid uit de collectie, omdat een deckregel geen fysieke afwerking selecteert. Als printinggegevens ontbreken of niet veilig in DCK kunnen worden geschreven, geeft de export een melding met de kaartnaam. Zie [de exportbeschrijving](docs/DECK-EXPORT.md).
+De TXT-export houdt dezelfde inhoud als voorheen. De DCK-export gebruikt `[metadata]` met de decknaam, `[Commander]` voor beide commanders, `[Main]` voor het hoofddeck en `[Sideboard]` voor sideboard en companion. Maybeboard wordt in beide formaten overgeslagen. DCK bevat per regel `aantal Naam|SET|[collectornummer]`. Basic lands worden willekeurig verdeeld over de eigen printings van dezelfde kaart; overige kaarten gebruiken de gekozen deckprinting. De geregistreerde aantallen vormen de voorraad per ronde. Bij tekort worden eigen printings opnieuw gebruikt; zonder passende eigen exemplaren blijft de oorspronkelijke deckprinting staan. Alleen identieke printingvermeldingen worden binnen een sectie samengevoegd; verschillende Forest-printings blijven dus apart. Foil wordt niet afgeleid uit de collectie, omdat een deckregel geen fysieke afwerking selecteert. Als printinggegevens ontbreken of niet veilig in DCK kunnen worden geschreven, geeft de export een melding met de kaartnaam. Zie [de exportbeschrijving](docs/DECK-EXPORT.md).
 
 ## Deckstatistieken
 
