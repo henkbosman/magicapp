@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parseHtml } from './support/dom.js';
+import { Element, parseHtml } from './support/dom.js';
+import { applyWriteAvailability } from '../public/js/write-access.js';
 
 import {
   compareDeckCards,
@@ -16,12 +17,12 @@ import {
   renderDeckDetail
 } from '../public/js/views/deck-detail.js';
 
-function deckCard({ deckCardId, cardId, name, cardTypes, typeLine, oracleText = '', printedText = '', quantity = 1, role = 'main', wantedGap = 0, supertypes = [], manaValue = 1, keywords = [], insights }) {
+function deckCard({ deckCardId, cardId, name, cardTypes, typeLine, oracleText = '', printedText = '', quantity = 1, role = 'main', wantedGap = 0, supertypes = [], manaValue = 1, keywords = [], insights, tags = [] }) {
   return {
     id: deckCardId,
     role,
     quantity,
-    tags: [],
+    tags,
     note: '',
     relations: [],
     coverage: {
@@ -52,6 +53,91 @@ function deckCard({ deckCardId, cardId, name, cardTypes, typeLine, oracleText = 
       usage: { owned: quantity, needed: quantity }
     }
   };
+}
+
+async function mountDeck(t, cards, query = '') {
+  const globalKeys = ['document', 'window', 'history', 'sessionStorage', 'Element',
+    'HTMLButtonElement', 'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement'];
+  const originals = globalKeys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
+  const originalQuerySelectorAll = Element.prototype.querySelectorAll;
+  t.after(() => {
+    Element.prototype.querySelectorAll = originalQuerySelectorAll;
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  // The shared tiny DOM adapter only supports simple selectors. Deck mounting
+  // also uses descendant selectors, so implement that browser behavior locally.
+  Element.prototype.querySelectorAll = function (selector) {
+    const descendants = (node) => node.children.filter((child) => child instanceof Element)
+      .flatMap((child) => [child, ...descendants(child)]);
+    const matches = (element, part) => /^h[1-6]$/.test(part)
+      ? element.tagName === part.toUpperCase() : element.matches(part);
+    const chains = selector.split(',').map((part) => part.trim().split(/\s+/));
+    return descendants(this).filter((candidate) => chains.some((chain) => {
+      if (!matches(candidate, chain.at(-1))) return false;
+      let parent = candidate.parentElement;
+      for (let index = chain.length - 2; index >= 0; index--) {
+        while (parent && !matches(parent, chain[index])) parent = parent.parentElement;
+        if (!parent) return false;
+        parent = parent.parentElement;
+      }
+      return true;
+    }));
+  };
+  const deck = { id: 7, name: 'Testdeck', format: 'commander', description: '', notes: '', commander: null, secondCommander: null };
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
+    requests.push({ url, method: options.method || 'GET' });
+    return Response.json({ data: String(url).endsWith('/cards') ? cards : deck });
+  });
+  const storage = new Map();
+  const sessionStorage = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key)
+  };
+  const location = { pathname: '/', search: '', hash: `#/decks/7${query ? `?${query}` : ''}` };
+  let refreshes = 0;
+  globalThis.window = {
+    location, sessionStorage, scrollY: 175,
+    dispatchEvent(event) { if (event.type === 'app:refresh') refreshes++; },
+    addEventListener() {}, removeEventListener() {}
+  };
+  globalThis.sessionStorage = sessionStorage;
+  globalThis.history = {
+    state: null,
+    replaceState(state, title, url) { location.hash = url.slice(url.indexOf('#')); }
+  };
+  for (const key of globalKeys.filter((key) => key.includes('Element'))) globalThis[key] = Element;
+  const append = function (child) { child.parentElement = this; this.children.push(child); };
+  const render = async () => {
+    const view = await renderDeckDetail({ params: { id: '7' }, query: new URLSearchParams(location.hash.split('?')[1] || '') });
+    const document = parseHtml(view.html);
+    document.body = document;
+    document.documentElement = document;
+    document.append = append;
+    document.getElementById = (id) => document.querySelector(`#${id}`);
+    document.createElement = (tag) => {
+      const element = new Element(tag);
+      element.append = append;
+      element.showModal = () => { element.open = true; };
+      element.close = () => { element.open = false; element.dispatch('close'); };
+      element.remove = () => {
+        if (element.parentElement) element.parentElement.children = element.parentElement.children.filter((child) => child !== element);
+        element.parentElement = null;
+      };
+      return element;
+    };
+    globalThis.document = document;
+    view.mount();
+    return document;
+  };
+  const document = await render();
+  return { document, location, render, requests, refreshes: () => refreshes,
+    query: () => new URLSearchParams(location.hash.split('?')[1] || '') };
 }
 
 test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async () => {
@@ -114,7 +200,7 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
 
     const listView = await renderDeckDetail({
       params: { id: '7' },
-      query: new URLSearchParams()
+      query: new URLSearchParams('view=list')
     });
     assert.match(listView.html, /id="deck-cards-per-row-control"[^>]*\shidden(?:\s|>)/);
 
@@ -173,6 +259,7 @@ test('decksortering en -groepering normaliseren naar veilige standaardwaarden', 
   assert.equal(normalizeDeckCardGroup(), 'type');
   assert.equal(normalizeDeckCardGroup('type'), 'type');
   assert.equal(normalizeDeckCardGroup('ability'), 'ability');
+  assert.equal(normalizeDeckCardGroup('tags'), 'tags');
   assert.equal(normalizeDeckCardGroup('none'), 'none');
   assert.equal(normalizeDeckCardGroup('onbekend'), 'type');
 });
@@ -186,9 +273,10 @@ test('deckquery bewaart filters, kaartview en kolomkeuze samen', () => {
     cardColumns: '7',
     cardSort: 'name',
     cardGroup: 'ability'
-  }), 'cardSearch=Llanowar+Elves&role=sideboard&cardType=Creature&view=cards&cardColumns=7&cardSort=name&cardGroup=ability');
-  assert.equal(deckDetailQueryString({ view: 'cards' }), 'view=cards');
-  assert.equal(deckDetailQueryString({ cardGroup: 'none', cardSort: 'name', cardSearch: 'Forest', view: 'cards' }), 'cardSearch=Forest&view=cards&cardSort=name&cardGroup=none');
+  }), 'cardSearch=Llanowar+Elves&role=sideboard&cardType=Creature&cardColumns=7&cardSort=name&cardGroup=ability');
+  assert.equal(deckDetailQueryString({ view: 'cards' }), '');
+  assert.equal(deckDetailQueryString({ view: 'list', cardGroup: 'tags' }), 'view=list&cardGroup=tags');
+  assert.equal(deckDetailQueryString({ cardGroup: 'none', cardSort: 'name', cardSearch: 'Forest', view: 'cards' }), 'cardSearch=Forest&cardSort=name&cardGroup=none');
   assert.equal(deckDetailQueryString({ cardColumns: '5', cardSort: 'mana', cardGroup: 'type' }), '');
   assert.equal(deckDetailQueryString({ cardColumns: '9', cardSort: 'anders', cardGroup: 'anders' }), '');
 });
@@ -227,6 +315,108 @@ test('typegroepering behoudt de vaste typevolgorde en sorteert binnen iedere gro
   const groups = groupDeckCards(input, { groupBy: 'type', sortBy: 'name' });
   assert.deepEqual(groups.map((group) => group.value), ['Creature', 'Land', 'Instant', 'Overig']);
   assert.deepEqual(input.map((item) => item.id), [123, 124, 122, 121]);
+});
+
+test('functionele tags plaatsen een kaart in elke eigen taggroep zonder dubbele labels of afgeleide abilities', () => {
+  const cards = [
+    deckCard({ deckCardId: 201, cardId: 201, name: 'Zeta', cardTypes: ['Creature'], typeLine: 'Creature', manaValue: 1, tags: [' Ramp ', 'Draw', 'ramp', '', '  '] }),
+    deckCard({ deckCardId: 202, cardId: 202, name: 'Alpha', cardTypes: ['Instant'], typeLine: 'Instant', manaValue: 4, tags: ['draw', 'Protection'] }),
+    deckCard({ deckCardId: 203, cardId: 203, name: 'Geen handmatige tag', cardTypes: ['Creature'], typeLine: 'Creature', keywords: ['Flying'], insights: { manaProduction: { entries: [{}] } } })
+  ];
+  const original = structuredClone(cards);
+  const groups = groupDeckCards(cards, { groupBy: 'tags', sortBy: 'mana' });
+  assert.deepEqual(groups.map((group) => group.label), ['Draw', 'Protection', 'Ramp', 'Geen functionele tags']);
+  assert.deepEqual(groups.map((group) => group.items.map((item) => item.id)), [[201, 202], [202], [201], [203]]);
+  assert.deepEqual(groupDeckCards(cards, { groupBy: 'tags', sortBy: 'name' })[0].items.map((item) => item.id), [202, 201]);
+  assert.deepEqual(groupDeckCards([], { groupBy: 'tags' }), []);
+  assert.deepEqual(cards, original);
+
+  const namedFallback = deckCard({ deckCardId: 204, cardId: 204, name: 'Eigen label', cardTypes: ['Instant'], typeLine: 'Instant', tags: ['Geen functionele tags'] });
+  const fallbackGroups = groupDeckCards([cards[2], namedFallback], { groupBy: 'tags' });
+  assert.equal(fallbackGroups.length, 2, 'an actual tag with the fallback label stays distinct from untagged cards');
+  assert.deepEqual(fallbackGroups.map((group) => group.items.map((item) => item.id)), [[204], [203]]);
+});
+
+test('deckpagina opent standaard in kaarten en behoudt expliciete lijstweergave bij filters, sorteren en herladen', async (t) => {
+  const cards = [
+    deckCard({ deckCardId: 211, cardId: 211, name: 'Alpha', cardTypes: ['Creature'], typeLine: 'Creature', tags: ['Ramp', 'Draw'], quantity: 2 }),
+    deckCard({ deckCardId: 212, cardId: 212, name: 'Beta', cardTypes: ['Instant'], typeLine: 'Instant' })
+  ];
+  const ui = await mountDeck(t, cards, 'cardGroup=tags');
+  let document = ui.document;
+  assert.equal(document.querySelector('#deck-card-list').hidden, true);
+  assert.equal(document.querySelector('#deck-card-visual-container').hidden, false);
+  assert.equal(document.querySelector('#deck-cards-per-row-control').hidden, false);
+  assert.equal(document.querySelector('[data-deck-view="cards"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(document.querySelector('#deck-card-group').value, 'tags');
+  assert.equal(document.querySelector('#deck-card-group').options.find((option) => option.value === 'tags').textContent, 'Functionele tags');
+  assert.equal(document.querySelector('#deck-filter-summary').textContent, '3 van 3 kaarten zichtbaar');
+
+  document.querySelector('[data-deck-view="list"]').click();
+  assert.equal(ui.query().get('view'), 'list');
+  assert.equal(document.querySelector('#deck-card-list').hidden, false);
+  assert.equal(document.querySelector('#deck-cards-per-row-control').hidden, true);
+  const search = document.querySelector('#deck-card-search');
+  search.value = 'Alpha';
+  search.dispatch('input');
+  assert.equal(document.querySelector('#deck-filter-summary').textContent, '2 van 3 kaarten zichtbaar');
+  for (const viewId of ['#deck-card-list', '#deck-card-visual']) {
+    const groups = document.querySelector(viewId).querySelectorAll('[data-deck-card-group]');
+    assert.deepEqual(groups.filter((group) => !group.hidden).map((group) => group.querySelector('[data-deck-group-count]').textContent), ['2', '2']);
+    assert.equal(groups.at(-1).hidden, true);
+  }
+  document.querySelector('#deck-card-sort').value = 'name';
+  document.querySelector('#deck-card-sort').dispatch('change');
+  assert.equal(ui.refreshes(), 1);
+  assert.equal(ui.query().get('view'), 'list');
+  assert.equal(ui.query().get('cardGroup'), 'tags');
+  assert.equal(ui.query().get('cardSort'), 'name');
+  assert.equal(ui.query().get('cardSearch'), 'Alpha');
+  document = await ui.render();
+  assert.equal(document.querySelector('#deck-card-list').hidden, false);
+  assert.equal(document.querySelector('#deck-filter-summary').textContent, '2 van 3 kaarten zichtbaar');
+  document.querySelector('[data-deck-view="cards"]').click();
+  assert.equal(ui.query().has('view'), false);
+  assert.equal(ui.query().get('cardGroup'), 'tags');
+  document = await ui.render();
+  assert.equal(document.querySelector('#deck-card-visual-container').hidden, false);
+  assert.equal(document.querySelector('#deck-card-list').hidden, true);
+  assert.ok(ui.requests.every((request) => request.method === 'GET'));
+});
+
+test('taggroepen tellen en bedienen alleen hun eigen basic-landprintings, ook bij overlappende groepen', async (t) => {
+  const forest = (id, quantity, tags, role = 'main') => deckCard({ deckCardId: id, cardId: id, name: 'Forest', cardTypes: ['Land'], supertypes: ['Basic'], typeLine: 'Basic Land — Forest', manaValue: 0, quantity, tags, role });
+  const cards = [forest(221, 2, ['Ramp', 'Draw']), forest(222, 3, ['Ramp']), forest(223, 4, ['Draw']), forest(224, 5, []), forest(225, 1, ['Ramp'], 'sideboard')];
+  const original = structuredClone(cards);
+  const ui = await mountDeck(t, cards, 'cardGroup=tags&view=list');
+  const document = ui.document;
+  assert.equal(document.querySelector('#deck-filter-summary').textContent, '15 van 15 kaarten zichtbaar');
+  for (const viewId of ['#deck-card-list', '#deck-card-visual']) {
+    const groups = document.querySelector(viewId).querySelectorAll('[data-deck-card-group]');
+    assert.deepEqual(groups.map((group) => group.querySelector('h3').textContent), ['Draw', 'Ramp', 'Geen functionele tags']);
+    assert.deepEqual(groups.map((group) => group.querySelector('[data-deck-group-count]').textContent), ['6', '6', '5']);
+    assert.deepEqual(groups.map((group) => group.querySelectorAll('[data-deck-filter-card]').map((row) => row.dataset.quantity)), [['6'], ['5', '1'], ['5']]);
+  }
+  const ramp = document.querySelector('#deck-card-list').querySelector('[data-deck-tag-group="Ramp"]');
+  ramp.querySelector('.open-deck-card-actions').click();
+  const actions = document.querySelector('dialog');
+  const printings = actions.querySelector('[data-deck-card-action="printings"]');
+  assert.equal(printings.disabled, false, 'printing inspection remains available in read-only mode');
+  printings.click();
+  const details = document.querySelector('dialog');
+  applyWriteAvailability(details);
+  assert.deepEqual(details.querySelectorAll('.edit-basic-land-printing').map((button) => button.dataset.id), ['221', '222']);
+  assert.ok(details.querySelectorAll('[data-write-action]').every((button) => button.disabled));
+  assert.equal(details.querySelector('h2').textContent, '5× Forest');
+  details.close();
+
+  document.querySelector('#deck-tabs').querySelector('[data-filter="sideboard"]').click();
+  assert.equal(document.querySelector('#deck-filter-summary').textContent, '1 van 15 kaarten zichtbaar');
+  assert.equal(ramp.querySelector('[data-deck-group-count]').textContent, '1');
+  assert.equal(ui.query().get('role'), 'sideboard');
+  assert.equal(ui.query().get('view'), 'list');
+  assert.deepEqual(cards, original);
+  assert.ok(ui.requests.every((request) => request.method === 'GET'));
 });
 
 test('zonder groepering sorteren kaarten over alle types en abilities heen zonder de invoer te wijzigen', () => {
@@ -411,7 +601,6 @@ test('deckfilters doorzoeken geneste lijstgroepen en werken groepsaantallen in b
   assert.match(source, /querySelectorAll\('#deck-card-list \[data-deck-filter-card\]'\)/);
   assert.doesNotMatch(source, /querySelectorAll\('#deck-card-list > \[data-deck-filter-card\]'\)/);
   assert.match(source, /querySelectorAll\('#deck-card-list \[data-deck-card-group\], #deck-card-visual \[data-deck-card-group\]'\)/);
-  assert.match(source, /visible \+= Number\(row\.dataset\.quantity \|\| 0\)/);
 });
 
 test('kaartacties verschillen correct voor Wanted en gegroepeerde basic lands', () => {

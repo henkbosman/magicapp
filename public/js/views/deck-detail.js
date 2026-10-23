@@ -32,8 +32,9 @@ const CARD_TYPE_GROUP_LABELS = {
 };
 const DECK_VISUAL_COLUMN_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 const DECK_CARD_SORT_OPTIONS = ['mana', 'name'];
-const DECK_CARD_GROUP_OPTIONS = ['type', 'ability', 'none'];
+const DECK_CARD_GROUP_OPTIONS = ['type', 'ability', 'tags', 'none'];
 const NO_ABILITY_GROUP = 'Geen ability';
+const NO_FUNCTIONAL_TAG_GROUP = 'Geen functionele tags';
 const DECK_CARD_COLLATOR = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
 
 const DECK_CARD_ACTION_ICONS = {
@@ -64,7 +65,7 @@ export function deckDetailQueryString({
   cardSearch = '',
   role = 'all',
   cardType = '',
-  view = 'list',
+  view = 'cards',
   cardColumns = '5',
   cardSort = 'mana',
   cardGroup = 'type'
@@ -77,7 +78,7 @@ export function deckDetailQueryString({
   if (search) params.set('cardSearch', search);
   if (role !== 'all') params.set('role', role);
   if (cardType) params.set('cardType', cardType);
-  if (view === 'cards') params.set('view', 'cards');
+  if (view === 'list') params.set('view', 'list');
   if (columns !== '5') params.set('cardColumns', columns);
   if (sort !== 'mana') params.set('cardSort', sort);
   if (group !== 'type') params.set('cardGroup', group);
@@ -95,7 +96,7 @@ function deckCardSortOptions(current) {
 }
 
 function deckCardGroupOptions(current) {
-  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option><option value="none" ${current === 'none' ? 'selected' : ''}>Geen</option>`;
+  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option><option value="tags" ${current === 'tags' ? 'selected' : ''}>Functionele tags</option><option value="none" ${current === 'none' ? 'selected' : ''}>Geen</option>`;
 }
 
 
@@ -593,7 +594,8 @@ function deckCardSearchText(item) {
 }
 
 function deckCardFilterAttributes(item) {
-  return `data-deck-filter-card data-display-id="${item.id}" data-role="${escapeHtml(item.role)}" data-types="${escapeHtml((item.card.cardTypes || []).join('|'))}" data-search="${escapeHtml(deckCardSearchText(item))}" data-quantity="${item.quantity}"`;
+  const memberIds = (item.displayMembers || [item]).map((member) => member.id).join(',');
+  return `data-deck-filter-card data-display-id="${item.id}" data-display-key="${escapeHtml(item.displayKey)}" data-deck-member-ids="${escapeHtml(memberIds)}" data-role="${escapeHtml(item.role)}" data-types="${escapeHtml((item.card.cardTypes || []).join('|'))}" data-search="${escapeHtml(deckCardSearchText(item))}" data-quantity="${item.quantity}"`;
 }
 
 export function primaryDeckCardType(card) {
@@ -685,6 +687,38 @@ export function groupDeckCards(items = [], { groupBy = 'type', sortBy = 'mana' }
     }] : [];
   }
 
+  if (normalizedGroup === 'tags') {
+    const groupsByTag = new Map();
+    // Tag membership belongs to individual deck rows. Expand combined basics
+    // before grouping so an untagged printing cannot inherit another's tags.
+    const members = uniqueById(items.flatMap((item) => item.displayMembers || [item]));
+    for (const item of members) {
+      const tags = new Map();
+      for (const rawTag of Array.isArray(item.tags) ? item.tags : []) {
+        const tag = String(rawTag || '').trim();
+        if (tag && !tags.has(tag.toLocaleLowerCase('nl'))) tags.set(tag.toLocaleLowerCase('nl'), tag);
+      }
+      const memberships = tags.size ? [...tags].map(([value, label]) => ({
+        key: `tags:value:${value}`, label, noTags: false
+      })) : [{ key: 'tags:none', label: NO_FUNCTIONAL_TAG_GROUP, noTags: true }];
+      for (const { key, label, noTags } of memberships) {
+        if (!groupsByTag.has(key)) groupsByTag.set(key, {
+          key, kind: 'tags', value: label, label, noTags, items: []
+        });
+        groupsByTag.get(key).items.push(item);
+      }
+    }
+    return [...groupsByTag.values()]
+      .sort((left, right) => left.noTags !== right.noTags
+        ? (left.noTags ? 1 : -1)
+        : DECK_CARD_COLLATOR.compare(left.label, right.label))
+      .map((group) => ({
+        ...group,
+        items: groupDeckCardsForDisplay(group.items)
+          .sort((left, right) => compareDeckCards(left, right, normalizedSort))
+      }));
+  }
+
   if (normalizedGroup === 'ability') {
     const groupsByAbility = new Map();
     for (const item of items) {
@@ -736,7 +770,8 @@ function deckVisualCardHtml(item) {
 function deckGroupAttributes(group) {
   const specificAttribute = group.kind === 'type'
     ? ` data-deck-type-group="${escapeHtml(group.value)}"`
-    : group.kind === 'ability' ? ` data-deck-ability-group="${escapeHtml(group.value)}"` : '';
+    : group.kind === 'ability' ? ` data-deck-ability-group="${escapeHtml(group.value)}"`
+      : group.kind === 'tags' ? ` data-deck-tag-group="${escapeHtml(group.value)}"` : '';
   return `data-deck-card-group data-deck-group-key="${escapeHtml(group.key)}" data-deck-group-kind="${group.kind}"${specificAttribute}`;
 }
 
@@ -800,7 +835,7 @@ export async function renderDeckDetail(context) {
   const requestedRole = context.query.get('role') || 'all';
   const initialRole = requestedRole === 'all' || Object.hasOwn(ROLE_LABELS, requestedRole) ? requestedRole : 'all';
   const initialType = context.query.get('cardType') || '';
-  const initialView = context.query.get('view') === 'cards' ? 'cards' : 'list';
+  const initialView = context.query.get('view') === 'list' ? 'list' : 'cards';
   const initialColumns = normalizeDeckVisualColumns(context.query.get('cardColumns'));
   const initialSort = normalizeDeckCardSort(context.query.get('cardSort'));
   const initialGroup = normalizeDeckCardGroup(context.query.get('cardGroup'));
@@ -813,9 +848,14 @@ export async function renderDeckDetail(context) {
   const groupsById = new Map();
   cards.flatMap((item) => item.relations || []).forEach((group) => groupsById.set(group.id, group));
   const displayCards = groupDeckCardsForDisplay(cards);
-  const displayGroups = groupDeckCards(displayCards, { groupBy: initialGroup, sortBy: initialSort });
-  const displayCardByLeadId = new Map(displayCards.map((item) => [item.id, item]));
-  const displayCardByCardId = new Map(displayCards.map((item) => [Number(item.card.id), item]));
+  const displayGroups = groupDeckCards(displayCards, { groupBy: initialGroup, sortBy: initialSort })
+    .map((group, groupIndex) => ({
+      ...group,
+      items: group.items.map((item, itemIndex) => ({ ...item, displayKey: `${groupIndex}:${itemIndex}` }))
+    }));
+  const displayCardByKey = new Map(displayGroups.flatMap((group) => group.items)
+    .map((item) => [item.displayKey, item]));
+  const displayCardForElement = (element) => displayCardByKey.get(element.closest('[data-display-key]')?.dataset.displayKey);
   const deckCardById = new Map(cards.map((item) => [Number(item.id), item]));
   const totalCardCount = deckCardQuantity(cards);
   const deckCardTypes = sortCardTypes(new Set(cards.flatMap((item) => item.card.cardTypes || [])));
@@ -899,7 +939,7 @@ export async function renderDeckDetail(context) {
       document.getElementById('empty-add-card')?.addEventListener('click', addCard);
 
       document.querySelectorAll('[data-card-preview-id]').forEach((trigger) => trigger.addEventListener('click', () => {
-        const item = displayCardByCardId.get(Number(trigger.dataset.cardPreviewId));
+        const item = displayCardForElement(trigger);
         if (item) openCardPreview(item.card);
       }));
 
@@ -968,7 +1008,7 @@ export async function renderDeckDetail(context) {
       };
 
       document.querySelectorAll('.open-deck-card-actions').forEach((button) => button.addEventListener('click', () => {
-        const item = displayCardByLeadId.get(Number(button.dataset.displayId));
+        const item = displayCardForElement(button);
         if (item) openDeckCardActionsDialog(item);
       }));
 
@@ -1070,7 +1110,7 @@ export async function renderDeckDetail(context) {
 
       document.querySelectorAll('.deck-visual-card-trigger').forEach((trigger) => {
         const openActions = (event) => {
-          const item = displayCardByLeadId.get(Number(trigger.closest('[data-display-id]')?.dataset.displayId));
+          const item = displayCardForElement(trigger);
           if (!item) return;
           event.preventDefault();
           event.stopPropagation();
@@ -1124,11 +1164,17 @@ export async function renderDeckDetail(context) {
       const applyDeckFilters = () => {
         const query = String(deckSearch?.value || '').trim().toLocaleLowerCase('nl');
         const selectedCardType = String(deckType?.value || '');
-        let visible = 0;
+        const visibleDeckCardIds = new Set();
         document.querySelectorAll('#deck-card-list [data-deck-filter-card]').forEach((row) => {
           row.hidden = !matchesDeckFilters(row, query, selectedCardType);
-          if (!row.hidden) visible += Number(row.dataset.quantity || 0);
+          if (!row.hidden) {
+            for (const id of String(row.dataset.deckMemberIds || '').split(',')) {
+              if (id) visibleDeckCardIds.add(Number(id));
+            }
+          }
         });
+        const visible = [...visibleDeckCardIds]
+          .reduce((total, id) => total + Number(deckCardById.get(id)?.quantity || 0), 0);
         document.querySelectorAll('#deck-card-visual [data-deck-filter-card]').forEach((card) => {
           card.hidden = !matchesDeckFilters(card, query, selectedCardType);
         });

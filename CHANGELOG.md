@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.16.0 - 2026-10-23
+
+### Deckgroepering en standaardweergave
+
+- **Groeperen** biedt nu **Functionele tags** in zowel lijst- als kaartweergave. De bestaande handmatige tags bij een deckkaart bepalen de groepen.
+- Kaarten met meerdere tags verschijnen in iedere passende groep. Tags worden getrimd en hoofdletterongevoelig ontdubbeld. De groepen staan alfabetisch, met **Geen functionele tags** als laatste; de gekozen sortering geldt binnen iedere groep.
+- De algemene teller telt kaarten eenmalig. Basic lands worden per tag en rol samengevoegd, zodat aantallen en acties bij de juiste printings blijven horen.
+- Decks openen standaard in **Kaarten**. Een expliciete keuze voor **Lijst** blijft behouden bij filteren, groeperen, sorteren en terugnavigeren.
+- Geen wijzigingen aan database, API-endpoints of opgeslagen collectie- en deckgegevens.
+
 ## 2.15.0 - 2026-10-22
 
 ### Ontdekken met eigen kaarten
