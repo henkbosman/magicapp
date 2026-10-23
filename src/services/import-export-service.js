@@ -52,9 +52,10 @@ export function parseDeckList(text) {
     }
     const checkedQuantity = parseCollectionQuantity(line);
     if (checkedQuantity.error) throw new HttpError(400, `Regel ${index + 1}: ${checkedQuantity.error}`);
-    const match = line.match(/^(\d+)\s*x?\s+(.+)$/i);
-    const quantity = match ? Number.parseInt(match[1], 10) : 1;
-    let remainder = (match ? match[2] : line).trim();
+    // Use the same parser for validation and interpretation, including compact
+    // quantities such as `2xSol Ring`.
+    const quantity = checkedQuantity.quantity;
+    let remainder = checkedQuantity.remainder.trim();
     remainder = remainder.replace(/\s+\*F\*\s*$/i, '').trim();
     const printing = remainder.match(/^(.*?)\s+\(([A-Za-z0-9]+)\)\s+([^\s]+)(?:\s+.*)?$/);
     let name = remainder;
@@ -65,7 +66,7 @@ export function parseDeckList(text) {
       set = printing[2].toLowerCase();
       collectorNumber = printing[3];
     }
-    if (name) rows.push({ quantity, name, set, collectorNumber, role });
+    if (name) rows.push({ line: index + 1, rawLine, quantity, name, set, collectorNumber, role });
   }
   return rows;
 }
@@ -568,18 +569,19 @@ export async function importDeckList(deckId, text) {
 
   const imported = [];
   const failed = [];
+  let importedQuantity = 0;
   for (const row of rows) {
     const key = row.set && row.collectorNumber
       ? `${row.set}|${row.collectorNumber}`
       : `${normalizeSearchText(row.name)}|${row.set || ''}`;
     const card = cardMap.get(key) || cardMap.get(`${normalizeSearchText(row.name)}|`);
     if (!card) {
-      failed.push({ name: row.name, reason: 'Niet gevonden bij Scryfall' });
+      failed.push({ ...row, reason: 'Niet gevonden bij Scryfall' });
       continue;
     }
     if (row.set && row.collectorNumber && !cardMatchesRequestedName(card, row.name)) {
       failed.push({
-        name: row.name,
+        ...row,
         reason: `${row.set.toUpperCase()} #${row.collectorNumber} hoort bij “${card.name}”, niet bij “${row.name}”.`
       });
       continue;
@@ -592,11 +594,22 @@ export async function importDeckList(deckId, text) {
         note: '',
         tags: []
       }));
+      // Saved deck rows may already contain copies from earlier imports. Count
+      // this input's successful quantities, respecting singleton deck roles.
+      importedQuantity += ['commander', 'partner', 'companion'].includes(row.role) ? 1 : row.quantity;
     } catch (error) {
-      failed.push({ name: row.name, reason: error.message });
+      failed.push({ ...row, reason: error.message });
     }
   }
-  return { importedCount: imported.length, imported, failed, notFound: ensured.notFound };
+  return {
+    importedCount: imported.length,
+    importedQuantity,
+    totalRows: rows.length,
+    failedCount: failed.length,
+    imported,
+    failed,
+    notFound: ensured.notFound
+  };
 }
 
 

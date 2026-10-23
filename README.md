@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.16.0
+# Magic Collection Manager 2.16.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -31,6 +31,8 @@ Versie **2.14.1** neemt in DCK ook de gekozen set en het collectornummer op, bij
 Versie **2.15.0** voegt **In bezit** toe aan Kaarten ontdekken en verdeelt basic lands bij DCK-export willekeurig over eigen printings van dezelfde kaart.
 
 Versie **2.16.0** laat decks standaard openen in **Kaarten** en voegt **Functionele tags** toe aan de groepering in beide deckweergaven.
+
+Versie **2.16.1** toont na deckimport een blijvend resultaatvenster met de geïmporteerde aantallen en eventuele overgeslagen regels met foutreden. De kaartweergave toont alleen een aantal bij meerdere exemplaren; de lijstweergave laat de labels **Missende kaarten** en **Alle decks** weg.
 
 ## Belangrijkste mogelijkheden
 
@@ -284,7 +286,7 @@ Een deck opent standaard in **Kaarten**. Met **Lijst** en **Kaarten** kan worden
 
 In de lijst opent de compacte knop **Acties** één menu met de beschikbare acties **Naar Wanted**, **Bewerken**, **Kenmerken**, **Combo's/synergieën** en **Verwijderen**. Bij samengevoegde basic lands worden alleen acties aangeboden die veilig op de groep kunnen worden uitgevoerd; via het printingoverzicht blijven de afzonderlijke printings beheerbaar. De kaartafbeelding is in deze lijst 92 pixels breed en opent de grote preview; de kaartnaam zelf is gewone tekst. Binnen `.card-list-content` krijgt de naam flexibel de resterende ruimte en staan de manakosten rechts uitgelijnd, zodat lange namen minder snel over twee regels lopen terwijl de mana per rij netjes blijft staan. Daarna staat de kaarttekst met gerenderde symbolen tussen de kaartsamenvatting en **Acties**. Kaarttekst en inline symbolen zijn duidelijk leesbaar; generieke, numerieke, gekleurde, kleurloze en tapsymbolen gebruiken dezelfde verticale basislijn. Alleen de exacte abilitynaam of het herkende keyword wordt gemarkeerd; de overige tekst blijft normaal weergegeven.
 
-In de kaartweergave staan geen zichtbare ellipsis- of actieknoppen op de kaarten. De beschikbare kaartacties blijven bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`; een normale klik opent eerst de grote preview. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Commander-thumbnails zijn daar verdubbeld van 52 × 73 naar 104 × 146 pixels. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. De optie om ontbrekende exemplaren ook aan Wanted toe te voegen staat standaard uit. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels.
+In de kaartweergave staat een aantalbadge alleen bij meer dan één exemplaar, bijvoorbeeld **2×**; **1×** wordt niet getoond. In de lijstweergave zijn de badges **Missende kaarten** en **Alle decks** verborgen. De overige bezits-, tekort- en Wanted-aanduidingen blijven beschikbaar. In de kaartweergave staan geen zichtbare ellipsis- of actieknoppen op de kaarten. De beschikbare kaartacties blijven bereikbaar via rechtsklikken, de ContextMenu-toets en `Shift+F10`; een normale klik opent eerst de grote preview. Het deckoverzicht toont per deck de kleuridentiteit met dezelfde manasymbolen als het collectiefilter. Commander-thumbnails zijn daar verdubbeld van 52 × 73 naar 104 × 146 pixels. Het venster voor **Kaart toevoegen** gebruikt een brede, hoge kaartkiezer zodat lokale resultaten en printings ook op grotere schermen overzichtelijk blijven. De optie om ontbrekende exemplaren ook aan Wanted toe te voegen staat standaard uit. Filters en scrollpositie blijven behouden na bewerken en na terugkeer vanaf kaartdetails of deckstatistieken. Basic lands met dezelfde kaartnaam en rol worden in de lijst samengevoegd, ook wanneer verschillende printings zijn gebruikt. De aantallen boven de lijst en in de rolfilters tellen echte kaarten in plaats van database-regels.
 
 Combo's en synergieën zijn benoemde groepen met minimaal twee kaarten en kunnen uit meer dan twee kaarten bestaan. Binnen een groep kan een volgorde worden aangegeven. De tekstexport bundelt gelijke Oracle-kaarten over verschillende printings en exporteert bijvoorbeeld één regel `24 Forest` in plaats van meerdere losse Forest-regels.
 
@@ -383,3 +385,10 @@ De applicatie bevat gerichte regressietests voor kritieke repositorylogica, de b
 ## Read-only kaart opzoeken
 
 Ook wanneer `/api/write` door de reverse proxy is geblokkeerd, blijven de globale zoekactie en de printinglijst onder **Kaart opzoeken** bruikbaar. Een printing kan worden bekeken en de kaartdetailpagina kan worden geopend. De invoervelden en knoppen waarmee collectie-, deck- of wantedgegevens worden gewijzigd, worden in read-only mode verborgen.
+
+
+### Resultaat van deckimport
+
+Na **Meer… → Importeren** verschijnt een resultaatvenster. Bij een volledig geslaagde import bevestigt het venster dat alle kaartregels zijn verwerkt. Bij een gedeeltelijke of geheel mislukte import toont het iedere overgeslagen regel met het oorspronkelijke regelnummer, de exacte invoer en de reden. De getoonde aantallen betreffen deze import; al aanwezige exemplaren worden niet nogmaals meegeteld. Commander-, partner- en companionregels volgen de bestaande limiet van één exemplaar.
+
+Naamregels, regels met een aantal zoals `2 Sol Ring`, `2x Sol Ring` en `2xSol Ring`, en printingregels zoals `1 Sol Ring (CMM) 396` worden ondersteund. Lege regels, opmerkingen en herkende sectiekoppen zijn geen overgeslagen kaartregels. Een ongeldig aantal stopt de volledige import vóórdat deckkaarten worden toegevoegd. Na een gedeeltelijke import zijn de geslaagde regels al verwerkt: corrigeer en importeer alleen de overgeslagen regels opnieuw, onder de juiste sectiekop zoals Commander of Sideboard.

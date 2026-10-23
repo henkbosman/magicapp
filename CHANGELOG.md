@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.16.1 - 2026-10-23
+
+### Deckweergave en importresultaat
+
+- In kaartweergave verschijnt de aantalbadge alleen bij meerdere exemplaren; **1×** is verborgen.
+- In lijstweergave zijn de badges **Missende kaarten** en **Alle decks** verwijderd. Overige bezits-, tekort- en Wanted-informatie blijft zichtbaar.
+- Na deckimport verschijnt een blijvend resultaatvenster met een succesbevestiging of iedere overgeslagen regel, inclusief oorspronkelijk regelnummer en foutreden.
+- Het bestaande importantwoord bevat nu ook `totalRows`, `importedQuantity`, `failedCount` en brongegevens bij `failed`. Succesvolle hoeveelheden tellen deze import, niet het opgetelde aantal van reeds aanwezige deckregels.
+- De deckparser gebruikt de gecontroleerde hoeveelheid en kaartnaam ook voor compacte invoer zoals `2xSol Ring`. Ongeldige aantallen blijven vóór iedere deckmutatie afgewezen.
+- Geen nieuwe endpointpaden of databaseschemawijzigingen.
+
 ## 2.16.0 - 2026-10-23
 
 ### Deckgroepering en standaardweergave

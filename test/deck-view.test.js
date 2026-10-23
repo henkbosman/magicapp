@@ -155,6 +155,9 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     deckCard({ deckCardId: 52, cardId: 12, name: 'Test Instant', cardTypes: ['Instant'], typeLine: 'Instant' }),
     deckCard({ deckCardId: 53, cardId: 11, name: 'Artifact Creature', cardTypes: ['Artifact', 'Creature'], typeLine: 'Artifact Creature', role: 'sideboard' })
   ];
+  cards[0].coverage.globalShortage = 4;
+  cards[1].coverage.missingFromCollection = 1;
+  cards[1].coverage.onWanted = true;
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => new Response(JSON.stringify({
     data: String(url).endsWith('/cards') ? cards : deck
@@ -184,6 +187,11 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
     assert.match(view.html, /aria-keyshortcuts="Shift\+F10"/);
     assert.match(view.html, /aria-label="Toon grotere versie van Artifact Creature, 2 exemplaren"/);
     assert.match(view.html, /class="deck-visual-card-quantity" aria-hidden="true">2&times;<\/span>/);
+    const visualCards = parseHtml(view.html).querySelector('#deck-card-visual').querySelectorAll('.deck-visual-card');
+    assert.equal(visualCards.length, 3);
+    for (const card of visualCards) {
+      assert.equal(Boolean(card.querySelector('.deck-visual-card-quantity')), Number(card.dataset.quantity) > 1);
+    }
     assert.match(view.html, /class="button secondary small open-deck-card-actions"/);
     assert.match(view.html, /aria-label="Acties voor Artifact Creature">Acties<\/button>/);
     assert.match(view.html, /class="deck-card-rules-text oracle-text">[\s\S]*?aria-label="Tappen"[\s\S]*?aria-label="Groen mana"/);
@@ -203,6 +211,12 @@ test('deckkaartweergave groepeert hoofdtypes en opent in de gekozen view', async
       query: new URLSearchParams('view=list')
     });
     assert.match(listView.html, /id="deck-cards-per-row-control"[^>]*\shidden(?:\s|>)/);
+    const listRows = parseHtml(listView.html).querySelector('#deck-card-list');
+    assert.doesNotMatch(listRows.textContent, /Missende kaarten|Alle decks/);
+    assert.match(listRows.textContent, /Totaal bezit 2/);
+    assert.match(listRows.textContent, /In bezit/);
+    assert.match(listRows.textContent, /Mist 1/);
+    assert.match(listRows.textContent, /Wanted/);
 
     const abilityView = await renderDeckDetail({
       params: { id: '7' },

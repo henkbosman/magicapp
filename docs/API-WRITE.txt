@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.16.0
+MAGIC COLLECTION MANAGER WRITE API 2.16.1
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.16.0"}
+{"status":"ok","writeAvailable":true,"version":"2.16.1"}
 
 POST /api/write/discovery-marks
 
@@ -433,7 +433,7 @@ OUTPUT JSON
 
 POST /api/write/decks/:id/import
 
-Importeert een tekstdecklijst. Ondersteunt onder meer 1 Card Name, 1 Card Name (SET) 123, SB:, Commander, Sideboard en Maybeboard.
+Importeert een tekstdecklijst. Ondersteunt onder meer 1 Card Name, 2x Card Name, 2xCard Name, 1 Card Name (SET) 123, SB:, Commander, Sideboard en Maybeboard.
 
 INPUT JSON
 
@@ -441,7 +441,15 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"data":{"importedCount":3,"imported":[],"failed":[],"notFound":[]}}
+{"data":{"totalRows":3,"importedCount":3,"importedQuantity":3,"failedCount":0,"imported":[],"failed":[],"notFound":[]}}
+
+De bestaande velden blijven beschikbaar. totalRows telt de herkende kaartregels, zonder lege regels, opmerkingen of sectiekoppen. importedCount telt succesvol verwerkte invoerregels; importedQuantity telt hun verwerkte exemplaren, zonder eerder aanwezige aantallen opnieuw mee te tellen. Commander, partner en companion tellen volgens de bestaande deckregel per regel als één exemplaar. Het is geen nettogroei van het deck: een commanderregel kan bijvoorbeeld een bestaande hoofddeckkaart promoveren. failedCount is het aantal overgeslagen kaartregels.
+
+Elk failed-item behoudt name en reason en bevat aanvullend line (oorspronkelijk 1-gebaseerd regelnummer), rawLine (exacte invoerregel), quantity, role, set en collectorNumber. Dezelfde fout op meerdere invoerregels blijft per regel gerapporteerd. Voorbeeld:
+
+{"line":6,"rawLine":"2 Onbekende kaart","name":"Onbekende kaart","quantity":2,"role":"main","set":"","collectorNumber":"","reason":"Niet gevonden bij Scryfall"}
+
+Bij gedeeltelijke import zijn de geslaagde regels al verwerkt. Importeer alleen gecorrigeerde overgeslagen regels opnieuw om dubbele aantallen te voorkomen. Een ongeldig aantal geeft HTTP 400 vóór enige deckmutatie; een mislukte Scryfall-aanvraag vóór het toevoegen geeft een foutantwoord. Niet-opgeloste kaarten en fouten bij het toevoegen van individuele regels staan in failed; ook als alle kaartregels zijn overgeslagen bevat het antwoord een resultaat met importedCount=0.
 
 POST /api/write/wanted
 

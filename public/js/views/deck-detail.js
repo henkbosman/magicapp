@@ -9,6 +9,7 @@ import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsi
 import { isBasicLand } from '../card-rules.js';
 import { openCardPreview } from '../card-preview.js';
 import { openDeckExport } from '../deck-export.js';
+import { openDeckImport } from '../deck-import.js';
 import { applyWriteAvailability } from '../write-access.js';
 
 const ROLE_LABELS = {
@@ -762,7 +763,7 @@ function deckVisualCardHtml(item) {
   return `<article class="deck-visual-card" ${deckCardFilterAttributes(item)}>
     <button type="button" class="deck-visual-card-trigger" data-card-preview-id="${item.card.id}" aria-haspopup="dialog" aria-keyshortcuts="Shift+F10" title="Klik voor een grotere versie; rechtsklik voor kaartacties" aria-label="Toon grotere versie van ${escapeHtml(item.card.name)}, ${item.quantity} exemplaren">
       ${cardImage(item.card, { className: 'deck-visual-card-image card-preview-image' })}
-      <span class="deck-visual-card-quantity" aria-hidden="true">${item.quantity}&times;</span>
+      ${Number(item.quantity) > 1 ? `<span class="deck-visual-card-quantity" aria-hidden="true">${item.quantity}&times;</span>` : ''}
     </button>
   </article>`;
 }
@@ -797,14 +798,11 @@ function deckVisualGroupsHtml(groups, columns) {
 }
 
 function deckCardHtml(item) {
-  const conflict = item.coverage.globalShortage > 0;
   const status = item.coverage.assumedAvailable
     ? '<span class="badge neutral">Basic land beschikbaar</span>'
     : item.coverage.missingFromCollection > 0
       ? `<span class="badge missing">Mist ${item.coverage.missingFromCollection}</span>`
-      : conflict
-        ? `<span class="badge warning">Missende kaarten ${item.coverage.globalShortage}</span>`
-        : '<span class="badge free">In bezit</span>';
+      : '<span class="badge free">In bezit</span>';
   const members = item.displayMembers || [item];
   const groupedPrintings = item.groupedBasicLand && members.length > 1;
   const meta = groupedPrintings
@@ -818,7 +816,7 @@ function deckCardHtml(item) {
     <div class="card-list-content">
       <div class="card-title-row deck-card-title-row"><div><span class="role-label">${escapeHtml(ROLE_LABELS[item.role] || item.role)}</span><div class="deck-card-name-mana"><span class="deck-card-name-slot"><strong>${item.quantity}× ${escapeHtml(item.card.name)}</strong></span><span class="deck-card-mana-slot">${manaCost(item.card.manaCost)}</span></div></div></div>
       <p class="card-meta">${meta}</p>
-      <div class="usage-badges compact">${status}${item.coverage.onWanted ? '<span class="badge wanted">Wanted</span>' : ''}<span class="badge neutral">Totaal bezit ${item.card.usage.owned}</span><span class="badge used">Alle decks ${item.card.usage.needed}</span></div>
+      <div class="usage-badges compact">${status}${item.coverage.onWanted ? '<span class="badge wanted">Wanted</span>' : ''}<span class="badge neutral">Totaal bezit ${item.card.usage.owned}</span></div>
       ${tagPills(item.tags)}
       ${cardInsightBadges(item.card)}
       ${relationPills(item.relations, members.map((member) => member.id))}
@@ -955,15 +953,7 @@ export async function renderDeckDetail(context) {
         }
       });
 
-      const importDeck = () => openDialog({
-        title: 'Decklijst importeren', submitLabel: 'Importeren', wide: true,
-        content: `<p>Plak een lijst in het formaat <strong>1 Card Name</strong>. Moxfield-regels zoals <strong>1 Card Name (SET) 123</strong> worden ook herkend.</p><div class="field"><label>Decklijst</label><textarea name="text" rows="14" placeholder="Commander\n1 Yedora, Grave Gardener\n\nDeck\n1 Sol Ring"></textarea></div>`,
-        onSubmit: async (data) => {
-          const result = await api(`/decks/${deck.id}/import`, { method: 'POST', body: { text: formValue(data,'text') } });
-          toast(`${result.importedCount} regels geïmporteerd${result.failed.length ? `; ${result.failed.length} mislukt` : ''}.`, result.failed.length ? 'warning' : 'success');
-          refreshDeckView(); return true;
-        }
-      });
+      const importDeck = () => openDeckImport(deck.id, { onDone: refreshDeckView });
 
       const runDeckCardAction = async (action, displayItem) => {
         if (!deckCardActionDescriptors(displayItem).some((descriptor) => descriptor.key === action)) return;

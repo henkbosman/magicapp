@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.16.0
+# Architectuur - Magic Collection Manager 2.16.1
 
 ## Overzicht
 
@@ -261,3 +261,12 @@ De deckpagina opent zonder expliciete weergavekeuze in de kaartweergave. `view=l
 `cardGroup=tags` groepeert de bestaande handmatige `tags` van deckregels, onafhankelijk van kaartkeywords en afgeleide kaartinzichten. Tags worden getrimd en hoofdletterongevoelig ontdubbeld. Kaarten met meerdere tags staan in iedere passende groep, alfabetisch op tagnaam; ontbrekende tags krijgen als laatste de groep **Geen functionele tags**. De huidige sorteerkeuze geldt binnen elke groep.
 
 Voor taggroepering worden basic lands pas binnen de taggroep per naam en rol samengevoegd. Daardoor horen getoonde aantallen en kaartacties uitsluitend bij de printings in die groep. Het algemene zichtbare aantal ontdubbelt originele deckregel-ID’s; aantallen per groep tellen de bijbehorende exemplaren. Dezelfde groepen worden gebruikt voor lijst en kaartweergave. Dit is een wijziging aan de weergave; API-endpoints en databaseschema’s blijven gelijk.
+
+
+## Zichtbare importresultaten vanaf 2.16.1
+
+`parseDeckList` bewaart het oorspronkelijke regelnummer en de ongewijzigde invoerregel. Hoeveelheid en naam worden afkomstig uit dezelfde gevalideerde parsing gebruikt; compact `2xNaam` wordt daardoor niet alsnog als volledige kaartnaam opgezocht. De bestaande controle van alle aantallen vindt plaats vóór enig toevoegen aan het deck.
+
+`importDeckList` rapporteert naast de bestaande velden het aantal kandidaatregels, succesvolle invoerhoeveelheden en mislukte regels. Fouten behouden hun bronregel en uitleg. Een eerder opgeslagen totaal op een samengevoegde deckregel wordt niet als nieuwe importhoeveelheid geteld. Commander, partner en companion blijven één exemplaar per verwerkte regel.
+
+De aparte frontendmodule `deck-import.js` beheert het importformulier en resultaatvenster. Na een ontvangen resultaat wordt de deckweergave ververst en blijft het resultaatvenster beschikbaar, inclusief alle overgeslagen regels. De interface herhaalt geen schrijfaanvraag automatisch. De labels en aantalbadges op de deckpagina wijzigen uitsluitend de weergave, niet de onderliggende aantallen. Databaseschema’s en routepaden blijven gelijk.
