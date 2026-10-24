@@ -23,7 +23,7 @@ class FormValues {
   has(name) { return this.values.some(([key]) => key === name); }
 }
 
-function mount(t, { available = true, availableDecks = decks } = {}) {
+function mount(t, { available = true, availableDecks = decks, deferTags = false } = {}) {
   const keys = ['fetch', 'document', 'window', 'FormData', 'requestAnimationFrame', 'Element',
     'HTMLButtonElement', 'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement'];
   const original = keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
@@ -66,6 +66,9 @@ function mount(t, { available = true, availableDecks = decks } = {}) {
     const request = { path, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null };
     requests.push(request);
     if (request.method === 'GET' && path === '/api/read/decks') return Promise.resolve(response(availableDecks));
+    if (request.method === 'GET' && /\/decks\/\d+\/tags$/.test(path) && !deferTags) {
+      return Promise.resolve(response([{ id: 21, name: 'Ramp', cardCount: 1 }, { id: 22, name: 'Draw', cardCount: 0 }]));
+    }
     return new Promise((resolve) => {
       request.resolve = (data) => resolve(response(data));
       request.fail = (message = 'Test failure', status = 500) => resolve(new Response(JSON.stringify({ error: { message } }), {
@@ -80,6 +83,7 @@ function mount(t, { available = true, availableDecks = decks } = {}) {
     async open(card = catalogCard, options = {}) {
       const dialog = await addCardToDeck(card, { onDone: () => {}, ...options });
       if (dialog) applyWriteAvailability(dialog); // The app's MutationObserver does this for new dialogs.
+      await flush();
       return dialog;
     },
     async submit(dialog) { dialog.querySelector('form').dispatch('submit'); await flush(); },
@@ -99,18 +103,42 @@ test('cataloguskaart opent de gewone deckdialoog en schrijft pas na bevestigen o
   assert.equal(dialog.querySelector('[name="addMissingWanted"]').checked, false);
   assert.equal(dialog.querySelector('[name="role"]').value, 'main');
   dialog.querySelector('[name="quantity"]').value = '3';
-  dialog.querySelector('[name="tags"]').value = 'Ramp, Draw, Ramp';
+  assert.equal(dialog.querySelector('[name="tags"]'), null);
+  dialog.querySelector('[data-deck-tag-id="21"]').checked = true;
+  dialog.querySelector('[data-deck-tag-id="22"]').checked = true;
   dialog.querySelector('[name="note"]').value = 'Interesting card';
   await ui.submit(dialog);
   assert.equal(ui.writes()[0].path, '/api/write/decks/2/cards');
   assert.deepEqual(ui.writes()[0].body, {
     name: catalogCard.name, expectedOracleId: catalogCard.scryfallOracleId,
-    quantity: 3, role: 'main', tags: ['Ramp', 'Draw'], note: 'Interesting card'
+    quantity: 3, role: 'main', tagIds: [21, 22], note: 'Interesting card'
   });
   await ui.respond(ui.writes()[0], { card: { id: 701, usage: { shortage: 3, wanted: 0 } } });
   assert.equal(dialog.open, false);
   assert.equal(completed, 1);
   assert.equal(ui.writes().length, 1);
+});
+
+test('deckwissel wist oude tagkeuzes en wacht op de tags van het gekozen deck', async (t) => {
+  const ui = mount(t, { deferTags: true });
+  const dialog = await ui.open();
+  const firstTags = ui.requests.find((request) => request.path === '/api/read/decks/1/tags');
+  await ui.respond(firstTags, [{ id: 11, name: 'Ramp', cardCount: 0 }]);
+  dialog.querySelector('[data-deck-tag-id="11"]').checked = true;
+  const selectedDeck = dialog.querySelector('[name="deckId"]');
+  selectedDeck.value = '2';
+  selectedDeck.dispatch('change');
+  assert.equal(dialog.querySelector('[data-deck-tag-id="11"]'), null);
+  await ui.submit(dialog);
+  assert.equal(ui.writes().length, 0, 'a pending tag load must not submit previous-deck tags');
+  const secondTags = ui.requests.find((request) => request.path === '/api/read/decks/2/tags');
+  await ui.respond(secondTags, [{ id: 21, name: 'Draw', cardCount: 0 }]);
+  dialog.querySelector('[data-deck-tag-id="21"]').checked = true;
+  await ui.submit(dialog);
+  assert.equal(ui.writes().length, 1);
+  assert.equal(ui.writes()[0].path, '/api/write/decks/2/cards');
+  assert.deepEqual(ui.writes()[0].body.tagIds, [21]);
+  await ui.respond(ui.writes()[0], { card: { id: 701 } });
 });
 
 test('bestaande collectiekaart behoudt zijn lokale printingnummer', async (t) => {

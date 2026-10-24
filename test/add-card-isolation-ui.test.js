@@ -29,7 +29,7 @@ class FormValues {
   [Symbol.iterator]() { return this.entries(); }
 }
 
-function setup(t) {
+function setup(t, { tags = [] } = {}) {
   const keys = ['fetch', 'document', 'window', 'FormData', 'requestAnimationFrame', 'Element',
     'HTMLButtonElement', 'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement'];
   const original = keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
@@ -80,6 +80,7 @@ function setup(t) {
       request.settled = true;
       resolve(new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } }));
     };
+    if (request.method === 'GET' && /\/decks\/\d+\/tags$/.test(path)) request.resolve(tags);
   });
   const respond = async (request, data) => { assert.ok(request, 'expected pending request'); request.resolve(data); await flush(); };
   const next = (suffix) => requests.find((request) => !request.settled && request.path.includes(suffix));
@@ -105,6 +106,29 @@ function setup(t) {
     async submit(form) { form.dispatch('submit'); await flush(); }
   };
 }
+
+test('combined collection/deck addition selects registered tag IDs while preserving card identity', async (t) => {
+  const ui = setup(t, { tags: [{ id: 71, name: 'Ramp', cardCount: 0 }, { id: 72, name: 'Draw', cardCount: 2 }] });
+  await ui.mount();
+  const target = card(42, 'Selected card');
+  const form = await ui.select(target);
+  form.querySelector('[name="quantity"]').value = '3';
+  form.querySelector('[name="finish"]').value = 'foil';
+  ui.get('selected-to-collection-deck').click();
+  await ui.respond(ui.next('/decks'), [{ id: 7, name: 'Test deck' }]);
+  const dialog = ui.document.querySelector('dialog');
+  assert.equal(dialog.querySelector('[name="tags"]'), null);
+  dialog.querySelector('[data-deck-tag-id="72"]').checked = true;
+  await ui.submit(dialog.querySelector('form'));
+  assert.equal(ui.writes().length, 1);
+  assert.equal(ui.writes()[0].path, '/api/write/collection/with-deck');
+  assert.equal(ui.writes()[0].body.cardId, 42);
+  assert.equal(ui.writes()[0].body.scryfallId, 'printing-42');
+  assert.equal(ui.writes()[0].body.quantity, 3);
+  assert.equal(ui.writes()[0].body.finish, 'foil');
+  assert.deepEqual(ui.writes()[0].body.tagIds, [72]);
+  assert.equal(Object.hasOwn(ui.writes()[0].body, 'tags'), false);
+});
 
 for (const action of ['collection', 'wanted', 'collection-deck']) {
   test(`a late usage response for A cannot change the ${action} target after selecting B`, async (t) => {

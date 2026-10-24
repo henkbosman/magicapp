@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config.js';
+import { migrateDeckTags } from './deck-tags-migration.js';
 
 fs.mkdirSync(config.dataDir, { recursive: true });
 fs.mkdirSync(config.imageCacheDir, { recursive: true });
@@ -24,6 +25,7 @@ function initializeSchema() {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.exec(schema);
+    migrateDeckTags(db);
     db.exec('COMMIT');
   } catch (error) {
     db.exec('ROLLBACK');

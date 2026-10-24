@@ -436,6 +436,12 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .modal { width: min(580px, calc(100vw - 24px)); max-height: calc(100vh - 30px); padding: 0; border: 0; border-radius: 18px; background: transparent; box-shadow: var(--shadow-md); }
 .modal::backdrop { background: rgba(12, 20, 15, .62); backdrop-filter: blur(3px); }
 .modal-wide { width: min(900px, calc(100vw - 24px)); }
+.modal-wide-picker { width: min(1180px, calc(100vw - 24px)); }
+.deck-tag-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 12px; }
+.deck-tag-manager-list { display: grid; gap: 10px; }
+.deck-tag-manager-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.deck-tag-manager-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.deck-tag-manager-row small { display: block; color: var(--ink-soft); }
 .modal-card { max-height: calc(100vh - 30px); display: flex; flex-direction: column; background: var(--surface); border-radius: 18px; overflow: hidden; }
 .modal-card > header, .modal-card > footer { flex: 0 0 auto; padding: 15px 18px; display: flex; align-items: center; gap: 12px; }
 .modal-card > header { justify-content: space-between; border-bottom: 1px solid var(--line); }

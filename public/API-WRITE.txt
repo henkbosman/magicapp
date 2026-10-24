@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.16.1
+MAGIC COLLECTION MANAGER WRITE API 2.17.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.16.1"}
+{"status":"ok","writeAvailable":true,"version":"2.17.0"}
 
 POST /api/write/discovery-marks
 
@@ -127,7 +127,7 @@ INPUT JSON
   "deckId": 4,
   "deckQuantity": 1,
   "role": "main",
-  "tags": ["Ramp"],
+  "tagIds": [7],
   "note": "Decknotitie"
 }
 
@@ -154,7 +154,7 @@ Met deckId:
 {
   "data": {
     "collectionItem": {"id":55,"quantity":1,"card":{"id":123,"name":"Eternal Witness"}},
-    "deckCard": {"id":81,"quantity":1,"role":"main","tags":["Ramp"],"card":{"id":123,"name":"Eternal Witness"}}
+    "deckCard": {"id":81,"quantity":1,"role":"main","tags":["Ramp"],"tagIds":[7],"card":{"id":123,"name":"Eternal Witness"}}
   }
 }
 
@@ -230,7 +230,7 @@ INPUT JSON
   "deckId": 4,
   "deckQuantity": 1,
   "role": "main",
-  "tags": ["Ramp"],
+  "tagIds": [7],
   "note": "Decknotitie"
 }
 
@@ -254,6 +254,7 @@ OUTPUT JSON
       "role": "main",
       "note": "Decknotitie",
       "tags": ["Ramp"],
+      "tagIds": [7],
       "card": {"id":123,"name":"Eternal Witness"}
     }
   }
@@ -325,7 +326,7 @@ OUTPUT JSON
 
 POST /api/write/decks/:id/duplicate
 
-Dupliceert deck, kaarten, tags en combo-/synergiegroepen. name is optioneel.
+Dupliceert deck, kaarten, tags en combo-/synergiegroepen. Ook ongebruikte tagdefinities worden gekopieerd, met nieuwe IDs voor het nieuwe deck. name is optioneel.
 
 INPUT JSON
 
@@ -335,15 +336,54 @@ OUTPUT JSON
 
 {"data":{"id":5,"name":"Yedora (kopie)","format":"commander","totalCards":100,"uniqueCards":80}}
 
+POST /api/write/decks/:id/tags
+
+Maakt een tagdefinitie in dit deck, zonder die meteen aan kaarten toe te wijzen. name is verplichte tekst van maximaal 60 tekens; omringende spaties worden verwijderd, besturingstekens geweigerd. Een reeds bestaande naam (Unicode NFC en hoofdletterongevoelig) geeft 409. Een onbekend deck geeft 404.
+
+INPUT JSON
+
+{"name":"Ramp"}
+
+OUTPUT JSON
+
+{"data":{"id":7,"name":"Ramp","cardCount":0}}
+
+PATCH /api/write/decks/:id/tags/:tagId
+
+Hernoemt de definitie en alle bijbehorende kaarttoewijzingen in dit deck binnen één transactie. Het ID blijft behouden. Een naamconflict geeft 409; een tag die niet in dit deck bestaat geeft 404. Kaarten, aantallen, notities en andere decks worden niet gewijzigd.
+
+INPUT JSON
+
+{"name":"Mana ramp"}
+
+OUTPUT JSON
+
+{"data":{"id":7,"name":"Mana ramp","cardCount":6}}
+
+DELETE /api/write/decks/:id/tags/:tagId
+
+Verwijdert de definitie en alle bijbehorende toewijzingen uitsluitend in dit deck binnen één transactie. Verwijdert geen kaartregels of fysieke exemplaren. Een onbekende of bij een ander deck horende tag geeft 404.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{"data":{"id":7,"name":"Mana ramp","deleted":true}}
+
 POST /api/write/decks/:id/cards
 
 Voegt een kaart toe aan een deck. Voeg één kaartidentificatie toe. Rollen: commander, partner, companion, main, sideboard, maybeboard.
+
+Functionele tags: geef tagIds als lijst van bestaande tag-ID’s uit GET /api/read/decks/:id/tags. Deze blijven geldig bij hernoemen. Een verwijderde of bij een ander deck horende selectie geeft 409 vóór de deckmutatie. Het oudere tags-veld met namen blijft mogelijk, maar accepteert uitsluitend bestaande definities; onbekende namen worden niet meer via deze route aangemaakt. Gebruik tagIds of tags, niet beide (anders 400). Nieuwe tags maak je via POST /api/write/decks/:id/tags. Deze validatie geldt ook voor gecombineerde collectie/decktoevoegingen en vindt daar vóór fysieke collectiewrites binnen dezelfde transactie plaats.
+
 
 Kaarten ontdekken gebruikt hetzelfde endpoint met name voor een kaart die nog geen lokaal cardId heeft. De server kiest een lokaal bekende printing of haalt die via de exacte Scryfall-naam op. Er wordt geen fysiek exemplaar aan de collectie toegevoegd. Optioneel expectedOracleId (UUID) controleert of de opgeloste printing hetzelfde Oracle-kaartconcept heeft; een afwijking geeft HTTP 409 vóór de decktoevoeging, ongeldige invoer HTTP 400. Bestaande aanroepen zonder dit veld blijven ongewijzigd.
 
 INPUT JSON
 
-{"scryfallId":"uuid","quantity":1,"role":"main","note":"","tags":["Ramp","Sacrifice"]}
+{"scryfallId":"uuid","quantity":1,"role":"main","note":"","tagIds":[7,8]}
 
 OUTPUT JSON
 
@@ -354,6 +394,7 @@ OUTPUT JSON
     "role": "main",
     "note": "",
     "tags": ["Ramp","Sacrifice"],
+    "tagIds": [7,8],
     "coverage": {},
     "card": {"id":123,"name":"Eternal Witness","usage":{},"insights":{}}
   }
@@ -361,15 +402,15 @@ OUTPUT JSON
 
 PATCH /api/write/decks/:id/cards/:deckCardId
 
-Wijzigt hoeveelheid, rol, notitie en/of tags van een deckkaart.
+Wijzigt hoeveelheid, rol, notitie en/of tags van een deckkaart. Zonder tagIds of tags blijven bestaande toewijzingen behouden. Een expliciete lege lijst verwijdert alle toewijzingen voor deze kaart; de definities blijven bestaan. Voor tagkeuze geldt dezelfde validatie als bij toevoegen.
 
 INPUT JSON
 
-{"quantity":2,"role":"main","note":"Belangrijk combo-onderdeel","tags":["Combo"]}
+{"quantity":2,"role":"main","note":"Belangrijk combo-onderdeel","tagIds":[9]}
 
 OUTPUT JSON
 
-{"data":{"id":77,"quantity":2,"role":"main","note":"Belangrijk combo-onderdeel","tags":["Combo"],"coverage":{},"card":{"id":123,"name":"Eternal Witness"}}}
+{"data":{"id":77,"quantity":2,"role":"main","note":"Belangrijk combo-onderdeel","tags":["Combo"],"tagIds":[9],"coverage":{},"card":{"id":123,"name":"Eternal Witness"}}}
 
 DELETE /api/write/decks/:id/cards/:deckCardId
 

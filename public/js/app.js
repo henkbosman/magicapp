@@ -18,6 +18,13 @@ import { renderWanted } from './views/wanted.js';
 const root = document.getElementById('app');
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 let renderSequence = 0;
+let disposeView = null;
+
+function disposeCurrentView() {
+  const dispose = disposeView;
+  disposeView = null;
+  dispose?.();
+}
 
 const routes = [
   { pattern: /^\/dashboard$/, name: 'dashboard', render: renderDashboard },
@@ -45,6 +52,7 @@ function markActive(name) {
 
 async function renderRoute() {
   const sequence = ++renderSequence;
+  disposeCurrentView();
   const location = currentLocation();
   const match = routes.map((route) => ({ route, result: location.path.match(route.pattern) })).find((entry) => entry.result);
   if (!match) {
@@ -65,8 +73,12 @@ async function renderRoute() {
     });
     if (sequence !== renderSequence) return;
     root.innerHTML = view.html;
-    await view.mount?.();
-    if (sequence !== renderSequence) return;
+    const dispose = await view.mount?.();
+    if (sequence !== renderSequence) {
+      if (typeof dispose === 'function') dispose();
+      return;
+    }
+    disposeView = typeof dispose === 'function' ? dispose : null;
     applyWriteAvailability(root);
     root.focus({ preventScroll: true });
     const restoredScroll = consumePendingScroll(window.location.hash);
@@ -79,6 +91,7 @@ async function renderRoute() {
     }
   } catch (error) {
     if (sequence !== renderSequence) return;
+    disposeCurrentView();
     root.innerHTML = `<div class="error-state"><div class="empty-icon">!</div><h1>Deze pagina kon niet worden geladen</h1><p>${escapeHtml(error.message || 'Onbekende fout')}</p><div class="page-actions"><button id="retry-view" class="button primary">Opnieuw proberen</button><a href="#/dashboard" class="button secondary">Dashboard</a></div></div>`;
     document.getElementById('retry-view')?.addEventListener('click', renderRoute);
   }

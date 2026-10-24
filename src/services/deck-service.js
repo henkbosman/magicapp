@@ -13,6 +13,8 @@ import {
   reassignDeckCardLinks
 } from './deck-link-service.js';
 import { resolveSinglePrintingCard } from './printing-catalog-service.js';
+import { copyDeckTags, resolveDeckTagSelection } from './deck-tag-service.js';
+import { deckTagKey } from '../lib/deck-tags.js';
 
 const COUNTED_ROLES = ['commander', 'partner', 'main'];
 const COLOR_IDENTITY_ORDER = ['W', 'U', 'B', 'R', 'G'];
@@ -181,6 +183,7 @@ export function addDeckCard(deckId, input) {
   const quantity = ['commander', 'partner', 'companion'].includes(input.role) ? 1 : input.quantity;
 
   return transaction(() => {
+    const tags = resolveDeckTagSelection(deckId, input, { allowCreate: input.strictTags !== true });
     synchronizeCommanderPointers(deckId, card.id, input.role);
     const singletonRole = ['commander', 'partner', 'companion'].includes(input.role);
     let existing = db.prepare('SELECT id, quantity, note FROM deck_cards WHERE deck_id = ? AND card_id = ? AND role = ?')
@@ -221,7 +224,7 @@ export function addDeckCard(deckId, input) {
       `).run(deckId, card.id, quantity, input.role, input.note);
       deckCardId = Number(result.lastInsertRowid);
     }
-    mergeTags(deckCardId, input.tags || []);
+    mergeTags(deckCardId, tags);
     return getDeckCard(deckCardId);
   });
 }
@@ -267,6 +270,8 @@ export function getDeckCards(deckId, { includeMaybeboard = true } = {}) {
   const cards = enrichCardsWithInsights(rows.map(cardRowToApi));
   const maps = usageMapsForKeys(cards.map((card) => card.cardKey));
   const tags = tagsForDeckCardIds(rows.map((row) => Number(row.deck_card_id)));
+  const tagIdsByKey = new Map(db.prepare('SELECT id, name_key FROM deck_tags WHERE deck_id = ?').all(deckId)
+    .map((row) => [row.name_key, Number(row.id)]));
   const relations = deckCardRelationMap(deckId);
 
   return rows.map((row, index) => {
@@ -286,6 +291,8 @@ export function getDeckCards(deckId, { includeMaybeboard = true } = {}) {
       role: row.deck_role,
       note: row.deck_note,
       tags: tags.get(Number(row.deck_card_id)) || [],
+      tagIds: [...new Set((tags.get(Number(row.deck_card_id)) || [])
+        .map((tag) => tagIdsByKey.get(deckTagKey(tag))).filter((id) => id !== undefined))],
       relations: relations.get(Number(row.deck_card_id)) || [],
       createdAt: row.deck_card_created_at,
       updatedAt: row.deck_card_updated_at,
@@ -317,6 +324,8 @@ export function updateDeckCard(deckId, deckCardId, input) {
   if (!existing) throw new HttpError(404, 'Kaartregel in deck niet gevonden.');
   const quantity = ['commander', 'partner', 'companion'].includes(input.role) ? 1 : input.quantity;
   return transaction(() => {
+    const tags = Object.hasOwn(input, 'tagIds') || Object.hasOwn(input, 'tags')
+      ? resolveDeckTagSelection(deckId, input, { allowCreate: input.strictTags !== true }) : null;
     synchronizeCommanderPointers(deckId, Number(existing.card_id), input.role);
     if (existing.role === 'commander' && input.role !== 'commander') {
       db.prepare('UPDATE decks SET commander_card_id = NULL WHERE id = ? AND commander_card_id = ?').run(deckId, existing.card_id);
@@ -331,7 +340,7 @@ export function updateDeckCard(deckId, deckCardId, input) {
       if (String(error.message).includes('UNIQUE')) throw new HttpError(409, 'Deze kaart staat al met die rol in het deck.');
       throw error;
     }
-    replaceTags(deckCardId, input.tags || []);
+    if (tags !== null) replaceTags(deckCardId, tags);
     return getDeckCard(deckCardId);
   });
 }
@@ -364,6 +373,7 @@ export function duplicateDeck(id, name) {
       throw error;
     }
     const newId = Number(result.lastInsertRowid);
+    copyDeckTags(id, newId);
     const cards = db.prepare('SELECT * FROM deck_cards WHERE deck_id = ? ORDER BY id').all(id);
     const insert = db.prepare('INSERT INTO deck_cards (deck_id, card_id, quantity, role, note) VALUES (?, ?, ?, ?, ?)');
     const deckCardIdMap = new Map();

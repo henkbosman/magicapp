@@ -1,5 +1,6 @@
 import { api, queryString } from './api.js';
 import { isBasicLand } from './card-rules.js';
+import { bindDeckTagPicker, deckTagPickerHtml } from './deck-tags.js';
 import {
   defaultLanguage,
   findPrintingForCard,
@@ -7,7 +8,7 @@ import {
   languageOptions,
   variantForLanguage
 } from './printing-utils.js';
-import { escapeHtml, formValue, openDialog, parseTags, refreshView, toast } from './utils.js';
+import { escapeHtml, formValue, openDialog, refreshView, toast } from './utils.js';
 
 function fallbackPrinting(card) {
   return {
@@ -124,6 +125,7 @@ export function addCardToWanted(card, { onDone = refreshView, quantity = 1, note
   return openDialog({
     title: `${card.name} op Wanted zetten`,
     submitLabel: 'Toevoegen',
+    wide: true,
     content: `<div class="form-grid">
       <div class="field"><label>Gewenst aantal</label><input name="quantity" type="number" min="1" value="${Math.max(Number(quantity || 1), 1)}" required></div>
       <div class="field"><label>Prioriteit</label><select name="priority"><option value="1">1 · Hoogst</option><option value="2">2 · Hoog</option><option value="3" selected>3 · Normaal</option><option value="4">4 · Laag</option><option value="5">5 · Laagst</option></select></div>
@@ -174,14 +176,15 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
   const basicLand = isBasicLand(card) || /^Basic\b[^—]*\bLand\b/i.test(String(card.typeLine || ''));
   let pending = false;
   let completed = false;
-  return openDialog({
+  let tagPicker;
+  const dialog = openDialog({
     title: `${card.name} aan deck toevoegen`,
     submitLabel: 'Toevoegen',
     content: `<div class="form-grid">
       <div class="field full"><label>Deck</label><select name="deckId">${decks.map((deck) => `<option value="${deck.id}" ${Number(deckId) === deck.id ? 'selected' : ''}>${escapeHtml(deck.name)}</option>`).join('')}</select></div>
       <div class="field"><label>Aantal</label><input name="quantity" type="number" min="1" value="1"></div>
       <div class="field"><label>Rol</label><select name="role"><option value="main">Main deck</option><option value="commander">Commander</option><option value="partner">Tweede commander</option><option value="companion">Companion</option><option value="sideboard">Sideboard</option><option value="maybeboard">Maybeboard</option></select></div>
-      <div class="field full"><label>Functionele tags</label><input name="tags" placeholder="Ramp, Draw, Protection"></div>
+      ${deckTagPickerHtml()}
       <div class="field full"><label>Notitie</label><textarea name="note"></textarea></div>
       ${basicLand
         ? '<p class="form-note full">Basic lands worden automatisch als beschikbaar behandeld en niet aan Wanted toegevoegd.</p>'
@@ -201,7 +204,7 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
           ...identifier,
           quantity: requestedQuantity,
           role,
-          tags: parseTags(formValue(data, 'tags')),
+          tagIds: tagPicker.readSelectedTagIds(),
           note: formValue(data, 'note')
         }});
         completed = true;
@@ -244,4 +247,7 @@ export async function addCardToDeck(card, { deckId = null, onDone = refreshView 
       }
     }
   });
+  const deckSelect = dialog.querySelector('[name="deckId"]');
+  tagPicker = bindDeckTagPicker(dialog, { deckId: Number(deckSelect.value), deckSelect });
+  return dialog;
 }

@@ -22,6 +22,8 @@ import { calculateDeckStats } from '../services/deck-stats-service.js';
 import { importDeckList } from '../services/import-export-service.js';
 import { booleanValue, oneOf, optionalString, positiveInteger, requiredString } from '../lib/validation.js';
 import { HttpError } from '../lib/http-error.js';
+import { createDeckTag, deleteDeckTag, listDeckTags, renameDeckTag } from '../services/deck-tag-service.js';
+import { getDeckRevision } from '../services/deck-revision-service.js';
 import {
   createDeckCardLink,
   deleteDeckCardLink,
@@ -44,12 +46,17 @@ function deckInput(body, current = {}) {
 }
 
 function deckCardInput(body, current = {}) {
-  const tags = body.tags ?? current.tags ?? [];
+  const tagInput = {};
+  if (Object.hasOwn(body, 'tagIds')) tagInput.tagIds = body.tagIds;
+  if (body.tags !== undefined && body.tags !== null) {
+    tagInput.tags = Array.isArray(body.tags) ? body.tags : String(body.tags).split(',').map((tag) => tag.trim());
+  }
   return {
     quantity: positiveInteger(body.quantity ?? current.quantity ?? 1, 'Aantal'),
     role: oneOf(body.role ?? current.role, ROLES, 'Rol', 'main'),
     note: optionalString(body.note ?? current.note, 5000),
-    tags: Array.isArray(tags) ? tags : String(tags).split(',').map((tag) => tag.trim())
+    ...tagInput,
+    strictTags: true
   };
 }
 
@@ -99,6 +106,29 @@ decksWriteRouter.post('/:id/duplicate', (req, res) => {
 
 decksReadRouter.get('/:id/cards', (req, res) => {
   res.json({ data: getDeckCards(positiveInteger(req.params.id, 'Deck-ID')) });
+});
+
+decksReadRouter.get('/:id/tags', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ data: listDeckTags(positiveInteger(req.params.id, 'Deck-ID')) });
+});
+
+decksWriteRouter.post('/:id/tags', (req, res) => {
+  res.status(201).json({ data: createDeckTag(positiveInteger(req.params.id, 'Deck-ID'), req.body?.name) });
+});
+
+decksWriteRouter.patch('/:id/tags/:tagId', (req, res) => {
+  res.json({ data: renameDeckTag(positiveInteger(req.params.id, 'Deck-ID'),
+    positiveInteger(req.params.tagId, 'Tag-ID'), req.body?.name) });
+});
+
+decksWriteRouter.delete('/:id/tags/:tagId', (req, res) => {
+  res.json({ data: deleteDeckTag(positiveInteger(req.params.id, 'Deck-ID'), positiveInteger(req.params.tagId, 'Tag-ID')) });
+});
+
+decksReadRouter.get('/:id/revision', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ data: getDeckRevision(positiveInteger(req.params.id, 'Deck-ID')) });
 });
 
 decksWriteRouter.post('/:id/cards', async (req, res) => {

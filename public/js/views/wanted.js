@@ -354,7 +354,7 @@ export async function renderWanted(context) {
       });
 
       const addWanted = async () => {
-        const card = await pickCard({ title: 'Kaart aan wanted-list toevoegen', resolveNameDirectly: true });
+        const card = await pickCard({ title: 'Kaart aan wanted-list toevoegen', resolveNameDirectly: true, wideResults: true });
         if (card) addCardToWanted(card, { onDone: reloadOptionsAndResults });
       };
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.17.0 - 2026-10-24
+
+### Functionele tags per deck
+
+- **Deckacties** bevat **Functionele tags beheren** voor aanmaken, hernoemen en verwijderen. Ook ongebruikte tags blijven beschikbaar.
+- Toevoegen aan een deck, gecombineerd toevoegen aan collectie en deck, en kaartbewerking gebruiken een keuze uit bestaande tags van het geselecteerde deck. Een deckwissel wist vorige tagkeuzes.
+- Stabiele `tagIds` zorgen dat hernoemde tags gekoppeld blijven. Verwijderde of bij een ander deck horende tags worden afgewezen binnen de schrijftransactie, ook bij gecombineerde collectie/decktoevoegingen.
+- Nieuwe tabel `deck_tags` in de primaire database, met automatische herhaalbare overname van bestaande tags. Toegewezen tags, aantallen en collectie blijven behouden; MTGJSON blijft ongewijzigd.
+- Hernoemen en verwijderen werken alleen binnen het gekozen deck. Een kopie van een deck neemt ook ongebruikte tagdefinities mee.
+- Nieuwe lees- en schrijfroutes voor tagbeheer. Bestaande toevoeg-/bewerkpaden accepteren `tagIds`; `tags` op naam accepteert via die routes alleen bestaande tags.
+
+### Breder zoeken en automatisch verversen
+
+- De Wanted-kaartkiezer wordt horizontaal breder (maximaal 1180 pixels); het Wanted-toevoegformulier gebruikt de brede popupstijl.
+- Deckpagina’s controleren elke vijf seconden de nieuwe read-only revisieroute. Toevoegingen en andere deckwijzigingen uit een andere browser worden automatisch zichtbaar, met behoud van filters, weergave en scrollpositie.
+- Revisies worden inhoudelijk bepaald, zodat aantallen, tags en wijzigingen binnen dezelfde seconde worden herkend. De controle pauzeert bij open popups, invoer en verborgen tabbladen en wordt opgeruimd bij navigatie.
+
 ## 2.16.1 - 2026-10-23
 
 ### Deckweergave en importresultaat

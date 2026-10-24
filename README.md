@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.16.1
+# Magic Collection Manager 2.17.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -33,6 +33,8 @@ Versie **2.15.0** voegt **In bezit** toe aan Kaarten ontdekken en verdeelt basic
 Versie **2.16.0** laat decks standaard openen in **Kaarten** en voegt **Functionele tags** toe aan de groepering in beide deckweergaven.
 
 Versie **2.16.1** toont na deckimport een blijvend resultaatvenster met de geïmporteerde aantallen en eventuele overgeslagen regels met foutreden. De kaartweergave toont alleen een aantal bij meerdere exemplaren; de lijstweergave laat de labels **Missende kaarten** en **Alle decks** weg.
+
+Versie **2.17.0** voegt per deck beheer van functionele tags toe, gebruikt bestaande tags in toevoeg- en bewerkpopups, maakt de Wanted-kaartkiezer breder en ververst geopende decks automatisch na wijzigingen vanuit een andere browser.
 
 ## Belangrijkste mogelijkheden
 
@@ -193,7 +195,7 @@ Via **Instellingen en onderhoud → MTGJSON-kaartcatalogus** kan `AtomicCards.js
 
 De download en verwerking kunnen enige tijd duren en vereisen internettoegang en voldoende vrije schijfruimte. De onderhoudspagina toont download- en verwerkingsvoortgang. Per proces kan maar één catalogusimport tegelijk actief zijn. Een serverstop breekt een lopende import af en ruimt tijdelijke bestanden op.
 
-Deze catalogus is alleen een opnieuw opbouwbare zoekbron. Zij bevat geen collectie-, deck-, wanted- of markeringsgegevens en heeft geen databasekoppeling met de primaire applicatiedatabase. De bestaande knop **Databaseback-up downloaden** maakt een consistente back-up van `magic-collection.sqlite`, inclusief je markeringen; importeer AtomicCards opnieuw om de zoekcatalogus te herstellen.
+Deze catalogus is alleen een opnieuw opbouwbare zoekbron. Zij bevat geen collectie-, deck-, wanted- of markeringsgegevens en heeft geen databasekoppeling met de primaire applicatiedatabase. De bestaande knop **Databaseback-up downloaden** maakt een consistente back-up van `magic-collection.sqlite`, inclusief je markeringen en functionele tagdefinities; importeer AtomicCards opnieuw om de zoekcatalogus te herstellen.
 
 ## Kaarten ontdekken
 
@@ -280,7 +282,7 @@ Bij het bewerken van een collectieregel die exact gelijk wordt aan een al bestaa
 
 Een deck mag kaarten bevatten die nog niet in bezit zijn. Per kaart worden bezit, ontbrekende aantallen en wanted-status berekend.
 
-De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Direct daarnaast staan keuzelijsten voor sorteren op **Mana kosten** of **Naam kaart** en groeperen op **Type**, **Ability**, **Functionele tags** of **Geen**. Met **Geen** staan alle kaarten in één doorlopende lijst of één raster, gesorteerd volgens de gekozen sortering. Standaard wordt op manakosten gesorteerd en op kaarttype gegroepeerd. Bij abilitygroepering bepaalt het primaire herkende kaartkeyword de groep. Heeft een kaart geen keyword, dan worden in vaste volgorde de al aanwezige functionele kaartinzichten voor mana produceren, land zoeken en creature zoeken gebruikt; pas daarna valt de kaart onder **Geen ability**. Elke kaart staat bij abilitygroepering in precies één groep. **Functionele tags** gebruikt de handmatige tags die je via **Acties → Bewerken** aan een deckkaart geeft, bijvoorbeeld Ramp, Draw en Protection. Een kaart met meerdere tags verschijnt in iedere passende groep. Dubbele tags en verschillen in hoofdletters leveren geen extra groep op. Taggroepen staan alfabetisch, met **Geen functionele tags** als laatste; binnen iedere groep geldt de gekozen sortering. Het totaal boven het overzicht telt een kaart eenmalig, ook als die in meerdere taggroepen staat. Basic lands worden per tag en rol samengevoegd, met alleen de aantallen en printings die bij die groep horen.
+De deckpagina ondersteunt zoeken, rolfilters en kaarttypefilters. Ook deze filters zijn standaard ingeklapt en kunnen met **Filters tonen** worden geopend. Direct daarnaast staan keuzelijsten voor sorteren op **Mana kosten** of **Naam kaart** en groeperen op **Type**, **Ability**, **Functionele tags** of **Geen**. Met **Geen** staan alle kaarten in één doorlopende lijst of één raster, gesorteerd volgens de gekozen sortering. Standaard wordt op manakosten gesorteerd en op kaarttype gegroepeerd. Bij abilitygroepering bepaalt het primaire herkende kaartkeyword de groep. Heeft een kaart geen keyword, dan worden in vaste volgorde de al aanwezige functionele kaartinzichten voor mana produceren, land zoeken en creature zoeken gebruikt; pas daarna valt de kaart onder **Geen ability**. Elke kaart staat bij abilitygroepering in precies één groep. **Functionele tags** gebruikt de handmatige tags die je beheert via **Meer… → Functionele tags beheren**, bijvoorbeeld Ramp, Draw en Protection. Via **Acties → Bewerken** wijs je bestaande tags aan een deckkaart toe. Een kaart met meerdere tags verschijnt in iedere passende groep. Dubbele tags en verschillen in hoofdletters leveren geen extra groep op. Taggroepen staan alfabetisch, met **Geen functionele tags** als laatste; binnen iedere groep geldt de gekozen sortering. Het totaal boven het overzicht telt een kaart eenmalig, ook als die in meerdere taggroepen staat. Basic lands worden per tag en rol samengevoegd, met alleen de aantallen en printings die bij die groep horen.
 
 Een deck opent standaard in **Kaarten**. Met **Lijst** en **Kaarten** kan worden gewisseld tussen de beheerlijst en een grote visuele weergave. Beide weergaven gebruiken dezelfde filters, sortering en groepering; de weergavekeuze, de gekozen sortering en groepering, het gekozen aantal kaarten per rij en de filters worden in de URL bewaard. In de kaartweergave biedt **Kaarten per rij** de expliciete keuzes 1 tot en met 8, met **5** als standaard; de eerdere keuze **Automatisch** is verwijderd. Op kleinere schermen wordt het gekozen aantal responsief begrensd en blijven kaartafbeeldingen volledig zichtbaar zonder aan de zijkanten te worden afgesneden.
 
@@ -392,3 +394,18 @@ Ook wanneer `/api/write` door de reverse proxy is geblokkeerd, blijven de global
 Na **Meer… → Importeren** verschijnt een resultaatvenster. Bij een volledig geslaagde import bevestigt het venster dat alle kaartregels zijn verwerkt. Bij een gedeeltelijke of geheel mislukte import toont het iedere overgeslagen regel met het oorspronkelijke regelnummer, de exacte invoer en de reden. De getoonde aantallen betreffen deze import; al aanwezige exemplaren worden niet nogmaals meegeteld. Commander-, partner- en companionregels volgen de bestaande limiet van één exemplaar.
 
 Naamregels, regels met een aantal zoals `2 Sol Ring`, `2x Sol Ring` en `2xSol Ring`, en printingregels zoals `1 Sol Ring (CMM) 396` worden ondersteund. Lege regels, opmerkingen en herkende sectiekoppen zijn geen overgeslagen kaartregels. Een ongeldig aantal stopt de volledige import vóórdat deckkaarten worden toegevoegd. Na een gedeeltelijke import zijn de geslaagde regels al verwerkt: corrigeer en importeer alleen de overgeslagen regels opnieuw, onder de juiste sectiekop zoals Commander of Sideboard.
+
+
+### Functionele tags beheren
+
+Open op een deck **Meer… → Functionele tags beheren** om tags aan te maken, te hernoemen of te verwijderen. Elke tag hoort bij één deck en blijft bestaan als er nog geen kaarten aan gekoppeld zijn. Hernoemen werkt alle toewijzingen binnen dat deck bij. Verwijderen haalt de tag en de toewijzingen weg; de kaarten, aantallen en tags van andere decks blijven behouden. Deckduplicatie kopieert ook ongebruikte tags.
+
+**Aan deck toevoegen**, **Collectie + Deck** en het bewerken van een deckkaart bieden alleen bestaande tags van het gekozen deck aan. Je kunt meerdere tags aanvinken of de keuze leeg laten. Na een deckwissel wordt de tagkeuze opnieuw geladen en worden de vorige selecties gewist. Een hernoemde tag behoudt zijn ID; een verwijderde tag wordt niet door een oud formulier opnieuw aangemaakt.
+
+Bij de eerste start van 2.17.0 wordt `deck_tags` automatisch aangemaakt in de primaire SQLite-database en gevuld met de bestaande toegewezen tags. De bestaande kaarttoewijzingen en collectiegegevens worden behouden. De MTGJSON-database blijft zelfstandig en ongewijzigd; herimport is niet nodig. Vervang de applicatiecode, behoud `.env` en `data/` en herstart Node.js of je systemd-service.
+
+### Wijzigingen vanuit een andere browser
+
+Een geopende deckpagina controleert elke vijf seconden op wijzigingen in dat deck via de server. Ook wijzigingen met hetzelfde kaarttotaal of binnen dezelfde seconde worden herkend. De pagina ververst met behoud van weergave, filters, sortering, groepering, kolommen en scrollpositie. Tijdens invoer, een open popup of een verborgen tabblad wordt verversen uitgesteld; na afloop hervat de controle. Dit werkt ook tussen verschillende browsers of apparaten die dezelfde applicatie gebruiken.
+
+De popup **Kaart aan wanted-list toevoegen** kan op brede schermen tot 1180 pixels breed worden, zodat meer van de filteropties leesbaar is. Op kleine schermen blijft de breedte binnen het venster.

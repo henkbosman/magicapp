@@ -192,6 +192,7 @@ async function mount(t, query = 'type=Creature', initialCards = result('Initial 
       body: options.body ? JSON.parse(options.body) : undefined
     };
     requests.push(request);
+    if (request.kind === 'tags' && /^\/api\/read\/decks\/\d+\/tags$/.test(parsed.pathname)) return Promise.resolve(response([]));
     if (initial) return Promise.resolve(response(request.kind === 'options' ? allOptions : initialCards));
     return new Promise((resolve) => {
       request.resolve = (data) => resolve(response(data));
@@ -894,11 +895,11 @@ test('Naar deck opent één popup met het filterdeck en annuleren verandert geen
   assert.equal(dialog.querySelector('[name="addMissingWanted"]').checked, false);
   assert.equal(button.disabled, true);
   button.dispatch('click');
-  assert.equal(ui.requests.length, before + 1);
+  assert.equal(ui.requests.length, before + 2, 'the opened dialog also loads the selected deck tags');
   dialog.querySelector('.close-dialog').dispatch('click');
   assert.equal(ui.document.querySelector('dialog'), null);
   assert.equal(button.disabled, false);
-  assert.equal(ui.requests.length, before + 1, 'cancelling does not refresh facets or cards');
+  assert.equal(ui.requests.length, before + 2, 'cancelling does not refresh facets or cards');
   assert.match(ui.get('discovery-results').textContent, /Initial card/);
 });
 

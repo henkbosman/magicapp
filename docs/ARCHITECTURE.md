@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.16.1
+# Architectuur - Magic Collection Manager 2.17.0
 
 ## Overzicht
 
@@ -36,7 +36,8 @@ Belangrijkste tabellen:
 - `collection_items`: fysieke exemplaren/groepen in bezit;
 - `decks`: deckmetadata;
 - `deck_cards`: gewenste kaarten per deck, onafhankelijk van bezit;
-- `deck_card_tags`: deck-specifieke functietags;
+- `deck_tags`: functionele tagdefinities met stabiele ID’s per deck;
+- `deck_card_tags`: toewijzingen van functietags aan deckkaartregels;
 - `deck_card_groups` + `deck_card_group_members`: benoemde combo-/synergiegroepen en volgorde;
 - `wanted_items`: wanted-kaarten;
 - `wanted_item_decks`: koppeling tussen wanted-items en decks;
@@ -71,6 +72,8 @@ Belangrijke services:
 - `scryfall-service.js`: externe verzoeken met rate limiting/cache;
 - `image-cache-service.js`: lokale schijfcache voor kaartafbeeldingen;
 - `deck-service.js`: deck CRUD, deckkaarten, ontbrekende kaarten en geaggregeerde tekstexport;
+- `deck-tag-service.js`: tagregister, atomaire hernoem-/verwijderacties en validatie van tagkeuzes;
+- `deck-revision-service.js`: compacte inhoudelijke revisie voor browseroverstijgende verversing;
 - `deck-stats-service.js`: centrale deterministische deckstatistieken;
 - `deck-link-service.js`: combo-/synergiegroepen;
 - `deck-printing-service.js`: deckprinting afstemmen na aankoop;
@@ -270,3 +273,16 @@ Voor taggroepering worden basic lands pas binnen de taggroep per naam en rol sam
 `importDeckList` rapporteert naast de bestaande velden het aantal kandidaatregels, succesvolle invoerhoeveelheden en mislukte regels. Fouten behouden hun bronregel en uitleg. Een eerder opgeslagen totaal op een samengevoegde deckregel wordt niet als nieuwe importhoeveelheid geteld. Commander, partner en companion blijven één exemplaar per verwerkte regel.
 
 De aparte frontendmodule `deck-import.js` beheert het importformulier en resultaatvenster. Na een ontvangen resultaat wordt de deckweergave ververst en blijft het resultaatvenster beschikbaar, inclusief alle overgeslagen regels. De interface herhaalt geen schrijfaanvraag automatisch. De labels en aantalbadges op de deckpagina wijzigen uitsluitend de weergave, niet de onderliggende aantallen. Databaseschema’s en routepaden blijven gelijk.
+
+
+## Tagregister en automatische deckverversing vanaf 2.17.0
+
+`deck_tags` bewaart per deck een stabiel ID, weergavenaam en unieke `name_key` op basis van trimmen, Unicode NFC en Nederlandse lowercasing. De starttransactie voert `migrateDeckTags` uit na het aanmaken van tabellen. Bestaande `deck_card_tags` blijven letterlijk intact; ontbrekende definities worden eenmalig per genormaliseerde naam toegevoegd. De migratie kan opnieuw draaien zonder extra definities of wijzigingen aan fysieke exemplaren. `user_version` blijft 20000.
+
+Tagbeheer verloopt via `deck-tag-service`. Hernoemen en verwijderen selecteren toewijzingen met dezelfde genormaliseerde naam en beperken iedere write tot het gekozen deck. Alle writes vormen één transactie. Duplicatie kopieert ook ongebruikte definities en krijgt eigen tag-ID’s. De API accepteert `tagIds` of geregistreerde `tags`, nooit beide; de service resolveert IDs binnen de daadwerkelijke schrijftransactie. Interne bestaande serviceaanroepen kunnen voor compatibiliteit definities registreren, terwijl route-input altijd strikte validatie gebruikt. Bij weglaten van beide velden blijven tags van een bestaande deckregel intact.
+
+`deck-tags.js` verzorgt de gedeelde tagkiezer en het beheervenster. De keuze wordt bij een deckwissel gewist. Verouderde antwoorden worden genegeerd; laden of fouten blokkeren indienen. Bewerken gebruikt stabiele IDs, met bestaande namen alleen als terugval voor oude kaartresponses. De modaliteit en schrijfblokkering blijven ook bij fouten en verversen actief.
+
+`getDeckRevision` leest deckmetadata, deckkaartregels, tags, definities en combo-/synergiegroepen in één SQL-statement en hasht de inhoud. Hiermee werkt detectie onafhankelijk van tijdstempelprecisie, kaarttotalen en het Node-proces dat de wijziging schreef. Er is geen aparte revisietabel of browseropslag nodig. Kaartprijzen en wijzigingen uitsluitend aan de collectie behoren niet tot deze deckrevisie.
+
+De deckpagina leest eerst de revisie en daarna de deckgegevens. `deck-live-refresh.js` controleert iedere vijf seconden terwijl de pagina zichtbaar en vrij van actieve invoer of popups is. Wijzigingen die tijdens een verzoek binnenkomen blijven wachten tot verversen veilig is. Fouten worden zonder extra schrijfaanvragen herprobeerd; een ontbrekend endpoint schakelt de controle voor deze render uit. `app.js` bewaart en beëindigt de cleanup uit `mount()`, ook bij verouderde asynchrone mounts. De verversing gebruikt de bestaande URL- en scrollbewaring.

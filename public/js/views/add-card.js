@@ -1,5 +1,6 @@
 import { api, queryString } from '../api.js';
 import { addCardToWanted } from '../card-actions.js';
+import { bindDeckTagPicker, deckTagPickerHtml } from '../deck-tags.js';
 import { isBasicLand } from '../card-rules.js';
 import { cachedCardImageUrl, cardImage, manaCost, pageHeader, usageBadges } from '../components.js';
 import { returnToDiscoverySource } from '../navigation-state.js';
@@ -10,7 +11,7 @@ import {
   languageOptions,
   variantForLanguage
 } from '../printing-utils.js';
-import { emptyState, escapeHtml, formValue, openDialog, parseTags, toast } from '../utils.js';
+import { emptyState, escapeHtml, formValue, openDialog, toast } from '../utils.js';
 import { applyWriteAvailability } from '../write-access.js';
 
 const ROLE_OPTIONS = [
@@ -479,14 +480,15 @@ export async function renderAddCard(context) {
           return;
         }
         let completed = false;
-        openDialog({
+        let tagPicker;
+        const dialog = openDialog({
           title: `${card.name} aan collectie en deck toevoegen`,
           submitLabel: 'Collectie + Deck',
           content: `<div class="form-grid">
             <div class="field full"><label>Deck</label><select name="deckId">${decks.map((deck) => `<option value="${deck.id}">${escapeHtml(deck.name)}</option>`).join('')}</select></div>
             <div class="field"><label>Aantal in deck</label><input name="deckQuantity" type="number" min="1" value="${Math.max(Number(collectionPayload.quantity || 1), 1)}" required></div>
             <div class="field"><label>Rol</label><select name="role">${ROLE_OPTIONS.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('')}</select></div>
-            <div class="field full"><label>Functionele tags</label><input name="tags" placeholder="Ramp, Draw, Protection"></div>
+            ${deckTagPickerHtml()}
             <div class="field full"><label>Decknotitie</label><textarea name="note"></textarea></div>
           </div>`,
           onSubmit: async (data) => {
@@ -501,7 +503,7 @@ export async function renderAddCard(context) {
                   deckId,
                   deckQuantity: Number(formValue(data, 'deckQuantity', String(collectionPayload.quantity || 1))),
                   role: formValue(data, 'role', 'main'),
-                  tags: parseTags(formValue(data, 'tags')),
+                  tagIds: tagPicker.readSelectedTagIds(),
                   note: formValue(data, 'note')
                 }
               });
@@ -528,6 +530,8 @@ export async function renderAddCard(context) {
             return true;
           }
         });
+        const deckSelect = dialog.querySelector('[name="deckId"]');
+        tagPicker = bindDeckTagPicker(dialog, { deckId: Number(deckSelect.value), deckSelect });
       };
 
       const scrollActionsIntoView = () => {

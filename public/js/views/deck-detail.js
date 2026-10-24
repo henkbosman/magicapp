@@ -3,13 +3,15 @@ import { addCardToDeck, addCardToWanted } from '../card-actions.js';
 import { pickCard } from '../card-picker.js';
 import { cardImage, cardInsightBadges, cardTextHtml, manaCost, pageHeader, tagPills } from '../components.js';
 import { openCardInsightsEditor } from '../card-insights.js';
-import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, parseTags, refreshView, toast } from '../utils.js';
+import { confirmDialog, emptyState, escapeHtml, formValue, openDialog, refreshView, toast } from '../utils.js';
 import { prepareDeckSimulatorNavigation, prepareDeckStatsNavigation, preserveCurrentScrollForNextRender } from '../navigation-state.js';
 import { bindFilterToggle, filterToggleHtml, filtersExpanded } from '../collapsible-filters.js';
 import { isBasicLand } from '../card-rules.js';
 import { openCardPreview } from '../card-preview.js';
 import { openDeckExport } from '../deck-export.js';
 import { openDeckImport } from '../deck-import.js';
+import { bindDeckTagPicker, deckTagPickerHtml, openDeckTagManager } from '../deck-tags.js';
+import { readDeckRevision, startDeckLiveRefresh } from '../deck-live-refresh.js';
 import { applyWriteAvailability } from '../write-access.js';
 
 const ROLE_LABELS = {
@@ -494,17 +496,18 @@ function deckCardActionMenuHtml(item, { contextMenu = false } = {}) {
 }
 
 function openDeckCardEditor(item, deck) {
-  return openDialog({
+  let tagPicker;
+  const dialog = openDialog({
     title: `${item.card.name} in deck`,
     submitLabel: 'Opslaan',
-    content: `<div class="form-grid"><div class="field"><label>Aantal</label><input name="quantity" type="number" min="1" value="${item.quantity}"></div><div class="field"><label>Rol</label><select name="role">${roleOptions(item.role)}</select></div><div class="field full"><label>Functionele tags</label><input name="tags" value="${escapeHtml(item.tags.join(', '))}" placeholder="Ramp, Draw, Protection"></div><div class="field full"><label>Notitie</label><textarea name="note">${escapeHtml(item.note)}</textarea></div></div>`,
+    content: `<div class="form-grid"><div class="field"><label>Aantal</label><input name="quantity" type="number" min="1" value="${item.quantity}"></div><div class="field"><label>Rol</label><select name="role">${roleOptions(item.role)}</select></div>${deckTagPickerHtml()}<div class="field full"><label>Notitie</label><textarea name="note">${escapeHtml(item.note)}</textarea></div></div>`,
     onSubmit: async (data) => {
       await api(`/decks/${deck.id}/cards/${item.id}`, {
         method: 'PATCH',
         body: {
           quantity: Number(formValue(data, 'quantity', '1')),
           role: formValue(data, 'role'),
-          tags: parseTags(formValue(data, 'tags')),
+          tagIds: tagPicker.readSelectedTagIds(),
           note: formValue(data, 'note')
         }
       });
@@ -513,6 +516,12 @@ function openDeckCardEditor(item, deck) {
       return true;
     }
   });
+  tagPicker = bindDeckTagPicker(dialog, {
+    deckId: deck.id,
+    selectedTags: item.tags || [],
+    selectedTagIds: item.tagIds
+  });
+  return dialog;
 }
 
 async function removeDeckCardItem(item, deck) {
@@ -837,6 +846,9 @@ export async function renderDeckDetail(context) {
   const initialColumns = normalizeDeckVisualColumns(context.query.get('cardColumns'));
   const initialSort = normalizeDeckCardSort(context.query.get('cardSort'));
   const initialGroup = normalizeDeckCardGroup(context.query.get('cardGroup'));
+  // Read before the deck data so a concurrent change during loading is still
+  // detected by the first poll, even if the visible response was older.
+  const initialRevision = await readDeckRevision(deckId);
   const [deck, cards] = await Promise.all([
     api(`/decks/${deckId}`),
     api(`/decks/${deckId}/cards`)
@@ -1240,6 +1252,7 @@ export async function renderDeckDetail(context) {
           content: `<div class="quick-actions deck-quick-actions">
             <button id="edit-deck-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">✎</span><div>Bewerken<small>Naam, formaat en beschrijving</small></div></button>
             <button id="import-deck-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⇧</span><div>Importeren<small>Voeg een kaartlijst toe</small></div></button>
+            <button id="deck-tags-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">◇</span><div>Functionele tags beheren<small>Aanmaken, hernoemen en verwijderen</small></div></button>
             <button id="duplicate-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⧉</span><div>Dupliceren<small>Maak een volledige kopie</small></div></button>
             <button id="delete-action" class="quick-action text-danger" data-write-action type="button"><span aria-hidden="true">×</span><div>Verwijderen<small>Deck permanent wissen</small></div></button>
           </div>`
@@ -1253,6 +1266,10 @@ export async function renderDeckDetail(context) {
         dialog.querySelector('#import-deck-action')?.addEventListener('click', () => {
           dialog.close();
           importDeck();
+        });
+        dialog.querySelector('#deck-tags-action')?.addEventListener('click', () => {
+          dialog.close();
+          openDeckTagManager(deck.id, { onChanged: refreshDeckView });
         });
 
         dialog.querySelector('#duplicate-action')?.addEventListener('click', () => {
@@ -1280,6 +1297,15 @@ export async function renderDeckDetail(context) {
           }
         });
       });
+      const stopLiveRefresh = startDeckLiveRefresh({
+        deckId: deck.id,
+        initialRevision,
+        onChange: refreshDeckView
+      });
+      return () => {
+        stopLiveRefresh();
+        closeDeckCardContextMenu();
+      };
     }
   };
 }

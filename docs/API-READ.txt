@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.16.1
+MAGIC COLLECTION MANAGER READ API 2.17.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -16,7 +16,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.16.1"}
+{"status":"ok","version":"2.17.0"}
 
 GET /api/read/card-catalog/status
 
@@ -601,9 +601,33 @@ OUTPUT JSON
   }
 }
 
+GET /api/read/decks/:id/tags
+
+Geeft de bestaande functionele tags van dit deck, inclusief nog ongebruikte tags. cardCount telt toegewezen deckkaartregels (niet het aantal fysieke exemplaren). Gesorteerd op naam. Namen zijn per deck uniek zonder onderscheid in hoofdletters en na Unicode-normalisatie.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{"data":[{"id":7,"name":"Ramp","cardCount":6},{"id":8,"name":"Sacrifice","cardCount":0}]}
+
+GET /api/read/decks/:id/revision
+
+Geeft een read-only SHA256-revisie van deckmetadata, kaartregels, tagdefinities, toewijzingen en combo-/synergiegroepen. De hash detecteert ook wijzigingen met dezelfde timestamp of hetzelfde kaarttotaal. Deze response schrijft niets en heeft Cache-Control: no-store. Een onbekend deck geeft 404. Lees een beginrevisie vóór de deckgegevens en controleer daarna op een gewijzigde waarde.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{"data":{"revision":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}}
+
 GET /api/read/decks/:id/cards
 
-Geeft alle kaartregels van een deck, inclusief maybeboard.
+Geeft alle kaartregels van een deck, inclusief maybeboard. tags behoudt de weergavenamen; tagIds bevat de stabiele IDs van de toegewezen definities in dit deck.
 
 INPUT JSON
 
@@ -619,6 +643,7 @@ OUTPUT JSON
       "role": "main",
       "note": "",
       "tags": ["Ramp"],
+      "tagIds": [7],
       "relations": [],
       "coverage": {"physicallyOwned":1,"assumedBasicLand":0,"assumedAvailable":false,"directlyOwned":1,"missingFromCollection":0,"globalShortage":0,"wantedGap":0,"sharedConflict":false,"onWanted":0},
       "card": {"id":123,"name":"Eternal Witness","usage":{},"insights":{}}
@@ -817,7 +842,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.16.1",
+    "applicationVersion": "2.17.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

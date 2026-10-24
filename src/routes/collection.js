@@ -12,6 +12,7 @@ import { ensureCard } from '../services/card-cache-service.js';
 import { booleanValue, oneOf, optionalNumber, optionalString, positiveInteger } from '../lib/validation.js';
 import { transaction } from '../db/database.js';
 import { addDeckCard } from '../services/deck-service.js';
+import { resolveDeckTagSelection } from '../services/deck-tag-service.js';
 import { HttpError } from '../lib/http-error.js';
 import {
   exportCollectionCsv,
@@ -51,13 +52,17 @@ function collectionImportInput(body) {
 const DECK_ROLES = ['commander', 'partner', 'companion', 'main', 'sideboard', 'maybeboard'];
 
 function collectionDeckInput(body) {
-  const tags = body.tags ?? [];
+  const tagInput = {};
+  if (Object.hasOwn(body, 'tagIds')) tagInput.tagIds = body.tagIds;
+  if (body.tags !== undefined && body.tags !== null) {
+    tagInput.tags = Array.isArray(body.tags) ? body.tags : String(body.tags).split(',').map((tag) => tag.trim());
+  }
   return {
     deckId: positiveInteger(body.deckId, 'Deck-ID'),
     quantity: positiveInteger(body.deckQuantity ?? body.quantity ?? 1, 'Aantal in deck'),
     role: oneOf(body.role, DECK_ROLES, 'Rol', 'main'),
     note: optionalString(body.note, 5000),
-    tags: Array.isArray(tags) ? tags : String(tags).split(',').map((tag) => tag.trim())
+    ...tagInput
   };
 }
 
@@ -76,13 +81,15 @@ collectionReadRouter.get('/', (req, res) => {
 
 function addCollectionAndDeck(card, collection, deck) {
   return transaction(() => {
+    const tags = resolveDeckTagSelection(deck.deckId, deck);
     const collectionItem = addCollectionItem({ cardId: card.id, ...collection });
     const deckCard = addDeckCard(deck.deckId, {
       cardId: card.id,
       quantity: deck.quantity,
       role: deck.role,
       note: deck.note,
-      tags: deck.tags
+      tags,
+      strictTags: true
     });
     return {
       collectionItem: getCollectionItem(collectionItem.id),
