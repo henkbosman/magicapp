@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.17.0
+# Architectuur - Magic Collection Manager 2.17.1
 
 ## Overzicht
 

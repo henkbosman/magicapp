@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.17.0
+# Magic Collection Manager 2.17.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -35,6 +35,8 @@ Versie **2.16.0** laat decks standaard openen in **Kaarten** en voegt **Function
 Versie **2.16.1** toont na deckimport een blijvend resultaatvenster met de geïmporteerde aantallen en eventuele overgeslagen regels met foutreden. De kaartweergave toont alleen een aantal bij meerdere exemplaren; de lijstweergave laat de labels **Missende kaarten** en **Alle decks** weg.
 
 Versie **2.17.0** voegt per deck beheer van functionele tags toe, gebruikt bestaande tags in toevoeg- en bewerkpopups, maakt de Wanted-kaartkiezer breder en ververst geopende decks automatisch na wijzigingen vanuit een andere browser.
+
+Versie **2.17.1** herstelt de oorspronkelijke breedte van de Wanted-popups en maakt de kaartzoekpopup hoger, met meer ruimte voor kaartsuggesties. Deze correctie verandert geen database of API.
 
 ## Belangrijkste mogelijkheden
 
@@ -408,4 +410,4 @@ Bij de eerste start van 2.17.0 wordt `deck_tags` automatisch aangemaakt in de pr
 
 Een geopende deckpagina controleert elke vijf seconden op wijzigingen in dat deck via de server. Ook wijzigingen met hetzelfde kaarttotaal of binnen dezelfde seconde worden herkend. De pagina ververst met behoud van weergave, filters, sortering, groepering, kolommen en scrollpositie. Tijdens invoer, een open popup of een verborgen tabblad wordt verversen uitgesteld; na afloop hervat de controle. Dit werkt ook tussen verschillende browsers of apparaten die dezelfde applicatie gebruiken.
 
-De popup **Kaart aan wanted-list toevoegen** kan op brede schermen tot 1180 pixels breed worden, zodat meer van de filteropties leesbaar is. Op kleine schermen blijft de breedte binnen het venster.
+De popup **Kaart aan wanted-list toevoegen** heeft weer de oorspronkelijke breedte (maximaal 900 pixels) en is hoger (maximaal 820 pixels), zodat meer kaartsuggesties tegelijk zichtbaar zijn. De lijst gebruikt de beschikbare hoogte en kan scrollen; de sluitknoppen blijven bereikbaar. De popup past binnen de schermhoogte en -breedte. Het daaropvolgende Wanted-toevoegformulier heeft weer de oorspronkelijke breedte van maximaal 580 pixels.

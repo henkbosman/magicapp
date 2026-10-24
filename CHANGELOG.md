@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.17.1 - 2026-10-24
+
+- De Wanted-kaartzoekpopup krijgt zijn oorspronkelijke breedte terug (maximaal 900 pixels) en wordt hoger (maximaal 820 pixels, begrensd door de schermhoogte).
+- Kaartsuggesties gebruiken de extra hoogte en scrollen binnen de popup; kop en sluitknoppen blijven bereikbaar.
+- Het daaropvolgende Wanted-toevoegformulier gebruikt weer de oorspronkelijke breedte (maximaal 580 pixels).
+- Geen wijzigingen aan databases, API-endpoints of opgeslagen gegevens.
+
 ## 2.17.0 - 2026-10-24
 
 ### Functionele tags per deck

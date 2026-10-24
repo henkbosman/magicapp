@@ -125,7 +125,6 @@ export function addCardToWanted(card, { onDone = refreshView, quantity = 1, note
   return openDialog({
     title: `${card.name} op Wanted zetten`,
     submitLabel: 'Toevoegen',
-    wide: true,
     content: `<div class="form-grid">
       <div class="field"><label>Gewenst aantal</label><input name="quantity" type="number" min="1" value="${Math.max(Number(quantity || 1), 1)}" required></div>
       <div class="field"><label>Prioriteit</label><select name="priority"><option value="1">1 · Hoogst</option><option value="2">2 · Hoog</option><option value="3" selected>3 · Normaal</option><option value="4">4 · Laag</option><option value="5">5 · Laagst</option></select></div>

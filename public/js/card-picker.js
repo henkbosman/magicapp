@@ -14,7 +14,7 @@ function localSuggestionHtml(card, index) {
   </button>`;
 }
 
-export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCollection = false, resolveNameDirectly = false, wideResults = false } = {}) {
+export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCollection = false, resolveNameDirectly = false, tallResults = false } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     let selectedName = '';
@@ -36,7 +36,7 @@ export function pickCard({ title = 'Kies een kaart', initialQuery = '', preferCo
         <div id="picker-results" class="printing-grid"></div>`
     });
     if (preferCollection) dialog.classList.add('modal-card-picker');
-    if (wideResults) dialog.classList.add('modal-wide-picker');
+    if (tallResults) dialog.classList.add('modal-tall-picker');
     const search = dialog.querySelector('#picker-search');
     const suggestions = dialog.querySelector('#picker-suggestions');
     const status = dialog.querySelector('#picker-status');

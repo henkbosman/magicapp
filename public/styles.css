@@ -436,7 +436,18 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
 .modal { width: min(580px, calc(100vw - 24px)); max-height: calc(100vh - 30px); padding: 0; border: 0; border-radius: 18px; background: transparent; box-shadow: var(--shadow-md); }
 .modal::backdrop { background: rgba(12, 20, 15, .62); backdrop-filter: blur(3px); }
 .modal-wide { width: min(900px, calc(100vw - 24px)); }
-.modal-wide-picker { width: min(1180px, calc(100vw - 24px)); }
+.modal-tall-picker { max-height: calc(100dvh - 30px); }
+.modal-tall-picker .modal-card {
+  height: min(820px, calc(100vh - 30px));
+  height: min(820px, calc(100dvh - 30px));
+  max-height: calc(100dvh - 30px);
+}
+.modal-tall-picker .modal-body { flex: 1 1 auto; min-height: 0; }
+.modal-tall-picker .picker-suggestion-list {
+  position: static;
+  max-height: none;
+  margin-top: 5px;
+}
 .deck-tag-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 12px; }
 .deck-tag-manager-list { display: grid; gap: 10px; }
 .deck-tag-manager-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
