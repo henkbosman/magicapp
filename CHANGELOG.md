@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.18.0 - 2026-10-24
+
+- **In bezit** activeert nu ook de gekozen commander-kleuridentiteit en andere aanvullende ontdekfilters. De frontend stuurde deze eerder niet mee zonder tekst- of kaartsoortfilter. Zoekresultaten, reactieve opties en terugkeerlinks gebruiken dezelfde voorwaarde. Alleen een kleur of deck kiezen start nog steeds geen zoekopdracht.
+- **Functionele tags beheren** toont **Aanmaken** naast het naamveld. De vaste knop **Vernieuwen** is verwijderd; wijzigingen verversen automatisch de lijst.
+- **Deckacties → Synergie** opent beheer voor aanmaken, hernoemen en verwijderen. Synergieën kunnen leeg worden aangemaakt en later meerdere kaarten bevatten.
+- Via **Acties → Combo’s/synergieën → Synergieën kiezen** kan iedere kaart aan nul, één of meer bestaande synergieën worden gekoppeld. Dit werkt ook via het contextmenu in kaartweergave.
+- **Groeperen → Synergieën** werkt in lijst- en kaartweergave. Meervoudige lidmaatschappen veranderen het decktotaal niet; basic-landprintings worden per groep correct samengevoegd.
+- Synergieën blijven bestaan met nul of één kaart, ook na kaartverwijdering, samenvoegen en deckduplicatie. Combo’s blijven minimaal twee kaarten vereisen.
+- Nieuw schrijfendpoint voor kaarttoewijzingen: `PUT /api/write/decks/:id/cards/:deckCardId/synergies`. De bestaande links-API ondersteunt lege synergieën en bewaart lidmaatschappen bij alleen hernoemen. Validatie en wijzigingen verlopen transactioneel en per deck.
+- Bestaande tabellen worden hergebruikt; geen databaseschemamigratie of wijziging aan de zelfstandige AtomicCards-catalogus.
+
 ## 2.17.1 - 2026-10-24
 
 - De Wanted-kaartzoekpopup krijgt zijn oorspronkelijke breedte terug (maximaal 900 pixels) en wordt hoger (maximaal 820 pixels, begrensd door de schermhoogte).

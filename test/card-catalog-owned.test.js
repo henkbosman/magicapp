@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { after, beforeEach, test } from 'node:test';
+import { discoverySearchParams } from '../public/js/views/card-discovery.js';
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'magic-catalog-owned-'));
 process.env.DATA_DIR = dataDir;
@@ -165,6 +166,27 @@ test('owned combines with marks and normal filters without changing selected-dec
   assert.deepEqual(counts(options({ owned: 1, marked: 1 }), 'types'), { creature: 1, instant: 1 });
   assert.equal(selected.query.owned, true);
   assert.equal(Object.hasOwn(selected.query, '_ownedCards'), false);
+});
+
+test('owned discovery UI queries apply commander colors to real catalog results and facets', () => {
+  own(1); own(2); own(4);
+  const before = databaseSnapshot();
+  for (const [colorIdentity, colorMode, expected] of [
+    ['G', 'subset', [alpha.name, delta.name]],
+    ['G', 'exact', [alpha.name]],
+    ['G', 'contains', [alpha.name]],
+    ['C', 'subset', [delta.name]],
+    ['G,U', 'subset', [alpha.name, beta.name, delta.name]]
+  ]) {
+    const input = Object.fromEntries(discoverySearchParams({ owned: true, colorIdentity, colorMode }));
+    assert.deepEqual(names(search(input)), expected, `${colorIdentity}/${colorMode}`);
+  }
+  const green = Object.fromEntries(discoverySearchParams({ owned: '1', colorIdentity: 'G', colorMode: 'subset' }));
+  const facets = options(green);
+  assert.deepEqual(counts(facets, 'types'), { artifact: 1, instant: 1 });
+  assert.deepEqual(counts(facets, 'keywords'), { flashback: 1 });
+  assert.deepEqual(counts(facets, 'colors'), { c: 1, g: 1, u: 1 }, 'color choices retain own-filter facet behavior within ownership');
+  assert.deepEqual(databaseSnapshot(), before);
 });
 
 test('owned scalar validation matches marked and handles large collections with bound identity lists', () => {

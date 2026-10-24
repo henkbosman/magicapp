@@ -216,11 +216,16 @@ export function hasPrimaryDiscoveryFilters(values = {}) {
     ? values.get(key) || '' : values[key] || '').trim().length > 0);
 }
 
+function canApplySecondaryFilters(values = {}) {
+  const owned = values instanceof URLSearchParams ? values.get('owned') : values.owned;
+  return hasPrimaryDiscoveryFilters(values) || ['1', 'true'].includes(String(owned));
+}
+
 export function discoverySearchParams(values = {}) {
   const params = discoveryRouteParams(values);
   // Preserve pending choices in the form and route, but apply them only once
-  // the user has selected a filter under “Tekst en kaartsoort”.
-  if (!hasPrimaryDiscoveryFilters(params)) {
+  // the user has selected a filter under “Tekst en kaartsoort” or “In bezit”.
+  if (!canApplySecondaryFilters(params)) {
     for (const key of SECONDARY_FILTER_FIELDS) params.delete(key);
   }
   return params;
@@ -454,7 +459,7 @@ export async function renderCardDiscovery(context) {
   });
   let result = normalizedResult(rawResult, filters.page);
   const filterCount = activeFilterCount(discoveryFiltersFromQuery(initialParams));
-  const secondaryFiltersActive = hasPrimaryDiscoveryFilters(filters);
+  const secondaryFiltersActive = canApplySecondaryFilters(filters);
   const isCompactViewport = globalThis.window?.matchMedia?.('(max-width: 900px)')?.matches === true;
   const filtersOpen = context.query.has('filterPanelOpen')
     ? context.query.get('filterPanelOpen') === '1'
@@ -513,7 +518,7 @@ export async function renderCardDiscovery(context) {
         <div class="discovery-results-column">
           <details id="discovery-secondary-filters" class="panel discovery-secondary-filters"${secondaryFiltersOpen ? ' open' : ''}${filtersOpen ? '' : ' hidden'}>
             <summary>Kleur, mana en legaliteit</summary>
-            <p id="discovery-secondary-hint" class="discovery-secondary-hint muted"${secondaryFiltersActive ? ' hidden' : ''}>Deze instellingen worden toegepast zodra je een filter bij “Tekst en kaartsoort” kiest.</p>
+            <p id="discovery-secondary-hint" class="discovery-secondary-hint muted"${secondaryFiltersActive ? ' hidden' : ''}>Deze instellingen worden toegepast zodra je een filter bij “Tekst en kaartsoort” kiest of “In bezit” aanvinkt.</p>
             <div class="discovery-secondary-filter-grid">
               ${colorIdentityFilterHtml(filters.colorIdentity, options, secondaryFiltersActive)}
               <select class="discovery-color-mode" name="colorMode" aria-label="Modus voor kleuridentiteit">
@@ -602,7 +607,7 @@ export async function renderCardDiscovery(context) {
 
       const updateColors = () => {
         const colors = new Map(optionEntries(currentOptions.colors).map((entry) => [entry.value, entry]));
-        const active = hasPrimaryDiscoveryFilters(new URLSearchParams(new FormData(form)));
+        const active = canApplySecondaryFilters(new URLSearchParams(new FormData(form)));
         for (const control of colorControls) {
           const label = COLOR_OPTIONS.find(([value]) => value === control.value)?.[1] || control.value;
           const count = colors.get(control.value)?.count || 0;
@@ -659,12 +664,12 @@ export async function renderCardDiscovery(context) {
       };
 
       const updateSecondaryState = () => {
-        secondaryHint.hidden = hasPrimaryDiscoveryFilters(routeParams());
+        secondaryHint.hidden = canApplySecondaryFilters(routeParams());
         updateColors();
       };
 
       const savePendingSecondaryChoice = (control) => {
-        if (!SECONDARY_FILTER_FIELDS.includes(control.name) || hasPrimaryDiscoveryFilters(routeParams())) return false;
+        if (!SECONDARY_FILTER_FIELDS.includes(control.name) || canApplySecondaryFilters(routeParams())) return false;
         replaceRouteQuery('/discover', routeParams());
         updateSecondaryState();
         filterToggle.updateActiveCount();

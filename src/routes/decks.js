@@ -27,8 +27,8 @@ import { getDeckRevision } from '../services/deck-revision-service.js';
 import {
   createDeckCardLink,
   deleteDeckCardLink,
-  getDeckCardLink,
   listDeckCardLinks,
+  setDeckCardSynergies,
   updateDeckCardLink
 } from '../services/deck-link-service.js';
 
@@ -57,23 +57,6 @@ function deckCardInput(body, current = {}) {
     note: optionalString(body.note ?? current.note, 5000),
     ...tagInput,
     strictTags: true
-  };
-}
-
-function deckCardLinkInput(body, current = {}) {
-  let rawIds = body.deckCardIds;
-  if (rawIds === undefined && (body.firstDeckCardId !== undefined || body.secondDeckCardId !== undefined)) {
-    rawIds = [body.firstDeckCardId, body.secondDeckCardId];
-  }
-  if (rawIds === undefined) rawIds = (current.members || []).map((member) => member.deckCardId);
-  if (!Array.isArray(rawIds)) throw new HttpError(400, 'Deckkaart-ID’s moeten als lijst worden aangeleverd.');
-  const deckCardIds = [...new Set(rawIds.map((value) => positiveInteger(value, 'Deckkaart-ID')))];
-  if (deckCardIds.length < 2) throw new HttpError(400, 'Een combo of synergie moet minimaal twee kaarten bevatten.');
-  return {
-    name: requiredString(body.name ?? current.name, 'Naam van combo of synergie', 200),
-    deckCardIds,
-    type: oneOf(body.type ?? current.type, ['synergy', 'combo'], 'Koppelingstype', 'synergy'),
-    note: optionalString(body.note ?? current.note, 2000)
   };
 }
 
@@ -149,21 +132,28 @@ decksWriteRouter.delete('/:id/cards/:deckCardId', (req, res) => {
   res.json({ data: deleteDeckCard(positiveInteger(req.params.id, 'Deck-ID'), positiveInteger(req.params.deckCardId, 'Deckkaart-ID')) });
 });
 
+decksWriteRouter.put('/:id/cards/:deckCardId/synergies', (req, res) => {
+  res.json({ data: setDeckCardSynergies(
+    positiveInteger(req.params.id, 'Deck-ID'),
+    positiveInteger(req.params.deckCardId, 'Deckkaart-ID'),
+    req.body?.synergyIds
+  ) });
+});
+
 decksReadRouter.get('/:id/links', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ data: listDeckCardLinks(positiveInteger(req.params.id, 'Deck-ID')) });
 });
 
 decksWriteRouter.post('/:id/links', (req, res) => {
   const deckId = positiveInteger(req.params.id, 'Deck-ID');
-  res.status(201).json({ data: createDeckCardLink(deckId, deckCardLinkInput(req.body || {})) });
+  res.status(201).json({ data: createDeckCardLink(deckId, req.body || {}) });
 });
 
 decksWriteRouter.patch('/:id/links/:linkId', (req, res) => {
   const deckId = positiveInteger(req.params.id, 'Deck-ID');
   const linkId = positiveInteger(req.params.linkId, 'Koppeling-ID');
-  const current = getDeckCardLink(deckId, linkId);
-  if (!current) throw new HttpError(404, 'Koppeling niet gevonden.');
-  res.json({ data: updateDeckCardLink(deckId, linkId, deckCardLinkInput(req.body || {}, current)) });
+  res.json({ data: updateDeckCardLink(deckId, linkId, req.body || {}) });
 });
 
 decksWriteRouter.delete('/:id/links/:linkId', (req, res) => {

@@ -449,6 +449,8 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
   margin-top: 5px;
 }
 .deck-tag-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 12px; }
+.deck-manager-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.deck-manager-create .field { min-width: 0; }
 .deck-tag-manager-list { display: grid; gap: 10px; }
 .deck-tag-manager-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .deck-tag-manager-row > div:first-child { min-width: 0; overflow-wrap: anywhere; }

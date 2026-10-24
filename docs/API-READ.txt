@@ -1,10 +1,10 @@
-MAGIC COLLECTION MANAGER READ API 2.17.1
+MAGIC COLLECTION MANAGER READ API 2.18.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
 Foutformaat: {"error":{"message":"...","details":null}}.
 
-De webpagina Kaarten ontdekken past sinds 2.13.2 kleur-, mana-, legaliteits- en deckparameters pas toe als Naam, Kaarttekst bevat, Ability of trigger, Keyword, Kaarttype of Subtype is ingevuld. Dit is uitsluitend frontendgedrag. De hieronder beschreven API-endpoints blijven hun afzonderlijke filters rechtstreeks accepteren.
+De webpagina Kaarten ontdekken past kleur-, mana-, legaliteits- en deckparameters toe als Naam, Kaarttekst bevat, Ability of trigger, Keyword, Kaarttype of Subtype is ingevuld, of als In bezit is aangevinkt (vanaf 2.18.0). Dit is uitsluitend frontendgedrag. De hieronder beschreven API-endpoints blijven hun afzonderlijke filters rechtstreeks accepteren.
 
 GET /api/read/health
 
@@ -16,7 +16,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.17.1"}
+{"status":"ok","version":"2.18.0"}
 
 GET /api/read/card-catalog/status
 
@@ -653,7 +653,7 @@ OUTPUT JSON
 
 GET /api/read/decks/:id/links
 
-Geeft benoemde combo- en synergiegroepen van een deck.
+Geeft benoemde combo- en synergiegroepen van een deck, inclusief synergieën zonder kaarten (memberCount=0 en members=[]). Response bevat Cache-Control: no-store. Bestaande group-IDs blijven behouden bij hernoemen.
 
 INPUT JSON
 
@@ -842,7 +842,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.17.1",
+    "applicationVersion": "2.18.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

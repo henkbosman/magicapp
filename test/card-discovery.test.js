@@ -94,8 +94,8 @@ test('elk tekst- of kaartsoortfilter activeert de bewaarde horizontale keuzes, w
   }
 });
 
-test('zelfstandige Effect-, Gemarkeerd- en In bezit-filters negeren horizontale keuzes tot een tekstfilter actief is', () => {
-  for (const query of ['marked=1', 'owned=1', 'owned=1&marked=1', 'effect=token&tokenPower=2&tokenType=Elf', 'effect=tutor&tutorTarget=land']) {
+test('zelfstandige Effect- en Gemarkeerd-filters negeren horizontale keuzes tot een tekstfilter actief is', () => {
+  for (const query of ['marked=1', 'effect=token&tokenPower=2&tokenType=Elf', 'effect=tutor&tutorTarget=land']) {
     const input = new URLSearchParams(`${query}&deckId=17&colorIdentity=G&manaMin=0&manaMax=4&legality=commander`);
     assert.equal(hasDiscoveryFilters(input), true);
     const search = discoverySearchParams(input);
@@ -103,6 +103,22 @@ test('zelfstandige Effect-, Gemarkeerd- en In bezit-filters negeren horizontale 
       assert.equal(search.has(field), false);
     }
     for (const [field, value] of new URLSearchParams(query)) assert.equal(search.get(field), value);
+  }
+});
+
+test('In bezit activeert commander-kleuridentiteit en andere horizontale keuzes zonder tekstfilter', () => {
+  const pending = { colorIdentity: 'G,U', colorMode: 'subset', manaMin: '0', manaMax: '4', legality: 'commander', deckId: '17' };
+  for (const owned of ['1', 'true', true, '', '0', 'false', false]) {
+    const active = ['1', 'true'].includes(String(owned));
+    for (const input of [{ ...pending, owned }, new URLSearchParams({ ...pending, owned })]) {
+      assert.equal(hasDiscoveryFilters(input), active);
+      const search = discoverySearchParams(input);
+      const saved = discoveryRouteParams(input);
+      for (const [key, value] of Object.entries(pending)) {
+        assert.equal(saved.get(key), value, `saved ${key}`);
+        assert.equal(search.get(key), active ? value : null, `effective ${key}`);
+      }
+    }
   }
 });
 

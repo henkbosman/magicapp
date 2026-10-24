@@ -11,6 +11,7 @@ import { openCardPreview } from '../card-preview.js';
 import { openDeckExport } from '../deck-export.js';
 import { openDeckImport } from '../deck-import.js';
 import { bindDeckTagPicker, deckTagPickerHtml, openDeckTagManager } from '../deck-tags.js';
+import { openDeckCardSynergies, openDeckSynergyManager } from '../deck-synergies.js';
 import { readDeckRevision, startDeckLiveRefresh } from '../deck-live-refresh.js';
 import { applyWriteAvailability } from '../write-access.js';
 
@@ -35,9 +36,10 @@ const CARD_TYPE_GROUP_LABELS = {
 };
 const DECK_VISUAL_COLUMN_OPTIONS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 const DECK_CARD_SORT_OPTIONS = ['mana', 'name'];
-const DECK_CARD_GROUP_OPTIONS = ['type', 'ability', 'tags', 'none'];
+const DECK_CARD_GROUP_OPTIONS = ['type', 'ability', 'tags', 'synergies', 'none'];
 const NO_ABILITY_GROUP = 'Geen ability';
 const NO_FUNCTIONAL_TAG_GROUP = 'Geen functionele tags';
+const NO_SYNERGY_GROUP = 'Geen synergie';
 const DECK_CARD_COLLATOR = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
 
 const DECK_CARD_ACTION_ICONS = {
@@ -99,7 +101,7 @@ function deckCardSortOptions(current) {
 }
 
 function deckCardGroupOptions(current) {
-  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option><option value="tags" ${current === 'tags' ? 'selected' : ''}>Functionele tags</option><option value="none" ${current === 'none' ? 'selected' : ''}>Geen</option>`;
+  return `<option value="type" ${current === 'type' ? 'selected' : ''}>Type</option><option value="ability" ${current === 'ability' ? 'selected' : ''}>Ability</option><option value="tags" ${current === 'tags' ? 'selected' : ''}>Functionele tags</option><option value="synergies" ${current === 'synergies' ? 'selected' : ''}>Synergieën</option><option value="none" ${current === 'none' ? 'selected' : ''}>Geen</option>`;
 }
 
 
@@ -241,7 +243,7 @@ function openGroupEditor({ group = null, item = null, cards, deck }) {
       const deckCardIds = [...dialogElement.querySelectorAll('[data-group-order-id]')]
         .map((row) => Number(row.dataset.groupOrderId))
         .filter((value) => Number.isInteger(value) && value > 0);
-      if (deckCardIds.length < 2) throw new Error('Selecteer minimaal twee kaarten.');
+      if (formValue(data, 'type', 'synergy') === 'combo' && deckCardIds.length < 2) throw new Error('Selecteer minimaal twee kaarten voor een combo.');
       const path = editing ? `/decks/${deck.id}/links/${group.id}` : `/decks/${deck.id}/links`;
       await api(path, {
         method: editing ? 'PATCH' : 'POST',
@@ -315,7 +317,10 @@ function openRelationsDialog(item, cards, deck) {
               <button type="button" class="button ghost small delete-deck-group text-danger" data-group-id="${group.id}" data-write-action>Verwijderen</button>
             </div>
           </article>`).join('')}</div>` : '<p class="muted">Deze kaart hoort nog niet bij een combo of synergie.</p>'}
-        <button type="button" class="button primary create-deck-group" data-write-action ${cards.length < 2 ? 'disabled title="Voeg eerst nog een kaart aan het deck toe"' : ''}><span class="icon-plus" aria-hidden="true"></span> Nieuwe combo of synergie</button>
+        <div class="page-actions">
+          <button type="button" class="button primary choose-card-synergies" data-write-action>Synergieën kiezen</button>
+          <button type="button" class="button secondary create-deck-group" data-write-action><span class="icon-plus" aria-hidden="true"></span> Nieuwe combo of synergie</button>
+        </div>
       </section>`
   });
 
@@ -348,6 +353,10 @@ function openRelationsDialog(item, cards, deck) {
   dialog.querySelector('.create-deck-group')?.addEventListener('click', () => {
     dialog.close();
     openGroupEditor({ item, cards, deck });
+  });
+  dialog.querySelector('.choose-card-synergies')?.addEventListener('click', () => {
+    dialog.close();
+    openDeckCardSynergies(deck.id, item, { onChanged: refreshDeckView });
   });
   return dialog;
 }
@@ -729,6 +738,33 @@ export function groupDeckCards(items = [], { groupBy = 'type', sortBy = 'mana' }
       }));
   }
 
+  if (normalizedGroup === 'synergies') {
+    const groupsBySynergy = new Map();
+    // Relations belong to deck rows, not merged basic-land display rows.
+    const members = uniqueById(items.flatMap((item) => item.displayMembers || [item]));
+    for (const item of members) {
+      const synergies = uniqueById((item.relations || []).filter((relation) => relation.type === 'synergy'));
+      const memberships = synergies.length ? synergies.map((relation) => ({
+        key: `synergies:id:${relation.id}`, value: String(relation.id), label: relation.name, noSynergy: false
+      })) : [{ key: 'synergies:none', value: '', label: NO_SYNERGY_GROUP, noSynergy: true }];
+      for (const { key, value, label, noSynergy } of memberships) {
+        if (!groupsBySynergy.has(key)) groupsBySynergy.set(key, {
+          key, kind: 'synergies', value, label, noSynergy, items: []
+        });
+        groupsBySynergy.get(key).items.push(item);
+      }
+    }
+    return [...groupsBySynergy.values()]
+      .sort((left, right) => left.noSynergy !== right.noSynergy
+        ? (left.noSynergy ? 1 : -1)
+        : DECK_CARD_COLLATOR.compare(left.label, right.label) || Number(left.value) - Number(right.value))
+      .map((group) => ({
+        ...group,
+        items: groupDeckCardsForDisplay(group.items)
+          .sort((left, right) => compareDeckCards(left, right, normalizedSort))
+      }));
+  }
+
   if (normalizedGroup === 'ability') {
     const groupsByAbility = new Map();
     for (const item of items) {
@@ -781,7 +817,8 @@ function deckGroupAttributes(group) {
   const specificAttribute = group.kind === 'type'
     ? ` data-deck-type-group="${escapeHtml(group.value)}"`
     : group.kind === 'ability' ? ` data-deck-ability-group="${escapeHtml(group.value)}"`
-      : group.kind === 'tags' ? ` data-deck-tag-group="${escapeHtml(group.value)}"` : '';
+      : group.kind === 'tags' ? ` data-deck-tag-group="${escapeHtml(group.value)}"`
+        : group.kind === 'synergies' ? ` data-deck-synergy-group="${escapeHtml(group.value)}"` : '';
   return `data-deck-card-group data-deck-group-key="${escapeHtml(group.key)}" data-deck-group-kind="${group.kind}"${specificAttribute}`;
 }
 
@@ -1253,6 +1290,7 @@ export async function renderDeckDetail(context) {
             <button id="edit-deck-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">✎</span><div>Bewerken<small>Naam, formaat en beschrijving</small></div></button>
             <button id="import-deck-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⇧</span><div>Importeren<small>Voeg een kaartlijst toe</small></div></button>
             <button id="deck-tags-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">◇</span><div>Functionele tags beheren<small>Aanmaken, hernoemen en verwijderen</small></div></button>
+            <button id="deck-synergies-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⌘</span><div>Synergie<small>Aanmaken, hernoemen en verwijderen</small></div></button>
             <button id="duplicate-action" class="quick-action" data-write-action type="button"><span aria-hidden="true">⧉</span><div>Dupliceren<small>Maak een volledige kopie</small></div></button>
             <button id="delete-action" class="quick-action text-danger" data-write-action type="button"><span aria-hidden="true">×</span><div>Verwijderen<small>Deck permanent wissen</small></div></button>
           </div>`
@@ -1270,6 +1308,10 @@ export async function renderDeckDetail(context) {
         dialog.querySelector('#deck-tags-action')?.addEventListener('click', () => {
           dialog.close();
           openDeckTagManager(deck.id, { onChanged: refreshDeckView });
+        });
+        dialog.querySelector('#deck-synergies-action')?.addEventListener('click', () => {
+          dialog.close();
+          openDeckSynergyManager(deck.id, { onChanged: refreshDeckView });
         });
 
         dialog.querySelector('#duplicate-action')?.addEventListener('click', () => {

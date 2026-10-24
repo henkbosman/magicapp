@@ -151,17 +151,17 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
     wide: true,
     cancelLabel: 'Sluiten',
     content: `<p>Maak tags voor dit deck, bijvoorbeeld Ramp, Draw en Protection. Hernoemen werkt ook de toegewezen kaarten bij.</p>
-      <div class="form-grid"><div class="field full"><label>Nieuwe tag</label><input name="newTag" maxlength="60" placeholder="Naam van de tag" data-write-action></div></div>
-      <div class="page-actions"><button type="button" class="button primary" data-create-deck-tag data-write-action>Aanmaken</button><button type="button" class="button secondary" data-reload-deck-tags>Vernieuwen</button></div>
+      <div class="deck-manager-create"><label class="field">Nieuwe tag<input name="newTag" maxlength="60" placeholder="Naam van de tag" data-write-action></label><button type="button" class="button primary" data-create-deck-tag data-write-action>Aanmaken</button></div>
       <p class="help-text" data-deck-tags-status role="status">Functionele tags laden…</p>
       <p class="import-warning" data-deck-tags-error role="alert" hidden></p>
+      <button type="button" class="button secondary small" data-retry-deck-tags hidden>Opnieuw proberen</button>
       <div class="deck-tag-manager-list" data-deck-tags-list></div>`
   });
   const list = dialog.querySelector('[data-deck-tags-list]');
   const status = dialog.querySelector('[data-deck-tags-status]');
   const errorElement = dialog.querySelector('[data-deck-tags-error]');
   const newName = dialog.querySelector('[name="newTag"]');
-  const reload = dialog.querySelector('[data-reload-deck-tags]');
+  const retry = dialog.querySelector('[data-retry-deck-tags]');
   let tags = [];
   let ready = false;
   let loading = false;
@@ -176,7 +176,7 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
       element.dataset.writeInitiallyDisabled = String(!ready || loading || busy);
     }
     applyWriteAvailability(dialog);
-    reload.disabled = loading || busy;
+    retry.disabled = loading || busy;
   }
 
   function renderList() {
@@ -194,6 +194,7 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
     loading = true;
     ready = false;
     status.textContent = 'Functionele tags laden…';
+    retry.hidden = true;
     controls();
     try {
       const result = readTagList(await api(`/decks/${id}/tags`, { signal: controller.signal }));
@@ -206,9 +207,10 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
       return true;
     } catch (error) {
       if (!isCurrent() || generation !== requestGeneration) return false;
-      status.textContent = 'De tags konden niet worden geladen. Gebruik Vernieuwen om het opnieuw te proberen.';
+      status.textContent = 'De tags konden niet worden geladen.';
       errorElement.textContent = error.message || 'Laden mislukt.';
       errorElement.hidden = false;
+      retry.hidden = false;
       return false;
     } finally {
       if (isCurrent() && generation === requestGeneration) {
@@ -233,7 +235,7 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
       afterCommit?.();
       const loaded = await load();
       if (!isCurrent()) return true;
-      if (!loaded) status.textContent = 'De wijziging is opgeslagen. Vernieuw de lijst om de actuele tags te zien.';
+      if (!loaded) status.textContent = 'De wijziging is opgeslagen. Probeer de lijst opnieuw te laden om de actuele tags te zien.';
       try {
         await onChanged?.();
       } catch {
@@ -247,7 +249,8 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
       if (isCurrent()) {
         errorTarget.textContent = error.message || 'De tag kon niet worden opgeslagen.';
         if (!error?.status || error.status >= 500) {
-          errorTarget.textContent += ' Vernieuw de lijst voordat je opnieuw probeert.';
+          errorTarget.textContent += ' Laad de lijst opnieuw voordat je opnieuw probeert.';
+          retry.hidden = false;
         }
         errorTarget.hidden = false;
       }
@@ -290,7 +293,7 @@ export function openDeckTagManager(deckId, { onChanged } = {}) {
 
   dialog.querySelector('[data-create-deck-tag]').addEventListener('click', create);
   dialog.querySelector('form').addEventListener('submit', (event) => { event.preventDefault(); create(); });
-  reload.addEventListener('click', () => {
+  retry.addEventListener('click', () => {
     if (!isCurrent() || busy || loading) return;
     errorElement.hidden = true;
     void load();

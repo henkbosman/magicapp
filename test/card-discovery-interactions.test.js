@@ -690,9 +690,10 @@ test('In bezit zoekt zelfstandig, behoudt paginering, combineert met Gemarkeerd 
   owned.dispatch('change');
   const first = ui.pair();
   assert.equal(first.search.params.get('owned'), '1');
-  for (const field of ['deckId', 'colorIdentity', 'manaMax', 'legality']) {
-    assert.equal(first.search.params.has(field), false, `${field} still requires a text/type criterion`);
+  for (const [field, value] of Object.entries({ deckId: '2', colorIdentity: 'G', colorMode: 'subset', manaMax: '4', legality: 'commander' })) {
+    assert.equal(first.search.params.get(field), value, `${field} applies within the owned selection`);
   }
+  assert.equal(ui.get('discovery-secondary-hint').hidden, true);
   assert.match(ui.routes.at(-1), /owned=1/);
   await ui.finish(first, allOptions, result('Owned card', 60));
   ui.get('discovery-pagination-wrap').querySelector('[data-discovery-page="2"]').dispatch('click');
@@ -719,6 +720,46 @@ test('In bezit zoekt zelfstandig, behoudt paginering, combineert met Gemarkeerd 
   reset.resolve(allOptions);
   await flush();
   assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+});
+
+test('commander-kleuridentiteit reageert binnen In bezit en blijft bewaard na uitschakelen', async (t) => {
+  const ui = await mount(t, 'owned=1&colorIdentity=G&colorMode=exact');
+  assert.equal(ui.pair().search.params.get('colorIdentity'), 'G', 'a restored owned search applies the color immediately');
+  assert.equal(ui.pair().search.params.get('colorMode'), 'exact');
+  assert.equal(ui.get('discovery-secondary-hint').hidden, true);
+  const blue = ui.form.querySelector('input[name="colorIdentity"][value="U"]');
+  blue.checked = true;
+  blue.dispatch('change');
+  const colors = ui.pair();
+  assert.equal(colors.search.params.get('owned'), '1');
+  assert.equal(colors.search.params.get('colorIdentity'), 'U,G');
+  assert.equal(colors.search.params.get('colorMode'), 'exact');
+  await ui.finish(colors, { ...allOptions, colors: entries('G', 'U') }, result('Owned blue-green card'));
+  const red = ui.form.querySelector('input[name="colorIdentity"][value="R"]');
+  assert.equal(red.disabled, true, 'reactive availability also applies to the owned selection');
+  ui.edit('colorMode', 'subset');
+  const subset = ui.pair();
+  assert.equal(subset.search.params.get('colorMode'), 'subset');
+  const owned = ui.control('owned');
+  owned.checked = false;
+  owned.dispatch('change');
+  assert.equal(subset.search.signal.aborted, true);
+  const idle = ui.requests.at(-1);
+  assert.equal(idle.kind, 'options');
+  assert.equal(idle.params.has('colorIdentity'), false);
+  assert.equal(ui.get('discovery-secondary-hint').hidden, false);
+  idle.resolve(allOptions);
+  await flush();
+  await ui.finish(subset, allOptions, result('Stale owned card'));
+  assert.match(ui.get('discovery-results').textContent, /Zoek kaarten voor je deck/);
+  assert.doesNotMatch(ui.get('discovery-results').textContent, /Stale owned card/);
+  assert.equal(blue.checked, true, 'pending commander colors stay selected');
+  owned.checked = true;
+  owned.dispatch('change');
+  const restored = ui.pair();
+  assert.equal(restored.search.params.get('colorIdentity'), 'U,G');
+  assert.equal(restored.search.params.get('colorMode'), 'subset');
+  await ui.finish(restored, allOptions, result('Restored owned card'));
 });
 
 test('snel uitzetten van In bezit voorkomt dat een laat antwoord het lege startscherm overschrijft', async (t) => {

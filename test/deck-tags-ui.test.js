@@ -240,6 +240,23 @@ test('tagmanager is read-only without write access and renders hostile names saf
   assert.equal(ui.document.querySelectorAll('dialog').length, 1);
 });
 
+test('tagmanager can recover from a failed initial load without a permanent refresh action', async (t) => {
+  const ui = mount(t);
+  const dialog = openDeckTagManager(7);
+  assert.equal(dialog.querySelector('[data-reload-deck-tags]'), null);
+  const retry = dialog.querySelector('[data-retry-deck-tags]');
+  assert.equal(retry.hidden, true);
+  await ui.respond(0, 'Tijdelijk niet bereikbaar', 503);
+  assert.equal(retry.hidden, false);
+  assert.equal(dialog.querySelector('[data-create-deck-tag]').disabled, true);
+  retry.click();
+  await ui.respond(1, tagList);
+  assert.equal(retry.hidden, true);
+  assert.equal(dialog.querySelector('[data-create-deck-tag]').disabled, false);
+  assert.equal(dialog.querySelector('[data-deck-tags-error]').hidden, true);
+  assert.equal(ui.writes().length, 0);
+});
+
 test('navigation closes the manager and a late mutation does not refresh another deck', async (t) => {
   const ui = mount(t);
   let refreshes = 0;

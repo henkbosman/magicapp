@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER WRITE API 2.17.1
+MAGIC COLLECTION MANAGER WRITE API 2.18.0
 
 Base URL: https://<host>
 Gebruik Content-Type: application/json. De reverse proxy kan /api/write/* buiten het LAN blokkeren.
@@ -24,7 +24,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","writeAvailable":true,"version":"2.17.1"}
+{"status":"ok","writeAvailable":true,"version":"2.18.0"}
 
 POST /api/write/discovery-marks
 
@@ -326,7 +326,7 @@ OUTPUT JSON
 
 POST /api/write/decks/:id/duplicate
 
-Dupliceert deck, kaarten, tags en combo-/synergiegroepen. Ook ongebruikte tagdefinities worden gekopieerd, met nieuwe IDs voor het nieuwe deck. name is optioneel.
+Dupliceert deck, kaarten, tags en combo-/synergiegroepen. Ook ongebruikte tagdefinities en lege synergieën worden gekopieerd, met nieuwe IDs voor het nieuwe deck. name is optioneel.
 
 INPUT JSON
 
@@ -414,7 +414,7 @@ OUTPUT JSON
 
 DELETE /api/write/decks/:id/cards/:deckCardId
 
-Verwijdert een deckkaart en ruimt groepslidmaatschappen op.
+Verwijdert een deckkaart en ruimt haar groepslidmaatschappen op. Synergieën blijven ook met nul of één kaart bestaan; combo’s met minder dan twee kaarten worden opgeruimd.
 
 INPUT JSON
 
@@ -424,9 +424,21 @@ OUTPUT JSON
 
 {"data":{"id":77,"quantity":1,"role":"main","card":{"id":123,"name":"Eternal Witness"}}}
 
+PUT /api/write/decks/:id/cards/:deckCardId/synergies
+
+Vervangt alleen de synergietoewijzingen van deze deckkaart. synergyIds is een verplichte lijst van bestaande synergie-ID’s uit GET /api/read/decks/:id/links. [] verwijdert alle synergietoewijzingen van deze kaart; de groepen blijven bestaan. Dubbele IDs worden ontdubbeld. De hele selectie wordt vóór mutatie binnen één transactie gevalideerd. Onbekende/verwijderde groepen, combo-ID’s en groepen uit een ander deck geven 409; ongeldige invoer geeft 400; een ontbrekende of bij een ander deck horende kaart geeft 404. Andere leden, hun volgorde, combo’s, tags, aantallen en fysieke collectiegegevens blijven behouden. Bestaande lidmaatschappen behouden hun positie; nieuwe worden achteraan toegevoegd. Herhaling met dezelfde selectie wijzigt de lidmaatschappen niet.
+
+INPUT JSON
+
+{"synergyIds":[9,12]}
+
+OUTPUT JSON
+
+{"data":[{"id":9,"deckId":4,"name":"Landfall","type":"synergy","note":"","memberCount":1,"members":[{"deckCardId":77,"cardId":123,"name":"Eternal Witness","quantity":1,"role":"main","position":0}],"createdAt":"2026-10-24 10:00:00","updatedAt":"2026-10-24 10:00:00"},{"id":12,"deckId":4,"name":"Recursion","type":"synergy","note":"","memberCount":1,"members":[{"deckCardId":77,"cardId":123,"name":"Eternal Witness","quantity":1,"role":"main","position":0}],"createdAt":"2026-10-24 10:00:00","updatedAt":"2026-10-24 10:00:00"}]}
+
 POST /api/write/decks/:id/links
 
-Maakt een benoemde combo- of synergiegroep. deckCardIds bevat minimaal twee unieke kaarten; de volgorde wordt opgeslagen.
+Maakt een benoemde combo- of synergiegroep. type is synergy (standaard) of combo. Synergieën mogen nul, één of meer kaarten bevatten; deckCardIds mag voor een nieuwe synergie worden weggelaten of []. Combo’s vereisen minimaal twee unieke deckkaart-ID’s. Alle opgegeven kaarten moeten in dit deck staan; de lijstvolgorde wordt opgeslagen. Een ongeldige lijst of ID geeft 400. Een dubbele synergienaam binnen dit deck (getrimd, Unicode NFC, hoofdletterongevoelig) geeft 409. Kaartregels, aantallen en collectiegegevens blijven ongewijzigd.
 
 INPUT JSON
 
@@ -438,7 +450,7 @@ OUTPUT JSON
 
 PATCH /api/write/decks/:id/links/:linkId
 
-Wijzigt naam, type, notitie en/of ledenvolgorde van een combo-/synergiegroep.
+Wijzigt naam, type, notitie en/of ledenvolgorde van een combo-/synergiegroep. Weggelaten velden blijven behouden. PATCH met alleen {"name":"Nieuwe naam"} leest de actuele groep binnen de transactie en vervangt geen lidmaatschappen. Een expliciet deckCardIds vervangt de leden en volgorde; [] is alleen geldig voor een synergie. Een naamconflict bij synergieën geeft 409; een ontbrekende of bij een ander deck horende groep geeft 404. Historische dubbele namen worden niet automatisch gewijzigd.
 
 INPUT JSON
 

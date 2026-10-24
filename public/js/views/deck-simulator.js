@@ -250,7 +250,7 @@ function turnInformationHtml(state, groups, byDeckCardId) {
       ${progress.length ? progress.map((group) => `<div class="sim-combo-progress ${group.complete ? 'complete' : ''}">
         <div><span class="relation-type-badge ${escapeHtml(group.type)}">${group.type === 'combo' ? 'Combo' : 'Synergie'}</span><strong>${escapeHtml(group.name)}</strong></div>
         <progress max="${Math.max(group.ordered.length, 1)}" value="${group.completed}"></progress>
-        <small>${group.complete ? 'Alle kaarten liggen op tafel.' : `Volgende stap: ${escapeHtml(group.nextItem?.card?.name || group.next?.name || 'onbekend')}${group.nextAvailable ? ' · beschikbaar in hand, command zone of graveyard' : ''}`}</small>
+        <small>${!group.ordered.length ? 'Nog geen kaarten toegewezen.' : group.complete ? 'Alle kaarten liggen op tafel.' : `Volgende stap: ${escapeHtml(group.nextItem?.card?.name || group.next?.name || 'onbekend')}${group.nextAvailable ? ' · beschikbaar in hand, command zone of graveyard' : ''}`}</small>
       </div>`).join('') : '<p class="muted">Geen combo\'s of synergieen vastgelegd.</p>'}
     </section>
     <section class="sim-info-card">
