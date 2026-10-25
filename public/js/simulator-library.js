@@ -128,13 +128,8 @@ export function createSimulatorLibraryController({
           <span class="sim-library-reveal-count"><output data-sim-reveal-count aria-live="polite">0</output> zichtbaar</span>
           <button type="button" class="button secondary" data-sim-reveal-more aria-label="Eén kaart tonen">+</button>
         </div>
-        <div class="sim-library-return-control">
-          <select data-sim-reveal-return aria-label="Resterende kaarten terugplaatsen">
-            <option value="top">Bovenaan library</option>
-            <option value="bottom">Onderop library</option>
-            <option value="shuffle">Shuffle in library</option>
-          </select>
-          <button type="button" class="button primary" data-sim-reveal-finish>Bovenaan library</button>
+        <div class="sim-library-return-control" role="group" aria-label="Resterende kaarten terugplaatsen">
+          ${Object.entries(RETURN_LABELS).map(([mode, label]) => `<button type="button" class="button ${mode === 'top' ? 'primary' : 'secondary'}" data-sim-reveal-finish="${mode}">${label}</button>`).join('')}
         </div>
       </div>
       <p class="muted sim-library-reveal-help">De eerste kaart is de bovenste. Rechtermuisknop op een kaart opent de verplaatsopties. Sluiten laat resterende kaarten bovenaan liggen.</p>
@@ -147,8 +142,6 @@ export function createSimulatorLibraryController({
     const grid = dialog.querySelector('[data-sim-reveal-cards]');
     const plus = dialog.querySelector('[data-sim-reveal-more]');
     const minus = dialog.querySelector('[data-sim-reveal-less]');
-    const finish = dialog.querySelector('[data-sim-reveal-finish]');
-    const returnChoice = dialog.querySelector('[data-sim-reveal-return]');
 
     const valid = () => isCurrent(state) && reveal === session && dialog.open;
     const remaining = () => {
@@ -181,13 +174,8 @@ export function createSimulatorLibraryController({
       revealedIds.pop();
       update();
     });
-    returnChoice.addEventListener('change', () => {
-      finish.textContent = RETURN_LABELS[returnChoice.value] || RETURN_LABELS.top;
-    });
-    finish.addEventListener('click', () => {
-      if (!valid()) return;
-      const mode = returnChoice.value;
-      if (!Object.hasOwn(RETURN_LABELS, mode)) return;
+    const finishReveal = (mode) => {
+      if (!valid() || !Object.hasOwn(RETURN_LABELS, mode)) return;
       const cards = remaining();
       if (mode === 'shuffle') {
         state.zones.library = shuffle(state.zones.library);
@@ -202,6 +190,9 @@ export function createSimulatorLibraryController({
       state.updatedAt = Date.now();
       render();
       dialog.close();
+    };
+    dialog.querySelectorAll('[data-sim-reveal-finish]').forEach((button) => {
+      button.addEventListener('click', () => finishReveal(button.dataset.simRevealFinish));
     });
 
     const openCardMenu = (event) => {
@@ -252,9 +243,11 @@ export function createSimulatorLibraryController({
     const empty = currentLibrary().length === 0;
     const run = (callback) => () => { if (isCurrent(state)) callback(); };
     const actions = [
-      { value: 'peek', label: 'Toon bovenste kaart', icon: '◉', disabled: empty, run: run(() => {
-        const item = itemFor(state.zones.library.at(-1));
-        if (item) trackDialog(openCardZoom(item));
+      { value: 'peek', label: state.libraryTopVisible ? 'Verberg bovenste kaart' : 'Toon bovenste kaart', icon: '◉', disabled: empty && !state.libraryTopVisible, run: run(() => {
+        state.libraryTopVisible = !state.libraryTopVisible;
+        state.updatedAt = Date.now();
+        render();
+        document.querySelector('[data-sim-library-source]')?.focus();
       }) },
       { value: 'mill', label: 'Mill kaart', icon: '↓', disabled: empty, run: run(() => {
         if (drawTop('graveyard')) render();

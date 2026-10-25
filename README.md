@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.21.0
+# Magic Collection Manager 2.22.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -45,6 +45,8 @@ Versie **2.19.0** toont bijbehorende tokenafbeeldingen onder de kaartafbeelding 
 Versie **2.20.0** hernoemt de deckknop naar **Goldfishing**, geeft de speeltafel de volledige breedte en stapelt gelijke kaarten op tafel. Iedere kaart blijft afzonderlijk te bedienen; getapte en ongetapte exemplaren staan apart.
 
 Versie **2.21.0** plaatst de aantallen op de kaartstapels, voegt **Exile** toe en verplaatst library-acties naar een rechtermuisknopmenu. **Toon X kaarten** ondersteunt bekijken met +/−, afzonderlijk verplaatsen en de resterende kaarten bovenop, onderop of geschud terugleggen. De knoppen **Beurt beëindigen** zijn verwijderd.
+
+Versie **2.22.0** maakt Graveyard en Exile compacte stapels, deelt de hogere tafel in per kaarttype en laat de bovenste librarykaart rechtstreeks op de stapel zien of verbergen. **Toon X kaarten** heeft drie aparte teruglegknoppen.
 
 ## Belangrijkste mogelijkheden
 
@@ -337,16 +339,20 @@ Deterministische statistieken worden zonder AI berekend.
 
 Via **Goldfishing** op de deckpagina open je de vrije speeltafel. Kaarten kunnen met drag-and-drop tussen library, hand, tafel, graveyard, exile en command zone worden verplaatst.
 
+De tafel gebruikt extra verticale ruimte en groeit mee met de beschikbare schermhoogte. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts. Kaarten met meerdere typen krijgen één plek: Land heeft voorrang, daarna Creature, Artifact en Enchantment. Overige kaarten blijven zichtbaar in een eigen rij. De indeling gebruikt de voorzijde; subtypes tellen niet als kaarttype.
+
 Gelijke kaarten op tafel, inclusief verschillende printings van dezelfde basic land, staan in overlappende stapels van maximaal vijf exemplaren. De aantalbadge staat op de stapel, net als bij de library. Getapte en ongetapte exemplaren staan apart. Iedere kaart behoudt zijn eigen afbeelding en blijft afzonderlijk te verslepen, vergroten en tappen. Klik op een kaart om te vergroten; dubbelklik om te tappen of untappen. Met het toetsenbord gebruik je Enter voor vergroten en de spatiebalk voor tappen. Er is geen knop **Beurt beëindigen** meer; je tapt en untapt de kaarten zelf. De tellers bovenaan tonen de aantallen in library, hand, tafel, graveyard en exile.
+
+Graveyard en Exile tonen ieder één stapel met de bovenste kaart en een aantalbadge. De bovenste kaart blijft rechtstreeks te verslepen. Klik of rechtsklik op de stapel om alle kaarten te bekijken, inclusief de kaarten onderin. Selecteer daar een kaart en kies een bestemming of **Vergroten**. Een dubbelklik op de stapel vergroot de bovenste kaart.
 
 Rechtsklik op de library voor:
 
-- **Toon bovenste kaart**: bekijk de bovenste kaart zonder de volgorde of aantallen te veranderen.
+- **Toon bovenste kaart**: laat de bovenste kaart rechtstreeks op de library zien. De optie verandert in **Verberg bovenste kaart**. Zolang dit ingeschakeld is, wisselt de afbeelding mee met de actuele bovenste kaart na trekken, millen, schudden of terugleggen. Er opent geen popup en de volgorde/aantallen veranderen niet. **Reset** verbergt de bovenste kaart weer.
 - **Mill kaart**: verplaats precies de bovenste kaart naar graveyard.
 - **Toon X kaarten**: open de bovenste kaart en gebruik **+** en **−** om telkens een kaart meer of minder te tonen. De getoonde volgorde begint bij de bovenste kaart. Rechtsklik op een getoonde kaart voor **Naar hand**, **Naar speelveld**, **Naar graveyard** of **Naar exile**.
 - **Schudden** en **Library bekijken**: de bestaande functies zijn via dit menu beschikbaar en staan niet meer bovenaan.
 
-In **Toon X kaarten** kies je naast +/− de teruglegwijze en druk je op de derde actieknop:
+In **Toon X kaarten** staan naast +/− drie afzonderlijke teruglegknoppen:
 
 - **Bovenaan library**: leg de resterende getoonde kaarten bovenop, in de getoonde volgorde.
 - **Onderop library**: leg ze onderop, waarbij de eerst getoonde kaart als eerste van dat groepje gepakt wordt.

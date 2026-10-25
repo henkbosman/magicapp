@@ -51,6 +51,7 @@ function createInitialState(cards) {
   const hand = [];
   for (let index = 0; index < 7 && zones.library.length; index += 1) hand.push(zones.library.pop());
   return {
+    libraryTopVisible: false,
     zones: {
       library: zones.library,
       hand,
@@ -148,24 +149,77 @@ function battlefieldStacksHtml(instances, byDeckCardId) {
   return stacks.join('');
 }
 
+function battlefieldArea(card) {
+  // Use the active/front face's card types only. Subtypes and the back face
+  // must not accidentally move a card to a different part of the table.
+  const firstFace = card?.cardFaces?.[0];
+  const typeLine = String(firstFace?.typeLine || firstFace?.type_line || card?.typeLine || '').split(' // ')[0];
+  const types = typeLine.split(/[—–]/, 1)[0];
+  if (/\bland\b/i.test(types)) return 'lands';
+  if (/\bcreature\b/i.test(types)) return 'creatures';
+  if (/\bartifact\b/i.test(types)) return 'artifacts';
+  if (/\benchantment\b/i.test(types)) return 'enchantments';
+  return 'other';
+}
+
+function battlefieldHtml(instances, byDeckCardId) {
+  const groups = { creatures: [], lands: [], artifacts: [], enchantments: [], other: [] };
+  for (const instance of instances) {
+    groups[battlefieldArea(itemForInstance(instance, byDeckCardId)?.card)].push(instance);
+  }
+  const area = (key, label) => `<section class="simulator-battlefield-area simulator-battlefield-${key}" data-sim-battlefield-area="${key}">
+    <h3>${label}</h3>
+    <div class="simulator-zone-cards">${groups[key].length ? battlefieldStacksHtml(groups[key], byDeckCardId) : '<p class="simulator-zone-empty">Sleep kaarten naar de tafel.</p>'}</div>
+  </section>`;
+  return `<section class="simulator-zone simulator-zone-battlefield" data-sim-dropzone="battlefield">
+    <header><h2>Tafel</h2><span>${instances.length}</span></header>
+    <div class="simulator-battlefield-layout">
+      <div class="simulator-battlefield-main">
+        ${area('creatures', 'Creatures')}
+        ${groups.other.length ? area('other', 'Overige kaarten') : ''}
+        ${area('lands', 'Landen')}
+      </div>
+      <div class="simulator-battlefield-side">
+        ${area('enchantments', 'Enchantments')}
+        ${area('artifacts', 'Artifacts')}
+      </div>
+    </div>
+  </section>`;
+}
+
 function zoneHtml(zone, instances, byDeckCardId, { empty = 'Sleep kaarten hierheen.' } = {}) {
   return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}">
     <header><h2>${escapeHtml(ZONE_LABELS[zone])}</h2><span>${instances.length}</span></header>
     <div class="simulator-zone-cards">${instances.length
-      ? zone === 'battlefield'
-        ? battlefieldStacksHtml(instances, byDeckCardId)
-        : instances.map((instance) => simulatorCard(instance, zone, byDeckCardId)).join('')
+      ? instances.map((instance) => simulatorCard(instance, zone, byDeckCardId)).join('')
       : `<p class="simulator-zone-empty">${escapeHtml(empty)}</p>`}</div>
   </section>`;
 }
 
-function libraryPileHtml(state) {
+function libraryPileHtml(state, byDeckCardId) {
+  const item = itemForInstance(state.zones.library.at(-1), byDeckCardId);
+  const visible = state.libraryTopVisible && item;
   return `<section class="simulator-zone simulator-library-zone" data-sim-dropzone="library">
     <header><h2>Library</h2><span>${state.zones.library.length}</span></header>
     <div class="library-pile-wrap">
-      <div class="library-pile ${state.zones.library.length ? '' : 'empty'}" data-sim-library-source draggable="${state.zones.library.length ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="menu" aria-label="Library-acties; klik of gebruik de rechtermuisknop" title="Klik of rechtermuisknop voor library-acties; sleep de bovenste kaart naar een zone">
-        <span class="library-card-back" aria-hidden="true"><i></i></span>
+      <div class="library-pile ${state.zones.library.length ? '' : 'empty'}${visible ? ' is-face-up' : ''}" data-sim-library-source draggable="${state.zones.library.length ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="menu" aria-label="Library-acties; klik of gebruik de rechtermuisknop" title="Klik of rechtermuisknop voor library-acties; sleep de bovenste kaart naar een zone">
+        ${visible ? cardImage(item.card, { className: 'sim-library-top-image' }) : '<span class="library-card-back" aria-hidden="true"><i></i></span>'}
         <span class="library-pile-count">${state.zones.library.length}</span>
+      </div>
+    </div>
+  </section>`;
+}
+
+function zonePileHtml(zone, instances, byDeckCardId) {
+  const top = instances.at(-1);
+  const item = itemForInstance(top, byDeckCardId);
+  const label = `${ZONE_LABELS[zone]}: ${instances.length} kaarten; klik om de stapel te bekijken`;
+  return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}">
+    <header><h2>${escapeHtml(ZONE_LABELS[zone])}</h2><span>${instances.length}</span></header>
+    <div class="library-pile-wrap">
+      <div class="library-pile simulator-zone-pile${top ? '' : ' empty'}" data-sim-zone-pile="${zone}" ${top ? `data-sim-instance="${escapeHtml(top.id)}" data-sim-source-zone="${zone}"` : ''} draggable="${top ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="dialog" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
+        ${item ? cardImage(item.card, { className: 'sim-zone-pile-image' }) : `<span class="sim-zone-pile-placeholder">${escapeHtml(ZONE_LABELS[zone])}</span>`}
+        <span class="library-pile-count">${instances.length}</span>
       </div>
     </div>
   </section>`;
@@ -195,12 +249,12 @@ function tableHtml(state, byDeckCardId) {
   return `<div class="simulator-layout">
     <div class="simulator-table" aria-label="Drag-and-drop speeltafel">
       <div class="simulator-top-zones">
-        ${libraryPileHtml(state)}
-        ${zoneHtml('graveyard', state.zones.graveyard, byDeckCardId)}
-        ${zoneHtml('exile', state.zones.exile, byDeckCardId)}
+        ${libraryPileHtml(state, byDeckCardId)}
+        ${zonePileHtml('graveyard', state.zones.graveyard, byDeckCardId)}
+        ${zonePileHtml('exile', state.zones.exile, byDeckCardId)}
         ${zoneHtml('command', state.zones.command, byDeckCardId, { empty: 'Geen commander of companion.' })}
       </div>
-      ${zoneHtml('battlefield', state.zones.battlefield, byDeckCardId)}
+      ${battlefieldHtml(state.zones.battlefield, byDeckCardId)}
       ${zoneHtml('hand', state.zones.hand, byDeckCardId)}
     </div>
   </div>`;
@@ -423,6 +477,90 @@ function librarySearchDialog(state, byDeckCardId, onMove) {
   return dialog;
 }
 
+
+function zonePileDialog(zone, state, byDeckCardId, { isCurrent, onMove, onZoom }) {
+  const rows = [...state.zones[zone]].reverse().map((instance) => ({
+    instance, item: itemForInstance(instance, byDeckCardId)
+  }));
+  let selectedId = rows[0]?.instance.id || null;
+  const targets = ['hand', 'battlefield', 'library', 'graveyard', 'exile', 'command'].filter((target) => target !== zone);
+  const dialog = openDialog({
+    title: ZONE_LABELS[zone],
+    cancelLabel: 'Sluiten',
+    wide: true,
+    writeAction: false,
+    initialFocus: '[data-sim-pile-card]',
+    content: `<p class="muted">De eerste kaart is de bovenste. Selecteer een kaart om deze te verplaatsen of te vergroten.</p>
+      <div class="sim-zone-pile-actions">
+        ${targets.map((target) => `<button type="button" class="button secondary" data-sim-pile-target="${target}"${selectedId ? '' : ' disabled'}>${target === 'library' ? 'Bovenop library' : `Naar ${target === 'battlefield' ? 'speelveld' : escapeHtml(ZONE_LABELS[target].toLowerCase())}`}</button>`).join('')}
+        <button type="button" class="button secondary" data-sim-pile-zoom${selectedId ? '' : ' disabled'}>Vergroten</button>
+      </div>
+      <div class="sim-library-reveal-grid">${rows.length ? rows.map(({ instance, item }, index) => {
+        const name = item?.card.name || 'Onbekende kaart';
+        return `<figure class="sim-library-reveal-item"><button type="button" class="sim-library-reveal-card sim-zone-pile-card${instance.id === selectedId ? ' selected' : ''}" data-sim-pile-card="${escapeHtml(instance.id)}" draggable="true" aria-pressed="${instance.id === selectedId}" aria-label="${escapeHtml(`${index + 1}. ${name}; selecteren`)}">${item ? cardImage(item.card, { className: 'sim-library-reveal-image' }) : escapeHtml(name)}</button><figcaption>${index + 1}. ${escapeHtml(name)}</figcaption></figure>`;
+      }).join('') : '<p class="simulator-zone-empty">Deze stapel is leeg.</p>'}</div>`
+  });
+  dialog.classList.add('sim-zone-pile-dialog');
+  dialog.setAttribute('data-sim-pile-dialog', zone);
+  const valid = () => dialog.open && isCurrent();
+  const findSelected = () => state.zones[zone].find((instance) => instance.id === selectedId);
+  const select = (card) => {
+    if (!valid()) return;
+    selectedId = card.dataset.simPileCard;
+    dialog.querySelectorAll('[data-sim-pile-card]').forEach((entry) => {
+      const selected = entry.dataset.simPileCard === selectedId;
+      entry.classList.toggle('selected', selected);
+      entry.setAttribute('aria-pressed', String(selected));
+    });
+  };
+  const zoom = () => {
+    if (!valid()) return;
+    const item = itemForInstance(findSelected(), byDeckCardId);
+    if (item) onZoom(item);
+  };
+  const move = (target) => {
+    if (!valid() || !targets.includes(target) || !findSelected()) return;
+    if (onMove(selectedId, target)) dialog.close();
+  };
+  dialog.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-sim-pile-card]');
+    if (card) return select(card);
+    const target = event.target.closest('[data-sim-pile-target]');
+    if (target) return move(target.dataset.simPileTarget);
+    if (event.target.closest('[data-sim-pile-zoom]')) zoom();
+  });
+  dialog.addEventListener('dblclick', (event) => {
+    const card = event.target.closest('[data-sim-pile-card]');
+    if (!card) return;
+    select(card);
+    zoom();
+  });
+  let draggedId = null;
+  dialog.addEventListener('dragstart', (event) => {
+    const card = event.target.closest('[data-sim-pile-card]');
+    if (!card || !valid()) return;
+    select(card);
+    draggedId = selectedId;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', draggedId);
+  });
+  dialog.addEventListener('dragover', (event) => {
+    if (!valid() || !draggedId || !event.target.closest('[data-sim-pile-target]')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  });
+  dialog.addEventListener('drop', (event) => {
+    const target = event.target.closest('[data-sim-pile-target]');
+    if (!valid() || !target || !draggedId) return;
+    event.preventDefault();
+    selectedId = draggedId;
+    draggedId = null;
+    move(target.dataset.simPileTarget);
+  });
+  dialog.addEventListener('dragend', () => { draggedId = null; });
+  return dialog;
+}
+
 function metricsHtml(state) {
   return [
     metric('Library', state.zones.library.length, 'Kaarten over'),
@@ -497,6 +635,20 @@ export async function renderDeckSimulator(context) {
           }));
         }
       });
+      const openZonePile = (zone) => {
+        if (disposed || !['graveyard', 'exile'].includes(zone)) return;
+        const pileState = state;
+        trackDialog(zonePileDialog(zone, pileState, byDeckCardId, {
+          isCurrent: () => !disposed && state === pileState,
+          onMove: (instanceId, targetZone) => {
+            if (disposed || state !== pileState || findZone(state, instanceId)?.zone !== zone) return false;
+            const changed = moveInstance(state, instanceId, targetZone);
+            if (changed) render();
+            return changed;
+          },
+          onZoom: openCardZoom
+        }));
+      };
       const handleDrop = (payload, targetZone) => {
         if (disposed) return;
         const changed = payload.type === 'library'
@@ -532,6 +684,13 @@ export async function renderDeckSimulator(context) {
       });
 
       listen(root, 'contextmenu', (event) => {
+        const pile = event.target.closest('[data-sim-zone-pile]');
+        if (pile) {
+          event.preventDefault();
+          clearTimeout(cardClickTimer);
+          openZonePile(pile.dataset.simZonePile);
+          return;
+        }
         const library = event.target.closest('[data-sim-library-source]');
         if (!library) return;
         event.preventDefault();
@@ -550,12 +709,25 @@ export async function renderDeckSimulator(context) {
         const card = event.target.closest('[data-sim-instance]');
         if (!card) return;
         const found = findZone(state, card.dataset.simInstance);
+        if (card.matches('[data-sim-zone-pile]')) {
+          const item = found ? itemForInstance(found.instance, byDeckCardId) : null;
+          if (item) openCardZoom(item);
+          return;
+        }
         if (found?.zone !== 'battlefield') return;
         found.instance.tapped = !found.instance.tapped;
         render();
       });
       listen(root, 'click', (event) => {
         if (Date.now() < suppressCardZoomUntil || event.detail > 1) return;
+        const pile = event.target.closest('[data-sim-zone-pile]');
+        if (pile) {
+          clearTimeout(cardClickTimer);
+          cardClickTimer = window.setTimeout(() => {
+            if (!disposed && Date.now() >= suppressCardZoomUntil) openZonePile(pile.dataset.simZonePile);
+          }, 320);
+          return;
+        }
         const library = event.target.closest('[data-sim-library-source]');
         if (library) {
           clearTimeout(cardClickTimer);
@@ -575,6 +747,13 @@ export async function renderDeckSimulator(context) {
         }, 320);
       });
       listen(root, 'keydown', (event) => {
+        const pile = event.target.closest('[data-sim-zone-pile]');
+        if (pile && (['Enter', ' ', 'ContextMenu'].includes(event.key) || (event.key === 'F10' && event.shiftKey))) {
+          event.preventDefault();
+          clearTimeout(cardClickTimer);
+          openZonePile(pile.dataset.simZonePile);
+          return;
+        }
         const library = event.target.closest('[data-sim-library-source]');
         if (library && (['Enter', ' ', 'ContextMenu'].includes(event.key) || (event.key === 'F10' && event.shiftKey))) {
           event.preventDefault();

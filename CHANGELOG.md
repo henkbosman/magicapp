@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.22.0 - 2026-10-25
+
+- Graveyard en Exile worden als compacte stapels getoond, met de bovenste kaart en aantalbadge. Via de stapelpopup blijven alle exemplaren afzonderlijk te vergroten en te verplaatsen, ook kaarten onderin.
+- **Toon X kaarten** bevat drie rechtstreekse knoppen: **Bovenaan library**, **Onderop library** en **Shuffle in library**. De pulldown vervalt; kaartvolgorde en aantallen blijven behouden.
+- **Tafel** toont landen onderaan, creatures erboven en enchantments/artifacts rechts. Meervoudige kaarttypes worden één keer ingedeeld; onbekende en overige kaarttypen blijven zichtbaar.
+- **Toon bovenste kaart** toont de actuele kaart op de library zelf en verandert in **Verberg bovenste kaart**. De afbeelding volgt trekken, millen, schudden en terugleggen; reset verbergt deze weer.
+- De hogere tafel benut de beschikbare verticale schermruimte en groeit door bij meer kaarten. De layout blijft begrensd in de breedte en kaarten worden niet afgeknipt.
+- De sleepafbeelding van stapels blijft bij touchbediening correct bij de vinger staan.
+- Geen database- of API-wijzigingen; speeltestacties blijven uitsluitend lokaal.
+
 ## 2.21.0 - 2026-10-25
 
 - Aantalbadges staan op de kaartstapels, in dezelfde stijl als de libraryteller.

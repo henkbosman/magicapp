@@ -156,7 +156,8 @@ async function setup(t, cards = sampleDeck()) {
     zone(target).dispatch('dragover', { dataTransfer });
     zone(target).dispatch('drop', { dataTransfer });
   };
-  const libraryCount = () => Number(zone('library').querySelector('header').querySelector('span').textContent);
+  const zoneCount = (name) => Number(zone(name).querySelector('header').querySelector('span').textContent);
+  const libraryCount = () => zoneCount('library');
   const allToBattlefield = () => {
     while (libraryCount()) drag(root().querySelector('[data-sim-library-source]'), 'battlefield');
     for (const id of instances('hand').map((card) => card.dataset.simInstance)) drag(instance(id), 'battlefield');
@@ -172,7 +173,7 @@ async function setup(t, cards = sampleDeck()) {
   };
   return {
     app, document, requests, storageWrites, root, zone, instance, instances, drag,
-    libraryCount, allToBattlefield, open, cloneForTouch, dispose: () => dispose?.(),
+    libraryCount, zoneCount, allToBattlefield, open, cloneForTouch, dispose: () => dispose?.(),
     libraryAction(action) {
       root().querySelector('[data-sim-library-source]').dispatch('contextmenu', { clientX: 30, clientY: 50 });
       const button = document.querySelector(`[data-sim-library-action="${action}"]`);
@@ -196,7 +197,7 @@ async function setup(t, cards = sampleDeck()) {
 function assertUniqueInstances(ui, expected) {
   const ids = ui.instances().map((card) => card.dataset.simInstance);
   assert.equal(new Set(ids).size, ids.length, 'every visible physical copy occurs only once');
-  assert.equal(ids.length + ui.libraryCount(), expected, 'no copies lost or created across all zones');
+  assert.equal(['library', 'hand', 'battlefield', 'graveyard', 'exile', 'command'].reduce((total, zone) => total + ui.zoneCount(zone), 0), expected, 'no copies lost or created across all zones, including cards hidden beneath piles');
 }
 
 test('goldfishing opens without the sidebar, end-turn or header library buttons and exposes exile', async (t) => {
@@ -263,7 +264,7 @@ test('stack identity handles older printing IDs and missing IDs without mixing d
   const ui = await setup(t, [
     deckCard(41, 'Forest', 1, { cardKey: 'old-print-a', scryfallId: 'old-print-a' }),
     deckCard(42, ' Forest ', 1, { cardKey: 'old-print-b', scryfallId: 'old-print-b' }),
-    deckCard(43, 'forest', 1, { cardKey: null, scryfallId: null }),
+    deckCard(43, 'forest', 1, { cardKey: null, scryfallId: null, typeLine: 'Basic Land — Forest' }),
     deckCard(44, 'Identical display name', 1, { cardKey: 'printing-a', oracleId: 'oracle-one' }),
     deckCard(45, 'Identical display name', 1, { cardKey: 'printing-b', oracleId: 'oracle-one' }),
     deckCard(46, 'Identical display name', 1, { cardKey: 'printing-c', oracleId: 'oracle-two' })
@@ -399,33 +400,46 @@ const revealControl = (ui, attribute) => {
   return button;
 };
 const finishReveal = (ui, method) => {
-  const select = revealControl(ui, 'data-sim-reveal-return');
-  select.value = method;
-  select.dispatch('change');
-  revealControl(ui, 'data-sim-reveal-finish').click();
+  assert.equal(ui.document.querySelector('[data-sim-reveal-return]'), null, 'return choices are direct buttons, not a dropdown');
+  const button = ui.document.querySelector(`[data-sim-reveal-finish="${method}"]`);
+  assert.ok(button, `direct return action ${method} exists`);
+  button.click();
 };
 const millAll = (ui) => {
-  while (ui.libraryCount()) ui.libraryAction('mill');
-  return ui.instances('graveyard').map((card) => card.dataset.simInstance);
+  const milled = [];
+  while (ui.libraryCount()) {
+    ui.libraryAction('mill');
+    milled.push(ui.instances('graveyard')[0].dataset.simInstance);
+  }
+  return milled;
 };
 
-test('library peek preserves the exact top printing and mill moves only that card to graveyard', async (t) => {
+test('library peek toggles the current top printing inline and follows mill without a popup', async (t) => {
   const cards = orderedDeck();
   const original = structuredClone(cards);
   const ui = await setup(t, cards);
+  const library = () => ui.root().querySelector('[data-sim-library-source]');
   assert.equal(ui.libraryCount(), 5);
+  assert.equal(library().querySelector('img'), null);
   ui.libraryAction('peek');
-  const dialog = ui.document.querySelector('dialog');
-  assert.match(dialog.querySelector('img').getAttribute('src'), /\/cards\/165\/image/);
-  assert.equal(ui.libraryCount(), 5);
-  assert.equal(ui.instances('graveyard').length, 0);
-  dialog.close();
+  assert.equal(ui.document.querySelector('dialog'), null, 'showing top does not open a popup');
+  assert.match(library().querySelector('img').getAttribute('src'), /\/cards\/165\/image/);
+  assert.equal(ui.document.activeElement, library(), 'focus follows the updated library pile');
+  library().dispatch('contextmenu', { clientX: 30, clientY: 50 });
+  assert.equal(ui.document.querySelector('[data-sim-library-action="peek"]').textContent.trim().endsWith('Verberg bovenste kaart'), true);
   ui.libraryAction('mill');
   assert.equal(ui.libraryCount(), 4);
   assert.equal(ui.instances('graveyard')[0].dataset.simInstance, '65:1');
+  assert.match(library().querySelector('img').getAttribute('src'), /\/cards\/164\/image/);
   ui.libraryAction('mill');
   assert.equal(ui.libraryCount(), 3);
-  assert.deepEqual(ui.instances('graveyard').map((card) => card.dataset.simInstance), ['65:1', '64:1']);
+  assert.equal(ui.zoneCount('graveyard'), 2);
+  assert.equal(ui.instances('graveyard').length, 1, 'graveyard displays only its top copy');
+  assert.equal(ui.instances('graveyard')[0].dataset.simInstance, '64:1');
+  assert.match(library().querySelector('img').getAttribute('src'), /\/cards\/163\/image/);
+  ui.libraryAction('peek');
+  assert.equal(library().querySelector('img'), null, 'hiding returns the library back');
+  assert.equal(ui.document.querySelector('dialog'), null);
   assertUniqueInstances(ui, 12);
   assert.deepEqual(cards, original);
 });
@@ -621,4 +635,202 @@ test('scrolling within a context menu keeps it open while scrolling the surround
   assert.equal(ui.document.querySelector('[data-sim-library-action]'), null);
   assert.equal(ui.libraryCount(), 5);
   assertUniqueInstances(ui, 12);
+});
+
+
+test('battlefield areas classify front-face card types exactly once without treating subtypes as types', async (t) => {
+  const definitions = [
+    ['Basic Land — Forest', 'lands'],
+    ['Creature — Elf Druid', 'creatures'],
+    ['Enchantment — Aura', 'enchantments'],
+    ['Artifact — Equipment', 'artifacts'],
+    ['Artifact Creature — Golem', 'creatures'],
+    ['Enchantment Creature — Dryad', 'creatures'],
+    ['Artifact Land', 'lands'],
+    ['Land Creature — Forest Dryad', 'lands'],
+    ['Enchantment Artifact', 'artifacts'],
+    ['Instant — Land', 'other'],
+    ['Legendary Enchantment — Creature', 'enchantments'],
+    ['Planeswalker — Nissa', 'other'],
+    ['', 'other']
+  ];
+  const cards = definitions.map(([typeLine], index) => deckCard(201 + index, `Type ${index}`, 1, { typeLine }));
+  cards.push(deckCard(220, 'Front sorcery, back land', 1, {
+    typeLine: 'Sorcery // Land', cardFaces: [{ typeLine: 'Sorcery' }, { typeLine: 'Land' }]
+  }));
+  cards.push(deckCard(221, 'Legacy front land', 1, {
+    typeLine: '', cardFaces: [{ type_line: 'Land — Forest' }, { type_line: 'Creature — Elf' }]
+  }));
+  const original = structuredClone(cards);
+  const ui = await setup(t, cards);
+  ui.allToBattlefield();
+  for (const [index, [, area]] of definitions.entries()) {
+    assert.equal(ui.instance(`${201 + index}:1`).closest('[data-sim-battlefield-area]').dataset.simBattlefieldArea, area);
+  }
+  assert.equal(ui.instance('220:1').closest('[data-sim-battlefield-area]').dataset.simBattlefieldArea, 'other');
+  assert.equal(ui.instance('221:1').closest('[data-sim-battlefield-area]').dataset.simBattlefieldArea, 'lands');
+  const main = ui.zone('battlefield').querySelector('.simulator-battlefield-main');
+  assert.deepEqual(main.querySelectorAll('[data-sim-battlefield-area]').map((area) => area.dataset.simBattlefieldArea), ['creatures', 'other', 'lands']);
+  const side = ui.zone('battlefield').querySelector('.simulator-battlefield-side');
+  assert.deepEqual(side.querySelectorAll('[data-sim-battlefield-area]').map((area) => area.dataset.simBattlefieldArea), ['enchantments', 'artifacts']);
+  assertUniqueInstances(ui, cards.length);
+  assert.deepEqual(cards, original, 'placing cards by type changes no source metadata');
+});
+
+test('inline library visibility follows draw, shuffle and return actions, can hide an empty pile, and resets', async (t) => {
+  const ui = await setup(t, orderedDeck());
+  const library = () => ui.root().querySelector('[data-sim-library-source]');
+  const image = () => library().querySelector('img')?.getAttribute('src');
+  ui.libraryAction('peek');
+  library().dispatch('dblclick');
+  assert.equal(ui.libraryCount(), 4);
+  assert.match(image(), /\/cards\/164\/image/);
+  t.mock.method(Math, 'random', () => 0);
+  ui.libraryAction('shuffle');
+  assert.match(image(), /\/cards\/161\/image/);
+  ui.libraryAction('reveal');
+  revealControl(ui, 'data-sim-reveal-more').click();
+  assert.deepEqual(revealedIds(ui), ['61:1', '64:1']);
+  ui.revealMove('61:1', 'exile');
+  assert.match(image(), /\/cards\/164\/image/);
+  finishReveal(ui, 'bottom');
+  assert.match(image(), /\/cards\/163\/image/);
+  assert.equal(ui.document.querySelector('dialog'), null);
+  millAll(ui);
+  assert.equal(image(), undefined, 'empty library has no stale face image');
+  library().dispatch('contextmenu', { clientX: 30, clientY: 40 });
+  let toggle = ui.document.querySelector('[data-sim-library-action="peek"]');
+  assert.equal(toggle.disabled, false, 'a visible empty library can still be hidden');
+  assert.match(toggle.textContent, /Verberg bovenste kaart/);
+  toggle.click();
+  library().dispatch('contextmenu', { clientX: 30, clientY: 40 });
+  toggle = ui.document.querySelector('[data-sim-library-action="peek"]');
+  assert.equal(toggle.disabled, true, 'an empty hidden library cannot show a nonexistent card');
+  ui.document.dispatch('keydown', { key: 'Escape' });
+  const topGrave = ui.instances('graveyard')[0];
+  ui.drag(topGrave, 'library');
+  assert.equal(image(), undefined, 'hiding persists when a card returns');
+  ui.libraryAction('peek');
+  assert.ok(image());
+  ui.document.getElementById('sim-reset').click();
+  ui.document.querySelector('dialog').querySelector('form').dispatch('submit');
+  await flush();
+  assert.equal(image(), undefined, 'reset starts with face-down library');
+  assert.equal(ui.libraryCount(), 5);
+  assertUniqueInstances(ui, 12);
+});
+
+test('reveal exposes three direct return buttons and stale finished buttons cannot apply a second action', async (t) => {
+  const ui = await setup(t, orderedDeck());
+  ui.libraryAction('reveal');
+  const buttons = ui.document.querySelectorAll('[data-sim-reveal-finish]');
+  assert.deepEqual(buttons.map((button) => button.dataset.simRevealFinish), ['top', 'bottom', 'shuffle']);
+  assert.deepEqual(buttons.map((button) => button.textContent), ['Bovenaan library', 'Onderop library', 'Shuffle in library']);
+  assert.equal(ui.document.querySelector('select'), null);
+  revealControl(ui, 'data-sim-reveal-more').click();
+  buttons[1].click();
+  buttons[0].click();
+  buttons[2].click();
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.deepEqual(millAll(ui), ['63:1', '62:1', '61:1', '65:1', '64:1']);
+  assertUniqueInstances(ui, 12);
+});
+
+test('graveyard and exile show one top card but their browser retains every buried printing and moves one selected copy', async (t) => {
+  const ui = await setup(t);
+  for (const id of ['11:1', '12:1', '11:2']) ui.drag(ui.instance(id), 'graveyard');
+  for (const id of ['14:1', '14:2', '13:1']) ui.drag(ui.instance(id), 'exile');
+  for (const [zone, topId] of [['graveyard', '11:2'], ['exile', '13:1']]) {
+    assert.equal(ui.zoneCount(zone), 3);
+    assert.equal(ui.instances(zone).length, 1);
+    const pile = ui.zone(zone).querySelector('[data-sim-zone-pile]');
+    assert.equal(pile.dataset.simInstance, topId);
+    assert.equal(pile.querySelector('.library-pile-count').textContent, '3');
+    assert.equal(pile.getAttribute('draggable'), 'true');
+  }
+  ui.zone('graveyard').querySelector('[data-sim-zone-pile]').dispatch('keydown', { key: 'Enter' });
+  const dialog = ui.document.querySelector('[data-sim-pile-dialog="graveyard"]');
+  assert.ok(dialog);
+  assert.equal(dialog.querySelector('[data-write-action]'), null);
+  assert.deepEqual(dialog.querySelectorAll('[data-sim-pile-card]').map((card) => card.dataset.simPileCard), ['11:2', '12:1', '11:1']);
+  const selected = dialog.querySelector('[data-sim-pile-card="12:1"]');
+  assert.match(selected.querySelector('img').getAttribute('src'), /\/cards\/112\/image/);
+  selected.click();
+  assert.equal(selected.getAttribute('aria-pressed'), 'true');
+  dialog.querySelector('[data-sim-pile-zoom]').click();
+  const zoom = ui.document.querySelectorAll('dialog').at(-1);
+  assert.notEqual(zoom, dialog);
+  assert.match(zoom.querySelector('img').getAttribute('src'), /\/cards\/112\/image\?face=front&size=large/);
+  zoom.close();
+  const staleHand = dialog.querySelector('[data-sim-pile-target="hand"]');
+  dialog.querySelector('[data-sim-pile-target="exile"]').click();
+  staleHand.click();
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.equal(ui.zoneCount('graveyard'), 2);
+  assert.equal(ui.zoneCount('exile'), 4);
+  assert.equal(ui.instances('exile')[0].dataset.simInstance, '12:1');
+  assert.equal(ui.instance('12:1').dataset.simSourceZone, 'exile', 'stale closed-dialog action cannot move it again');
+  assertUniqueInstances(ui, 8);
+  ui.zone('graveyard').querySelector('[data-sim-zone-pile]').dispatch('contextmenu');
+  const remaining = ui.document.querySelector('[data-sim-pile-dialog="graveyard"]');
+  assert.deepEqual(remaining.querySelectorAll('[data-sim-pile-card]').map((card) => card.dataset.simPileCard), ['11:2', '11:1']);
+  remaining.close();
+  assertUniqueInstances(ui, 8);
+});
+
+test('buried pile cards can be dragged to a popup destination and pile double-click zooms the actual top printing', async (t) => {
+  const ui = await setup(t);
+  ui.drag(ui.instance('11:1'), 'graveyard');
+  ui.drag(ui.instance('12:1'), 'graveyard');
+  ui.zone('graveyard').querySelector('[data-sim-zone-pile]').dispatch('dblclick');
+  let dialog = ui.document.querySelector('dialog');
+  assert.equal(dialog.getAttribute('data-sim-pile-dialog'), null, 'double-click zooms instead of opening the pile browser');
+  assert.match(dialog.querySelector('img').getAttribute('src'), /\/cards\/112\/image\?face=front&size=large/);
+  dialog.close();
+  ui.zone('graveyard').querySelector('[data-sim-zone-pile]').dispatch('keydown', { key: ' ' });
+  dialog = ui.document.querySelector('[data-sim-pile-dialog="graveyard"]');
+  const buried = dialog.querySelector('[data-sim-pile-card="11:1"]');
+  const target = dialog.querySelector('[data-sim-pile-target="library"]');
+  const dataTransfer = { setData() {} };
+  buried.dispatch('dragstart', { dataTransfer });
+  target.dispatch('dragover', { dataTransfer });
+  target.dispatch('drop', { dataTransfer });
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.equal(ui.libraryCount(), 1);
+  assert.equal(ui.zoneCount('graveyard'), 1);
+  assert.equal(ui.instances('graveyard')[0].dataset.simInstance, '12:1');
+  ui.libraryAction('peek');
+  assert.match(ui.root().querySelector('[data-sim-library-source]').querySelector('img').getAttribute('src'), /\/cards\/111\/image/);
+  assertUniqueInstances(ui, 8);
+});
+
+test('empty zone piles remain inspectable without fake cards, and disposed pile actions cannot change a new game', async (t) => {
+  const ui = await setup(t);
+  const empty = ui.zone('exile').querySelector('[data-sim-zone-pile]');
+  assert.equal(empty.getAttribute('draggable'), 'false');
+  assert.equal(empty.getAttribute('data-sim-instance'), null);
+  empty.dispatch('keydown', { key: 'Enter' });
+  let dialog = ui.document.querySelector('[data-sim-pile-dialog="exile"]');
+  assert.ok(dialog);
+  assert.equal(dialog.querySelectorAll('[data-sim-pile-card]').length, 0);
+  assert.ok(dialog.querySelectorAll('[data-sim-pile-target]').every((button) => button.disabled));
+  dialog.querySelector('[data-sim-pile-target="hand"]').click();
+  assertUniqueInstances(ui, 8);
+  dialog.close();
+  ui.drag(ui.instance('12:1'), 'exile');
+  ui.zone('exile').querySelector('[data-sim-zone-pile]').dispatch('contextmenu');
+  dialog = ui.document.querySelector('[data-sim-pile-dialog="exile"]');
+  const oldMove = dialog.querySelector('[data-sim-pile-target="battlefield"]');
+  const oldZoom = dialog.querySelector('[data-sim-pile-zoom]');
+  await ui.open();
+  assert.equal(ui.document.querySelector('dialog'), null);
+  oldMove.click();
+  oldZoom.click();
+  assert.equal(ui.zoneCount('battlefield'), 0);
+  assert.equal(ui.zoneCount('exile'), 0);
+  assert.equal(ui.zoneCount('hand'), 7);
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assertUniqueInstances(ui, 8);
+  assert.ok(ui.requests.every((request) => request.method === 'GET'));
+  assert.equal(ui.storageWrites.length, 0);
 });

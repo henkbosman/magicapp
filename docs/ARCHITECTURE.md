@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.21.0
+# Architectuur - Magic Collection Manager 2.22.0
 
 ## Overzicht
 
@@ -202,10 +202,12 @@ Er is geen Monte Carlo- of regelsimulatieanalyse in 2.0.
 
 De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regelengine. De toestand bestaat uitsluitend in het geheugen van de actieve view. Herladen of opnieuw openen start een nieuwe simulatie; kaartverplaatsingen veranderen geen browseropslag of databasegegevens. De resetbevestiging is een lokale actie en is niet gekoppeld aan de write-API.
 
-Vanaf 2.20.0 heet de ingang **Goldfishing**. De speeltafel gebruikt de volledige breedte en heeft geen informatiekolom meer. Alleen de battlefield-weergave groepeert gelijke kaarten per kaartidentiteit en tapstatus, met maximaal vijf echte kaartinstanties per stapel. Het groeperen verandert geen zonevolgorde, aantallen of kaartgegevens. Iedere instantie houdt zijn oorspronkelijke printing, instance-ID en interacties; de overige zones blijven ongestapeld. Er worden alleen het deck en de kaarten opgehaald; de vervallen informatiekolom vraagt geen decklinks meer op.
+Vanaf 2.20.0 heet de ingang **Goldfishing**. De speeltafel gebruikt de volledige breedte en heeft geen informatiekolom meer. Alleen de battlefield-weergave groepeert gelijke kaarten per kaartidentiteit en tapstatus, met maximaal vijf echte kaartinstanties per stapel. Het groeperen verandert geen zonevolgorde, aantallen of kaartgegevens. Iedere instantie houdt zijn oorspronkelijke printing, instance-ID en interacties; hand en command zone blijven ongestapeld. Er worden alleen het deck en de kaarten opgehaald; de vervallen informatiekolom vraagt geen decklinks meer op.
 
 
 Vanaf 2.21.0 bevat de toestand een afzonderlijke `exile`-zone en geen beurtadministratie meer. `public/js/simulator-library.js` beheert lokale contextmenu’s en de popup voor het bekijken van de bovenste kaarten. Bekeken kaarten blijven in de library; een popup bewaart alleen de instance-ID’s in pakvolgorde. Een verplaatsing haalt precies die instantie uit de library. Terugleggen onderop/bovenop partitioneert de overgebleven instanties zonder duplicatie; schudden gebruikt de hele library. Sluiten verandert geen volgorde. Controller- en view-opruiming sluiten popups, verwijderen listeners en blokkeren verouderde callbacks. Contextmenu’s binnen de popup worden binnen hetzelfde native dialog-element geplaatst.
+
+Vanaf 2.22.0 toont `zonePileHtml` alleen de bovenste instantie van graveyard/exile. De onderliggende zone-array blijft intact; `zonePileDialog` biedt alle instanties in volgorde van boven naar onder aan en controleert de sessie en bronzone vóór een verplaatsing. De battlefield wordt alleen voor rendering verdeeld, met prioriteit Land → Creature → Artifact → Enchantment → Other op basis van de voorzijde en het typegedeelte vóór de subtype-scheiding. `libraryTopVisible` is een tijdelijke weergavekeuze: iedere render leest opnieuw de actuele top, zonder de library te muteren. Drie directe teruglegknoppen hergebruiken dezelfde gecontroleerde afhandeling. De simulatorpagina gebruikt een flex/grid-layout met extra ruimte voor de battlefield; geen vaste hoogte kapt kaartinhoud af.
 
 ## Statische API-documentatie
 
