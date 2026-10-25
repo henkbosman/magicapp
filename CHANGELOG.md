@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.22.1 - 2026-10-25
+
+- Goldfishing heeft een vaste schermbegrenzing in plaats van een minimale schermhoogte plus een battlefieldminimum van 420 pixels. De kop, compacte tellers en mobiele navigatie worden binnen dezelfde hoogte meegenomen.
+- Enchantments en Artifacts krijgen exact gelijke hoogtes, ook wanneer één vak veel kaarten en het andere geen kaarten bevat. Kaartgebieden scrollen afzonderlijk; extra kaarten vergroten de pagina niet.
+- De bovenste zones blijven op smalle schermen in één horizontaal scrollbare rij. Op zeer lage schermen kan de speeltafel intern scrollen zodat alle zones bereikbaar blijven.
+- Alleen CSS, releasegegevens en documentatie gewijzigd; geen wijzigingen aan speltoestand, databases of API-endpoints.
+
 ## 2.22.0 - 2026-10-25
 
 - Graveyard en Exile worden als compacte stapels getoond, met de bovenste kaart en aantalbadge. Via de stapelpopup blijven alle exemplaren afzonderlijk te vergroten en te verplaatsen, ook kaarten onderin.

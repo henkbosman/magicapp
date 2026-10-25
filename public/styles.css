@@ -1069,23 +1069,41 @@ button[data-write-action].write-disabled,
 .group-order-actions { display: inline-flex; gap: 5px; }
 .group-order-actions .icon-button { width: 32px; height: 32px; border-radius: 8px; font-size: .95rem; }
 
-.simulator-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.simulator-metrics .metric-card { min-height: 105px; padding: 15px; }
+body:has(#deck-simulator-root) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.app-shell:has(#deck-simulator-root),
+.workspace:has(#deck-simulator-root) { height: 100%; min-height: 0; }
+.simulator-metrics { flex: 0 1 auto; min-height: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; overflow: auto; }
+.simulator-metrics .metric-card { min-width: 0; min-height: 0; padding: 6px 10px; flex-direction: row; align-items: center; gap: 8px; }
+.simulator-metrics .metric-card span { font-size: .72rem; }
+.simulator-metrics .metric-card strong { margin: 0; font-size: 1.25rem; }
+.simulator-metrics .metric-card small { display: none; }
 #app:has(#deck-simulator-root) {
+  --simulator-nav-space: 0px;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - var(--topbar));
-  min-height: calc(100dvh - var(--topbar));
-  padding-bottom: 24px;
+  height: calc(100vh - var(--topbar));
+  height: calc(100dvh - var(--topbar));
+  min-height: 0;
+  padding-top: 10px;
+  padding-bottom: calc(10px + var(--simulator-nav-space));
+  overflow: hidden;
 }
-#deck-simulator-root { flex: 1; display: flex; min-width: 0; }
-.simulator-layout { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+#app:has(#deck-simulator-root) > .page-header { flex: 0 1 auto; min-height: 0; max-height: 22vh; max-height: 22dvh; display: flex; align-items: center; gap: 12px; margin-bottom: 10px; overflow: auto; }
+#app:has(#deck-simulator-root) > .page-header > div:first-child { min-width: 0; flex: 1; }
+#app:has(#deck-simulator-root) .page-header h1 { font-size: clamp(1.1rem, 1.7vw, 1.5rem); margin-bottom: 4px; overflow-wrap: anywhere; }
+#app:has(#deck-simulator-root) .page-header .eyebrow { margin-bottom: 3px; font-size: .65rem; }
+#app:has(#deck-simulator-root) .page-header p:not(.eyebrow) { font-size: .78rem; }
+#app:has(#deck-simulator-root) .page-actions { flex: 0 0 auto; margin-top: 0; }
+#deck-simulator-root { flex: 1 1 0; display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.simulator-layout { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
 .simulator-table {
   min-width: 0;
-  padding: 16px;
+  min-height: 0;
+  padding: 10px;
   display: grid;
-  grid-template-rows: auto minmax(420px, 1fr) auto;
-  gap: 14px;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
+  gap: 10px;
+  overflow: hidden;
   border: 1px solid #2d5c3e;
   border-radius: 18px;
   background:
@@ -1093,32 +1111,33 @@ button[data-write-action].write-disabled,
     linear-gradient(145deg, #20553a, #16462f 58%, #113a27);
   box-shadow: inset 0 1px rgba(255,255,255,.08), 0 10px 28px rgba(17,58,39,.14);
 }
-.simulator-zone-battlefield { display: flex; flex-direction: column; }
+.simulator-zone-battlefield { min-height: 0; display: flex; flex-direction: column; }
 .simulator-battlefield-layout {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
 }
 .simulator-battlefield-main,
-.simulator-battlefield-side { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
-.simulator-battlefield-side { padding-left: 14px; border-left: 1px solid var(--line); }
-.simulator-battlefield-area { min-width: 0; }
-.simulator-battlefield-area[data-sim-battlefield-area="lands"] { margin-top: auto; }
-.simulator-battlefield-area > h3 { margin-bottom: 10px; color: var(--ink-soft); font-size: .76rem; font-weight: 750; }
-.simulator-top-zones { display: grid; grid-template-columns: minmax(160px, .8fr) repeat(3, minmax(0, 1fr)); gap: 12px; }
-.simulator-zone { min-width: 0; padding: 11px; border: 1px solid rgba(255,255,255,.16); border-radius: 13px; background: rgba(245,250,247,.94); box-shadow: 0 5px 15px rgba(5,30,18,.12); }
-.simulator-zone > header { min-height: 28px; margin-bottom: 9px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.simulator-battlefield-side { min-width: 0; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 10px; }
+.simulator-battlefield-side { grid-template-rows: repeat(2, minmax(0, 1fr)); padding-left: 12px; border-left: 1px solid var(--line); }
+.simulator-battlefield-area { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.simulator-battlefield-area > h3 { flex: 0 0 auto; margin-bottom: 5px; color: var(--ink-soft); font-size: .76rem; font-weight: 750; }
+.simulator-top-zones { min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(130px, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 10px; overflow: auto; }
+.simulator-zone { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 7px; border: 1px solid rgba(255,255,255,.16); border-radius: 13px; background: rgba(245,250,247,.94); box-shadow: 0 5px 15px rgba(5,30,18,.12); overflow: hidden; }
+.simulator-zone > header { flex: 0 0 auto; min-height: 25px; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .simulator-zone > header h2 { font-size: .88rem; }
 .simulator-zone > header > span { min-width: 25px; height: 25px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: .7rem; font-weight: 800; }
-.simulator-zone-cards { min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 9px; }
+.simulator-zone-cards { flex: 1 1 0; min-width: 0; min-height: 0; padding: 4px 9px 9px 4px; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: repeat(auto-fill, minmax(205px, 1fr)); gap: 9px; }
 .simulator-zone-battlefield .simulator-zone-cards,
 .simulator-zone-hand .simulator-zone-cards { grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); }
 .simulator-zone-empty { grid-column: 1 / -1; min-height: 64px; margin: 0; display: grid; place-items: center; color: var(--ink-faint); font-size: .76rem; text-align: center; }
 .simulator-card { min-width: 0; padding: 8px; display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: start; gap: 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); transition: transform .15s, opacity .15s; }
 .simulator-card.tapped { opacity: .72; }
-.library-pile-wrap { display: grid; justify-items: center; gap: 10px; }
+.library-pile-wrap { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; justify-content: center; align-items: flex-start; padding: 4px 10px 10px; overflow: auto; }
 .library-pile { width: 92px; aspect-ratio: 5 / 7; position: relative; display: grid; place-items: center; align-content: center; gap: 2px; border: 2px solid #c7ae69; border-radius: 9px; background: linear-gradient(145deg, #1c2921, #0c1510); color: #f5e2a4; box-shadow: 5px 5px 0 #d8ddd8, 8px 8px 0 rgba(21,34,26,.28); cursor: pointer; }
 .library-pile:disabled { opacity: .55; cursor: default; }
 .library-pile strong { font-size: 1.55rem; line-height: 1; }
@@ -1145,20 +1164,38 @@ button[data-write-action].write-disabled,
 
 @media (max-width: 1180px) {
   .simulator-layout { grid-template-columns: 1fr; }
-  .simulator-top-zones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .simulator-information { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .turn-card { grid-column: span 2; }
 }
 
 @media (max-width: 820px) {
-  .simulator-top-zones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .simulator-library-zone { grid-row: auto; }
   .insight-auto-preview { grid-template-columns: 1fr; }
   .insight-checkbox-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+@media (max-width: 900px) {
+  #app:has(#deck-simulator-root) { --simulator-nav-space: calc(72px + env(safe-area-inset-bottom)); }
+}
+@media (max-height: 600px) {
+  /* Keep every zone reachable when even the compact page chrome leaves very
+     little room, without growing the page beyond the viewport. */
+  .simulator-table {
+    grid-template-rows: minmax(100px, 1fr) minmax(220px, 2.4fr) minmax(100px, 1fr);
+    overflow: auto;
+  }
+  #app:has(#deck-simulator-root) { padding-top: 6px; }
+  #app:has(#deck-simulator-root) .page-header p { display: none; }
+  #app:has(#deck-simulator-root) .page-header h1 { font-size: 1rem; }
+  #app:has(#deck-simulator-root) .page-actions .button { min-height: 32px; padding: 6px 9px; font-size: .75rem; }
+}
 @media (max-width: 640px) {
-  #app:has(#deck-simulator-root) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .simulator-metrics { gap: 5px; }
+  .simulator-metrics .metric-card { padding: 4px 2px; flex-direction: column; gap: 2px; }
+  .simulator-metrics .metric-card span { font-size: .65rem; }
+  #app:has(#deck-simulator-root) .page-header p { display: none; }
+  #app:has(#deck-simulator-root) .page-actions { gap: 5px; }
+  #app:has(#deck-simulator-root) .page-actions .button { padding: 7px 9px; min-height: 36px; font-size: .75rem; }
   .simulator-battlefield-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 10px; }
   .simulator-battlefield-side { padding-left: 9px; }
   .mana-manual-row { grid-template-columns: minmax(0, 1fr) 82px 36px; }
@@ -1168,11 +1205,9 @@ button[data-write-action].write-disabled,
   .deck-group-member > .mana-cost { grid-column: 3; }
   .deck-group-member .play-order-arrow { display: none; }
   .play-order-step { width: 26px; height: 26px; }
-  .simulator-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .simulator-table { margin: 0 -10px; padding: 10px; border-radius: 14px; }
-  .simulator-top-zones { grid-template-columns: 1fr; }
+  .simulator-table { padding: 6px; gap: 6px; border-radius: 14px; }
   .simulator-library-zone { grid-row: auto; }
-  .simulator-zone { padding: 9px; }
+  .simulator-zone { padding: 5px; }
   .simulator-zone-cards,
   .simulator-zone-battlefield .simulator-zone-cards,
   .simulator-zone-hand .simulator-zone-cards { grid-template-columns: 1fr; }
@@ -1307,6 +1342,15 @@ body.simulator-touch-dragging { overflow: hidden; user-select: none; }
   touch-action: none;
 }
 .library-pile:focus-visible { outline: 3px solid rgba(50, 112, 68, .35); outline-offset: 4px; }
+.library-pile-wrap > .library-pile {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  height: 100%;
+  max-height: 162px;
+  max-width: 116px;
+  aspect-ratio: 488 / 680;
+}
 .library-pile.empty { box-shadow: none; cursor: default; opacity: .45; }
 .library-pile img { width: 100%; aspect-ratio: 488 / 680; display: block; object-fit: cover; border-radius: inherit; pointer-events: none; }
 .library-pile .sim-library-top-image,
