@@ -29,7 +29,7 @@ const sampleDeck = () => [
   { ...deckCard(16, 'Sideboard card', 1), role: 'sideboard' }
 ];
 
-async function setup(t, cards = sampleDeck()) {
+async function setup(t, cards = sampleDeck(), { tokens = () => [] } = {}) {
   const keys = ['document', 'window', 'Element', 'FormData', 'HTMLButtonElement',
     'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement'];
   const originals = keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
@@ -125,7 +125,17 @@ async function setup(t, cards = sampleDeck()) {
     innerWidth: 1280, innerHeight: 900,
     setTimeout: (...args) => setTimeout(...args)
   });
-  globalThis.FormData = class {};
+  globalThis.FormData = class {
+    constructor(form) {
+      this.values = form.elements.filter((field) => field.name && !field.disabled
+        && (!['checkbox', 'radio'].includes(field.type) || field.checked))
+        .map((field) => [field.name, field.value]);
+    }
+    get(name) { return this.values.find(([key]) => key === name)?.[1] ?? null; }
+    getAll(name) { return this.values.filter(([key]) => key === name).map(([, value]) => value); }
+    entries() { return this.values[Symbol.iterator](); }
+    [Symbol.iterator]() { return this.entries(); }
+  };
   for (const key of keys.filter((key) => key.includes('Element'))) globalThis[key] = Element;
   setWriteAvailability(false);
   const requests = [];
@@ -133,6 +143,11 @@ async function setup(t, cards = sampleDeck()) {
     requests.push({ url: String(url), method: options.method || 'GET' });
     if (String(url) === '/api/read/decks/7') return Response.json({ data: { id: 7, name: 'Forest test', format: 'Commander' } });
     if (String(url) === '/api/read/decks/7/cards') return Response.json({ data: cards });
+    const tokenMatch = String(url).match(/^\/api\/read\/cards\/(\d+)\/tokens$/);
+    if (tokenMatch) {
+      const response = await tokens(Number(tokenMatch[1]), options);
+      return response instanceof Response ? response : Response.json({ data: response });
+    }
     throw new Error(`Unexpected request: ${url}`);
   });
   const app = document.getElementById('app');
@@ -156,7 +171,7 @@ async function setup(t, cards = sampleDeck()) {
     zone(target).dispatch('dragover', { dataTransfer });
     zone(target).dispatch('drop', { dataTransfer });
   };
-  const zoneCount = (name) => Number(zone(name).querySelector('header').querySelector('span').textContent);
+  const zoneCount = (name) => Number(zone(name).getAttribute('data-sim-count'));
   const libraryCount = () => zoneCount('library');
   const allToBattlefield = () => {
     while (libraryCount()) drag(root().querySelector('[data-sim-library-source]'), 'battlefield');
@@ -210,7 +225,9 @@ test('goldfishing opens without the sidebar, end-turn or header library buttons 
   assert.equal(ui.root().querySelector('[data-sim-end-turn]'), null);
   for (const id of ['sim-end-turn', 'sim-search-library', 'sim-shuffle-library']) assert.equal(ui.document.getElementById(id), null);
   assert.equal(ui.instances('exile').length, 0);
-  assert.ok(ui.document.querySelector('.simulator-metrics').textContent.includes('Exile'));
+  assert.equal(ui.document.querySelector('.simulator-metrics'), null);
+  assert.equal(ui.root().textContent.trim(), '', 'empty playfield chrome contains no visible labels or counts');
+  assert.ok(ui.zone('exile').getAttribute('aria-label').includes('Exile'));
   assert.equal(ui.instances('hand').length, 7);
   assert.equal(ui.instances('command').length, 1);
   assert.equal(ui.instances().some((card) => card.dataset.simInstance === '16:1'), false, 'sideboard excluded');
@@ -231,7 +248,8 @@ test('same battlefield cards stack across printings while images and every physi
   assert.equal(forest.querySelectorAll('[data-sim-instance]').length, 4);
   assert.equal(ui.instance('12:2').closest('.simulator-card-stack'), forest);
   assert.notEqual(ui.instance('13:1').closest('.simulator-card-stack'), forest);
-  assert.match(forest.querySelector('.simulator-stack-count').textContent, /4/);
+  assert.equal(forest.querySelector('.simulator-stack-count'), null);
+  assert.match(forest.getAttribute('aria-label'), /4/);
   assert.match(ui.instance('11:1').querySelector('img').getAttribute('src'), /\/cards\/111\/image/);
   assert.match(ui.instance('12:2').querySelector('img').getAttribute('src'), /\/cards\/112\/image/);
   assert.ok(ui.instances('battlefield').every((card) => card.getAttribute('draggable') === 'true' && card.getAttribute('tabindex') === '0'));
@@ -243,7 +261,8 @@ test('same battlefield cards stack across printings while images and every physi
 test('tapping and untapping individual stacked copies preserves focus and reunites only those copies', async (t) => {
   const ui = await setup(t);
   ui.allToBattlefield();
-  ui.instance('12:2').dispatch('dblclick');
+  ui.tick(450);
+  ui.instance('12:2').click();
   assert.ok(ui.instance('12:2').classList.contains('tapped'));
   assert.ok(!ui.instance('11:1').classList.contains('tapped'));
   assert.equal(ui.instance('12:2').closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 1);
@@ -281,7 +300,8 @@ test('stack identity handles older printing IDs and missing IDs without mixing d
 test('dragging a stacked copy changes exactly one zone entry and returning it preserves its printing', async (t) => {
   const ui = await setup(t);
   ui.allToBattlefield();
-  ui.instance('12:2').dispatch('dblclick');
+  ui.tick(450);
+  ui.instance('12:2').click();
   ui.drag(ui.instance('12:2'), 'graveyard');
   assert.equal(ui.instances('battlefield').length, 6);
   assert.equal(ui.instances('graveyard').length, 1);
@@ -299,22 +319,24 @@ test('dragging a stacked copy changes exactly one zone entry and returning it pr
   assertUniqueInstances(ui, 8);
 });
 
-test('large land groups use bounded stacks without dropping copies when tapping or moving them', async (t) => {
+test('large land groups remain one unlimited stack without dropping copies when tapping or moving them', async (t) => {
   const ui = await setup(t, [deckCard(21, 'Forest', 13)]);
   ui.allToBattlefield();
-  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length), [5, 5, 3]);
-  ui.instance('21:6').dispatch('dblclick');
+  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length), [13]);
+  ui.tick(450);
+  ui.instance('21:6').click();
   ui.drag(ui.instance('21:9'), 'graveyard');
-  assert.ok(ui.stacks().every((stack) => stack.querySelectorAll('[data-sim-instance]').length <= 5));
+  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length).sort((a, b) => a - b), [1, 11]);
   assert.ok(ui.instance('21:6').classList.contains('tapped'));
-  ui.instance('21:6').dispatch('dblclick');
+  ui.tick(450);
+  ui.instance('21:6').click();
   ui.drag(ui.instance('21:9'), 'battlefield');
   assertUniqueInstances(ui, 13);
-  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length), [5, 5, 3]);
+  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length), [13]);
 });
 
 test('zoom on a stacked copy uses its actual printing and drag does not open an accidental zoom', async (t) => {
-  const ui = await setup(t);
+  const ui = await setup(t, [deckCard(11, 'Llanowar Elves', 2), deckCard(12, 'Llanowar Elves', 2)]);
   ui.allToBattlefield();
   ui.instance('12:2').click();
   ui.tick(350);
@@ -329,7 +351,7 @@ test('zoom on a stacked copy uses its actual printing and drag does not open an 
   ui.instance('11:1').dispatch('keydown', { key: 'Enter' });
   dialog = ui.document.querySelector('dialog');
   assert.match(dialog.querySelector('img').getAttribute('src'), /\/cards\/111\/image\?face=front&size=large/);
-  assertUniqueInstances(ui, 8);
+  assertUniqueInstances(ui, 4);
 });
 
 test('touch dragging a stacked copy moves only the selected instance', async (t) => {
@@ -372,7 +394,8 @@ test('the library search still moves an exact printing into a stack after sideba
 test('goldfishing remains temporary and fully usable in read-only mode, including reset', async (t) => {
   const ui = await setup(t, [deckCard(31, 'Forest', 10)]);
   ui.allToBattlefield();
-  ui.instance('31:1').dispatch('dblclick');
+  ui.tick(450);
+  ui.instance('31:1').click();
   ui.document.getElementById('sim-reset').click();
   const dialog = ui.document.querySelector('dialog');
   assert.equal(dialog.querySelector('[data-write-action]'), null);
@@ -745,7 +768,8 @@ test('graveyard and exile show one top card but their browser retains every buri
     assert.equal(ui.instances(zone).length, 1);
     const pile = ui.zone(zone).querySelector('[data-sim-zone-pile]');
     assert.equal(pile.dataset.simInstance, topId);
-    assert.equal(pile.querySelector('.library-pile-count').textContent, '3');
+    assert.equal(pile.querySelector('.library-pile-count'), null);
+    assert.match(pile.getAttribute('aria-label'), /3 kaarten/);
     assert.equal(pile.getAttribute('draggable'), 'true');
   }
   ui.zone('graveyard').querySelector('[data-sim-zone-pile]').dispatch('keydown', { key: 'Enter' });
@@ -833,4 +857,297 @@ test('empty zone piles remain inspectable without fake cards, and disposed pile 
   assertUniqueInstances(ui, 8);
   assert.ok(ui.requests.every((request) => request.method === 'GET'));
   assert.equal(ui.storageWrites.length, 0);
+});
+
+const relatedToken = (overrides = {}) => ({
+  scryfallId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+  name: 'Badger', typeLine: 'Token Creature — Badger', oracleText: '',
+  colors: ['G'], keywords: [], power: '3', toughness: '3', available: true,
+  images: { normal: 'https://cards.scryfall.io/normal/front/a/b/badger.jpg' },
+  ...overrides
+});
+
+async function openCardMenu(ui, id, key = null) {
+  const card = ui.instance(id);
+  assert.ok(card, 'card menu opener exists');
+  card.dispatch(key ? 'keydown' : 'contextmenu', key
+    ? { key, shiftKey: key === 'F10' }
+    : { clientX: 80, clientY: 90 });
+  await flush();
+}
+
+function cardAction(ui, action) {
+  const button = ui.document.querySelector(`[data-sim-card-action="${action}"]`);
+  assert.ok(button, `${action} action exists`);
+  button.click();
+  const dialog = ui.document.querySelector(`[data-sim-card-dialog="${action}"]`);
+  assert.ok(dialog, `${action} dialog exists`);
+  assert.equal(dialog.querySelector('[data-write-action]'), null, 'simulator action works without the write API');
+  return dialog;
+}
+
+function fillDialog(dialog, values) {
+  for (const [name, value] of Object.entries(values)) {
+    const input = dialog.querySelector(`[name="${name}"]`);
+    assert.ok(input, `${name} field exists`);
+    input.value = String(value);
+  }
+}
+
+async function submitDialog(dialog, values = {}) {
+  fillDialog(dialog, values);
+  dialog.querySelector('form').dispatch('submit');
+  await flush();
+}
+
+const generatedCards = (ui, zone = 'battlefield') => ui.instances(zone)
+  .filter((card) => card.dataset.simInstance.startsWith('generated:'));
+
+test('basic land click and keyboard actions tap one copy without zoom or a second double-click toggle', async (t) => {
+  const ui = await setup(t, [
+    deckCard(301, 'Wastes', 2, { typeLine: 'Basic Land' }),
+    deckCard(302, 'Snow-Covered Forest', 1, { typeLine: 'Basic Snow Land — Forest' }),
+    deckCard(303, 'Ordinary nonbasic land', 1, { typeLine: 'Land' })
+  ]);
+  ui.allToBattlefield();
+  ui.tick(450);
+  ui.instance('301:1').dispatch('click', { detail: 1 });
+  assert.ok(ui.instance('301:1').classList.contains('tapped'), 'single click taps immediately');
+  assert.ok(!ui.instance('301:2').classList.contains('tapped'));
+  ui.instance('301:1').dispatch('click', { detail: 2 });
+  ui.instance('301:1').dispatch('dblclick');
+  ui.tick(400);
+  assert.ok(ui.instance('301:1').classList.contains('tapped'), 'double-click sequence does not toggle again');
+  assert.equal(ui.document.querySelector('dialog'), null);
+  ui.instance('301:1').dispatch('keydown', { key: 'Enter' });
+  assert.ok(!ui.instance('301:1').classList.contains('tapped'));
+  ui.instance('302:1').dispatch('keydown', { key: ' ' });
+  assert.ok(ui.instance('302:1').classList.contains('tapped'));
+  assert.equal(ui.document.querySelector('dialog'), null);
+  ui.instance('303:1').click();
+  ui.tick(320);
+  assert.ok(ui.document.querySelector('dialog'), 'nonbasic lands retain click-to-zoom');
+  assertUniqueInstances(ui, 4);
+});
+
+test('battlefield menus expose appropriate creature and noncreature actions and support keyboard dismissal', async (t) => {
+  const ui = await setup(t, [
+    deckCard(311, 'Creature', 1),
+    deckCard(312, 'Artifact', 1, { typeLine: 'Artifact' })
+  ]);
+  ui.instance('311:1').dispatch('contextmenu');
+  assert.equal(ui.document.querySelector('[data-sim-card-action]'), null, 'hand cards do not expose battlefield actions');
+  ui.allToBattlefield();
+  await openCardMenu(ui, '311:1', 'F10');
+  assert.ok(ui.document.querySelector('[data-sim-card-action="counters"]'));
+  assert.ok(ui.document.querySelector('[data-sim-card-action="duplicate"]'));
+  assert.equal(ui.document.querySelector('[data-sim-card-action="token"]'), null, 'no related tokens means no token action');
+  ui.document.dispatch('keydown', { key: 'Escape' });
+  assert.equal(ui.document.querySelector('[data-sim-card-action]'), null);
+  assert.equal(ui.document.activeElement, ui.instance('311:1'));
+  await openCardMenu(ui, '312:1');
+  assert.equal(ui.document.querySelector('[data-sim-card-action="duplicate"]'), null);
+  const dialog = cardAction(ui, 'counters');
+  assert.ok(dialog.querySelector('[name="generic"]'));
+  assert.equal(dialog.querySelector('[name="power"]'), null);
+  assert.equal(dialog.querySelector('[name="toughness"]'), null);
+  await submitDialog(dialog, { generic: 4 });
+  assert.equal(ui.instance('312:1').querySelector('.simulator-card-counters').textContent.trim(), '4');
+  assert.equal(ui.instance('311:1').querySelector('.simulator-card-counters'), null);
+});
+
+test('counter totals belong to a single instance, split its stack and can be reset without mutating card metadata', async (t) => {
+  const cards = [deckCard(321, 'Twin', 2, { power: '2', toughness: '2' })];
+  const original = structuredClone(cards);
+  const ui = await setup(t, cards);
+  ui.allToBattlefield();
+  await openCardMenu(ui, '321:1');
+  let dialog = cardAction(ui, 'counters');
+  assert.equal(dialog.querySelector('[name="generic"]'), null);
+  await submitDialog(dialog, { power: 2, toughness: 3 });
+  assert.equal(ui.instance('321:1').querySelector('.simulator-card-counters').textContent.trim(), '+2/+3');
+  assert.equal(ui.instance('321:2').querySelector('.simulator-card-counters'), null);
+  assert.equal(ui.stacks().length, 2, 'different counters cannot hide in the same stack');
+  await openCardMenu(ui, '321:1');
+  dialog = cardAction(ui, 'counters');
+  assert.equal(dialog.querySelector('[name="power"]').value, '2');
+  assert.equal(dialog.querySelector('[name="toughness"]').value, '3');
+  await submitDialog(dialog, { power: 0, toughness: 0 });
+  assert.equal(ui.instance('321:1').querySelector('.simulator-card-counters'), null);
+  assert.equal(ui.stacks().length, 1);
+  assert.deepEqual(cards, original);
+  assertUniqueInstances(ui, 2);
+  assert.ok(ui.requests.every((request) => request.method === 'GET'));
+  assert.equal(ui.storageWrites.length, 0);
+});
+
+test('duplicate validates quantity, applies once and creates independent uncountered copies in an unlimited stack', async (t) => {
+  const cards = [deckCard(331, 'Copy source', 1, { power: '4', toughness: '4' })];
+  const original = structuredClone(cards);
+  const ui = await setup(t, cards);
+  ui.allToBattlefield();
+  await openCardMenu(ui, '331:1');
+  await submitDialog(cardAction(ui, 'counters'), { power: 1, toughness: 2 });
+  ui.instance('331:1').dispatch('dblclick');
+  await openCardMenu(ui, '331:1');
+  const dialog = cardAction(ui, 'duplicate');
+  for (const invalid of ['0', '-1', '1.5', '1001']) {
+    await submitDialog(dialog, { quantity: invalid });
+    assert.equal(dialog.open, true);
+    assert.equal(ui.zoneCount('battlefield'), 1, 'invalid quantity creates nothing');
+  }
+  fillDialog(dialog, { quantity: 8 });
+  const form = dialog.querySelector('form');
+  form.dispatch('submit');
+  form.dispatch('submit');
+  await flush();
+  assert.equal(ui.zoneCount('battlefield'), 9, 'double submission still creates exactly eight copies');
+  const generated = generatedCards(ui);
+  assert.equal(generated.length, 8);
+  assert.ok(generated.every((card) => !card.classList.contains('tapped')));
+  assert.ok(generated.every((card) => card.querySelector('.simulator-card-counters') === null));
+  assert.equal(generated[0].closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 8);
+  assert.equal(ui.instance('331:1').querySelector('.simulator-card-counters').textContent.trim(), '+1/+2');
+  assert.match(generated[0].querySelector('img').getAttribute('src'), /\/cards\/431\/image/);
+  assertUniqueInstances(ui, 9);
+  assert.deepEqual(cards, original);
+  assert.equal(ui.storageWrites.length, 0);
+});
+
+test('token selection creates the chosen kind and keeps generated cards usable in every library workflow', async (t) => {
+  const creature = relatedToken();
+  const treasure = relatedToken({
+    scryfallId: 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
+    name: 'Treasure', typeLine: 'Token Artifact — Treasure', power: null, toughness: null, colors: [],
+    images: { normal: 'https://cards.scryfall.io/normal/front/b/c/treasure.jpg' }
+  });
+  const ui = await setup(t, [deckCard(341, 'Token maker', 1)], { tokens: () => [creature, treasure] });
+  ui.allToBattlefield();
+  await openCardMenu(ui, '341:1');
+  let dialog = cardAction(ui, 'token');
+  const choices = dialog.querySelector('[name="tokenIndex"]');
+  assert.equal(choices.options.length, 2);
+  await submitDialog(dialog, { tokenIndex: 1, quantity: 3 });
+  assert.equal(generatedCards(ui).length, 3);
+  assert.ok(generatedCards(ui).every((card) => card.closest('[data-sim-battlefield-area]').dataset.simBattlefieldArea === 'artifacts'));
+  const id = generatedCards(ui)[0].dataset.simInstance;
+  const image = ui.instance(id).querySelector('img').getAttribute('src');
+  assert.match(image, /\/cards\/image-cache\?url=/);
+  assert.ok(decodeURIComponent(image).includes('treasure.jpg'));
+  await openCardMenu(ui, id);
+  assert.equal(ui.document.querySelector('[data-sim-card-action="duplicate"]'), null);
+  assert.equal(ui.document.querySelector('[data-sim-card-action="token"]'), null);
+  ui.document.dispatch('keydown', { key: 'Escape' });
+  ui.drag(ui.instance(id), 'library');
+  assert.equal(ui.libraryCount(), 1);
+  ui.libraryAction('peek');
+  assert.equal(ui.root().querySelector('[data-sim-library-source]').querySelector('img').getAttribute('src'), image);
+  ui.libraryAction('reveal');
+  assert.equal(ui.revealed().length, 1);
+  assert.equal(ui.revealed()[0].querySelector('img').getAttribute('src'), image);
+  ui.revealed()[0].click();
+  const zoom = ui.document.querySelectorAll('dialog').at(-1);
+  assert.match(zoom.querySelector('img').getAttribute('src'), /\/cards\/image-cache\?url=/);
+  assert.ok(!zoom.querySelector('img').getAttribute('src').includes('undefined'));
+  zoom.close();
+  ui.revealMove(id, 'hand');
+  finishReveal(ui, 'top');
+  assert.equal(ui.instance(id).dataset.simSourceZone, 'hand');
+  ui.drag(ui.instance(id), 'battlefield');
+  assertUniqueInstances(ui, 4);
+  assert.ok(ui.requests.every((request) => request.method === 'GET'));
+});
+
+test('identical tokens from different makers form one stack and individual counters do not alter their siblings', async (t) => {
+  const ui = await setup(t, [deckCard(351, 'Maker A', 1), deckCard(352, 'Maker B', 1)], {
+    tokens: () => [relatedToken()]
+  });
+  ui.allToBattlefield();
+  for (const id of ['351:1', '352:1']) {
+    await openCardMenu(ui, id);
+    await submitDialog(cardAction(ui, 'token'), { quantity: 4 });
+  }
+  const generated = generatedCards(ui);
+  assert.equal(generated.length, 8);
+  assert.equal(generated[0].closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 8);
+  const id = generated[0].dataset.simInstance;
+  await openCardMenu(ui, id);
+  await submitDialog(cardAction(ui, 'counters'), { power: 5, toughness: 5 });
+  assert.equal(ui.instance(id).querySelector('.simulator-card-counters').textContent.trim(), '+5/+5');
+  assert.ok(generatedCards(ui).filter((card) => card.dataset.simInstance !== id)
+    .every((card) => card.querySelector('.simulator-card-counters') === null));
+  assertUniqueInstances(ui, 10);
+});
+
+test('token lookup errors offer retry and do not claim missing token capability', async (t) => {
+  let calls = 0;
+  const ui = await setup(t, [deckCard(361, 'Maker', 1)], { tokens: () => {
+    calls++;
+    if (calls === 1) return Response.json({ error: { message: 'Tijdelijk niet beschikbaar' } }, { status: 503 });
+    return [relatedToken()];
+  } });
+  ui.allToBattlefield();
+  await openCardMenu(ui, '361:1');
+  assert.equal(ui.document.querySelector('[data-sim-card-action="token"]'), null);
+  assert.ok(ui.document.querySelector('[data-sim-token-status]').textContent.length > 0);
+  const retry = ui.document.querySelector('[data-sim-card-action="retry"]');
+  assert.ok(retry);
+  retry.click();
+  await flush();
+  assert.ok(ui.document.querySelector('[data-sim-card-action="token"]'));
+  assert.equal(calls, 2);
+  assertUniqueInstances(ui, 1);
+});
+
+test('late token lookup responses cannot reopen menus or alter a restarted simulator', async (t) => {
+  let resolveTokens;
+  let requestSignal;
+  const ui = await setup(t, [deckCard(371, 'Slow maker', 1)], { tokens: (_id, options) => {
+    requestSignal = options.signal;
+    return new Promise((resolve) => { resolveTokens = resolve; });
+  } });
+  ui.allToBattlefield();
+  ui.instance('371:1').dispatch('contextmenu');
+  await flush();
+  assert.equal(typeof resolveTokens, 'function');
+  await ui.open();
+  assert.ok(requestSignal.aborted);
+  resolveTokens([relatedToken()]);
+  await flush();
+  assert.equal(ui.document.querySelector('[data-sim-card-action]'), null);
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.equal(ui.zoneCount('battlefield'), 0);
+  assert.equal(ui.zoneCount('hand'), 1);
+  assertUniqueInstances(ui, 1);
+});
+
+test('stale menus and dialogs cannot duplicate a moved source or affect a reset game', async (t) => {
+  const ui = await setup(t, [deckCard(381, 'Source', 1)]);
+  ui.allToBattlefield();
+  await openCardMenu(ui, '381:1');
+  const oldAction = ui.document.querySelector('[data-sim-card-action="duplicate"]');
+  ui.drag(ui.instance('381:1'), 'graveyard');
+  oldAction.click();
+  assert.equal(ui.document.querySelector('dialog'), null);
+  ui.drag(ui.instance('381:1'), 'battlefield');
+  await openCardMenu(ui, '381:1');
+  let dialog = cardAction(ui, 'duplicate');
+  ui.drag(ui.instance('381:1'), 'graveyard');
+  await submitDialog(dialog, { quantity: 3 });
+  assert.equal(ui.zoneCount('battlefield'), 0, 'moving the source invalidates its dialog');
+  assertUniqueInstances(ui, 1);
+  dialog.close();
+  ui.drag(ui.instance('381:1'), 'battlefield');
+  await openCardMenu(ui, '381:1');
+  dialog = cardAction(ui, 'duplicate');
+  const oldForm = dialog.querySelector('form');
+  ui.document.getElementById('sim-reset').click();
+  const reset = ui.document.querySelectorAll('dialog').at(-1);
+  await submitDialog(reset);
+  oldForm.dispatch('submit');
+  await flush();
+  assert.equal(ui.document.querySelector('dialog'), null);
+  assert.equal(ui.zoneCount('battlefield'), 0);
+  assert.equal(ui.zoneCount('hand'), 1);
+  assertUniqueInstances(ui, 1);
 });

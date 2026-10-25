@@ -1,4 +1,5 @@
 import { cardImage } from './components.js';
+import { simulatorItem } from './simulator-permanents.js';
 import { escapeHtml, openDialog } from './utils.js';
 
 const RETURN_LABELS = {
@@ -26,7 +27,7 @@ export function createSimulatorLibraryController({
   let reveal = null;
   const dialogs = new Set();
 
-  const itemFor = (instance) => byDeckCardId.get(Number(instance?.deckCardId));
+  const itemFor = (instance) => simulatorItem(instance, byDeckCardId);
   const currentLibrary = () => getState()?.zones?.library || [];
   const isCurrent = (state) => !disposed && getState() === state;
 

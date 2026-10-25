@@ -1,8 +1,10 @@
 import { api, apiPath } from '../api.js';
 import { createSimulatorLibraryController } from '../simulator-library.js';
+import { createSimulatorCardActions } from '../simulator-card-actions.js';
+import { simulatorItem, simulatorStackKey, simulatorCounterLabel, isSimulatorBasicLand } from '../simulator-permanents.js';
 import {
   cardImage,
-  metric,
+  cachedCardImageUrl,
   pageHeader
 } from '../components.js';
 import {
@@ -13,7 +15,6 @@ import { escapeHtml, openDialog, toast } from '../utils.js';
 
 const SIMULATED_ROLES = new Set(['main']);
 const COMMAND_ROLES = new Set(['commander', 'partner', 'companion']);
-const MAX_STACK_SIZE = 5;
 const ZONE_LABELS = {
   library: 'Library', hand: 'Hand', battlefield: 'Tafel', graveyard: 'Graveyard', exile: 'Exile', command: 'Command zone'
 };
@@ -52,6 +53,7 @@ function createInitialState(cards) {
   for (let index = 0; index < 7 && zones.library.length; index += 1) hand.push(zones.library.pop());
   return {
     libraryTopVisible: false,
+    nextGeneratedId: 0,
     zones: {
       library: zones.library,
       hand,
@@ -69,7 +71,7 @@ function itemMap(cards) {
 }
 
 function itemForInstance(instance, byDeckCardId) {
-  return byDeckCardId.get(Number(instance?.deckCardId)) || null;
+  return simulatorItem(instance, byDeckCardId);
 }
 
 function findZone(state, instanceId) {
@@ -105,20 +107,12 @@ function simulatorCard(instance, zone, byDeckCardId, { stackIndex, stackSize } =
   if (!item) return '';
   const positionLabel = stackSize > 1 ? `, exemplaar ${stackIndex + 1} van ${stackSize}` : '';
   const stateLabel = zone === 'battlefield' ? `, ${instance.tapped ? 'getapt' : 'ongetapt'}` : '';
-  const label = `${item.card.name} in ${ZONE_LABELS[zone]}${stateLabel}${positionLabel}`;
-  return `<div class="simulator-playing-card ${instance.tapped ? 'tapped' : ''}" data-sim-instance="${escapeHtml(instance.id)}" data-sim-source-zone="${zone}" draggable="true" tabindex="0" role="button" aria-label="${escapeHtml(label)}" title="${escapeHtml(item.card.name)}">
+  const counters = simulatorCounterLabel(instance, item.card);
+  const label = `${item.card.name} in ${ZONE_LABELS[zone]}${stateLabel}${positionLabel}${counters ? `, counters ${counters}` : ''}`;
+  return `<div class="simulator-playing-card ${instance.tapped ? 'tapped' : ''}" data-sim-instance="${escapeHtml(instance.id)}" data-sim-source-zone="${zone}" draggable="true" tabindex="0" role="button" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"${zone === 'battlefield' ? ' aria-haspopup="menu"' : ''}>
     ${cardImage(item.card, { className: 'sim-playing-card-image' })}
+    ${counters ? `<span class="simulator-card-counters" aria-hidden="true">${escapeHtml(counters)}</span>` : ''}
   </div>`;
-}
-
-function battlefieldIdentity(card, instance) {
-  // cardKey normally contains the Oracle ID, but falls back to a printing ID
-  // for older records. Prefer the name over that printing-specific fallback.
-  const oracleId = String(card?.oracleId || (card?.cardKey !== card?.scryfallId ? card?.cardKey : '') || '').trim().toLowerCase();
-  if (oracleId) return `oracle:${oracleId}`;
-  const name = String(card?.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
-  if (name) return `name:${name}`;
-  return `instance:${instance.id}`;
 }
 
 function battlefieldStacksHtml(instances, byDeckCardId) {
@@ -126,27 +120,22 @@ function battlefieldStacksHtml(instances, byDeckCardId) {
   for (const instance of instances) {
     const item = itemForInstance(instance, byDeckCardId);
     if (!item) continue;
-    const key = JSON.stringify([battlefieldIdentity(item.card, instance), Boolean(instance.tapped)]);
+    const key = simulatorStackKey(instance, item.card);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(instance);
   }
 
-  const stacks = [];
-  for (const group of groups.values()) {
-    // Every copy stays individually visible, focusable and draggable. Limiting
-    // each pile prevents large land groups from covering their own controls.
-    for (let offset = 0; offset < group.length; offset += MAX_STACK_SIZE) {
-      const stack = group.slice(offset, offset + MAX_STACK_SIZE);
-      const item = itemForInstance(stack[0], byDeckCardId);
-      const tapped = Boolean(stack[0].tapped);
-      const label = `${stack.length} × ${item.card.name} · ${tapped ? 'getapt' : 'ongetapt'}`;
-      stacks.push(`<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" style="--sim-stack-count: ${stack.length}">
-        <div class="simulator-stack-cards">${stack.map((instance, stackIndex) => `<div class="simulator-stack-slot" style="--sim-stack-index: ${stackIndex}">${simulatorCard(instance, 'battlefield', byDeckCardId, { stackIndex, stackSize: stack.length })}</div>`).join('')}</div>
-        ${stack.length > 1 ? `<span class="simulator-stack-count" aria-hidden="true">${stack.length}</span>` : ''}
-      </div>`);
-    }
-  }
-  return stacks.join('');
+  return [...groups.values()].map((stack) => {
+    const item = itemForInstance(stack[0], byDeckCardId);
+    const tapped = Boolean(stack[0].tapped);
+    const label = `${stack.length} × ${item.card.name} · ${tapped ? 'getapt' : 'ongetapt'}`;
+    // Keep every instance in a single pile. Large piles use a compact fan;
+    // keyboard focus still reaches every copy, with its own menu and tap state.
+    const step = Math.min(22, 88 / Math.max(1, stack.length - 1));
+    return `<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" data-sim-stack-count="${stack.length}" style="--sim-stack-count: ${stack.length}; --sim-stack-step: ${step}px">
+      <div class="simulator-stack-cards">${stack.map((instance, stackIndex) => `<div class="simulator-stack-slot" style="--sim-stack-index: ${stackIndex}">${simulatorCard(instance, 'battlefield', byDeckCardId, { stackIndex, stackSize: stack.length })}</div>`).join('')}</div>
+    </div>`;
+  }).join('');
 }
 
 function battlefieldArea(card) {
@@ -167,12 +156,10 @@ function battlefieldHtml(instances, byDeckCardId) {
   for (const instance of instances) {
     groups[battlefieldArea(itemForInstance(instance, byDeckCardId)?.card)].push(instance);
   }
-  const area = (key, label) => `<section class="simulator-battlefield-area simulator-battlefield-${key}" data-sim-battlefield-area="${key}">
-    <h3>${label}</h3>
+  const area = (key, label) => `<section class="simulator-battlefield-area simulator-battlefield-${key}" data-sim-battlefield-area="${key}" aria-label="${escapeHtml(label)}">
     <div class="simulator-zone-cards">${battlefieldStacksHtml(groups[key], byDeckCardId)}</div>
   </section>`;
-  return `<section class="simulator-zone simulator-zone-battlefield" data-sim-dropzone="battlefield">
-    <header><h2>Tafel</h2><span>${instances.length}</span></header>
+  return `<section class="simulator-zone simulator-zone-battlefield" data-sim-dropzone="battlefield" data-sim-count="${instances.length}" aria-label="Tafel: ${instances.length} kaarten">
     <div class="simulator-battlefield-layout">
       <div class="simulator-battlefield-main">
         ${area('creatures', 'Creatures')}
@@ -187,24 +174,19 @@ function battlefieldHtml(instances, byDeckCardId) {
   </section>`;
 }
 
-function zoneHtml(zone, instances, byDeckCardId, { empty = 'Sleep kaarten hierheen.' } = {}) {
-  return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}">
-    <header><h2>${escapeHtml(ZONE_LABELS[zone])}</h2><span>${instances.length}</span></header>
-    <div class="simulator-zone-cards">${instances.length
-      ? instances.map((instance) => simulatorCard(instance, zone, byDeckCardId)).join('')
-      : `<p class="simulator-zone-empty">${escapeHtml(empty)}</p>`}</div>
+function zoneHtml(zone, instances, byDeckCardId) {
+  return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}" data-sim-count="${instances.length}" aria-label="${escapeHtml(ZONE_LABELS[zone])}: ${instances.length} kaarten">
+    <div class="simulator-zone-cards">${instances.map((instance) => simulatorCard(instance, zone, byDeckCardId)).join('')}</div>
   </section>`;
 }
 
 function libraryPileHtml(state, byDeckCardId) {
   const item = itemForInstance(state.zones.library.at(-1), byDeckCardId);
   const visible = state.libraryTopVisible && item;
-  return `<section class="simulator-zone simulator-library-zone" data-sim-dropzone="library">
-    <header><h2>Library</h2><span>${state.zones.library.length}</span></header>
+  return `<section class="simulator-zone simulator-library-zone" data-sim-dropzone="library" data-sim-count="${state.zones.library.length}" aria-label="Library: ${state.zones.library.length} kaarten">
     <div class="library-pile-wrap">
       <div class="library-pile ${state.zones.library.length ? '' : 'empty'}${visible ? ' is-face-up' : ''}" data-sim-library-source draggable="${state.zones.library.length ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="menu" aria-label="Library-acties; klik of gebruik de rechtermuisknop" title="Klik of rechtermuisknop voor library-acties; sleep de bovenste kaart naar een zone">
         ${visible ? cardImage(item.card, { className: 'sim-library-top-image' }) : '<span class="library-card-back" aria-hidden="true"><i></i></span>'}
-        <span class="library-pile-count">${state.zones.library.length}</span>
       </div>
     </div>
   </section>`;
@@ -214,12 +196,10 @@ function zonePileHtml(zone, instances, byDeckCardId) {
   const top = instances.at(-1);
   const item = itemForInstance(top, byDeckCardId);
   const label = `${ZONE_LABELS[zone]}: ${instances.length} kaarten; klik om de stapel te bekijken`;
-  return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}">
-    <header><h2>${escapeHtml(ZONE_LABELS[zone])}</h2><span>${instances.length}</span></header>
+  return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}" data-sim-count="${instances.length}" aria-label="${escapeHtml(ZONE_LABELS[zone])}: ${instances.length} kaarten">
     <div class="library-pile-wrap">
       <div class="library-pile simulator-zone-pile${top ? '' : ' empty'}" data-sim-zone-pile="${zone}" ${top ? `data-sim-instance="${escapeHtml(top.id)}" data-sim-source-zone="${zone}"` : ''} draggable="${top ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="dialog" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
-        ${item ? cardImage(item.card, { className: 'sim-zone-pile-image' }) : `<span class="sim-zone-pile-placeholder">${escapeHtml(ZONE_LABELS[zone])}</span>`}
-        <span class="library-pile-count">${instances.length}</span>
+        ${item ? cardImage(item.card, { className: 'sim-zone-pile-image' }) : `<span class="sim-zone-pile-placeholder" aria-hidden="true"></span>`}
       </div>
     </div>
   </section>`;
@@ -229,17 +209,20 @@ function openSimulatorCardZoom(item) {
   const card = item?.card;
   if (!card) return null;
   const revision = encodeURIComponent(`${card.scryfallId || ''}:${card.updatedAt || ''}`);
-  const front = apiPath(`/cards/${card.id}/image?face=front&size=large&v=${revision}`);
+  const local = Number.isInteger(Number(card.id)) && Number(card.id) > 0;
+  const front = local ? apiPath(`/cards/${card.id}/image?face=front&size=large&v=${revision}`)
+    : cachedCardImageUrl(card.images?.large || card.images?.normal || card.images?.png || card.images?.small);
   const hasBack = Boolean(card.images?.backLarge || card.images?.backNormal || card.images?.backSmall || card.images?.backPng);
   const back = hasBack
-    ? apiPath(`/cards/${card.id}/image?face=back&size=large&v=${revision}`)
+    ? (local ? apiPath(`/cards/${card.id}/image?face=back&size=large&v=${revision}`)
+      : cachedCardImageUrl(card.images?.backLarge || card.images?.backNormal || card.images?.backPng || card.images?.backSmall))
     : '';
   return openDialog({
     title: card.name,
     cancelLabel: 'Sluiten',
     wide: hasBack,
     content: `<div class="simulator-card-zoom ${hasBack ? 'has-back' : ''}">
-      <figure><img src="${escapeHtml(front)}" alt="${escapeHtml(card.name)}"><figcaption>Voorzijde</figcaption></figure>
+      <figure>${front ? `<img src="${escapeHtml(front)}" alt="${escapeHtml(card.name)}">` : '<p>Geen afbeelding beschikbaar.</p>'}<figcaption>Voorzijde</figcaption></figure>
       ${hasBack ? `<figure><img src="${escapeHtml(back)}" alt="${escapeHtml(`Achterzijde van ${card.name}`)}"><figcaption>Achterzijde</figcaption></figure>` : ''}
     </div>`
   });
@@ -252,7 +235,7 @@ function tableHtml(state, byDeckCardId) {
         ${libraryPileHtml(state, byDeckCardId)}
         ${zonePileHtml('graveyard', state.zones.graveyard, byDeckCardId)}
         ${zonePileHtml('exile', state.zones.exile, byDeckCardId)}
-        ${zoneHtml('command', state.zones.command, byDeckCardId, { empty: 'Geen commander of companion.' })}
+        ${zoneHtml('command', state.zones.command, byDeckCardId)}
       </div>
       ${battlefieldHtml(state.zones.battlefield, byDeckCardId)}
       ${zoneHtml('hand', state.zones.hand, byDeckCardId)}
@@ -561,16 +544,6 @@ function zonePileDialog(zone, state, byDeckCardId, { isCurrent, onMove, onZoom }
   return dialog;
 }
 
-function metricsHtml(state) {
-  return [
-    metric('Library', state.zones.library.length, 'Kaarten over'),
-    metric('Hand', state.zones.hand.length, 'Kaarten in hand'),
-    metric('Tafel', state.zones.battlefield.length, 'Kaarten op tafel'),
-    metric('Graveyard', state.zones.graveyard.length, 'Kaarten in graveyard'),
-    metric('Exile', state.zones.exile.length, 'Kaarten in exile')
-  ].join('');
-}
-
 export async function renderDeckSimulator(context) {
   const deckId = Number(context.params.id);
   const returnToken = context.query.get('return') || '';
@@ -585,10 +558,8 @@ export async function renderDeckSimulator(context) {
     html: `${pageHeader({
       eyebrow: `${deck.format} · Speeltest`,
       title: `${deck.name} - Goldfishing`,
-      description: 'Sleep kaarten vrij tussen library, hand, tafel, command zone, graveyard en exile.',
       actions: `<button id="simulator-back" class="button secondary" type="button">← ${escapeHtml(getDeckSimulatorReturnLabel(returnToken))}</button><button id="sim-reset" class="button secondary" type="button">Reset</button>`
     })}
-    <section class="simulator-metrics metrics-grid">${metricsHtml(state)}</section>
     <div id="deck-simulator-root">${tableHtml(state, byDeckCardId)}</div>`,
     mount() {
       const root = document.getElementById('deck-simulator-root');
@@ -596,6 +567,7 @@ export async function renderDeckSimulator(context) {
       let cardClickTimer = null;
       let suppressCardZoomUntil = 0;
       let libraryController = null;
+      let cardActions = null;
       const listeners = [];
       const dialogs = new Set();
       const listen = (element, type, handler) => {
@@ -613,9 +585,8 @@ export async function renderDeckSimulator(context) {
       const render = () => {
         if (disposed) return;
         libraryController?.closeMenu();
+        cardActions?.closeMenu();
         if (root) root.innerHTML = tableHtml(state, byDeckCardId);
-        const metrics = document.querySelector('.simulator-metrics');
-        if (metrics) metrics.innerHTML = metricsHtml(state);
       };
       libraryController = createSimulatorLibraryController({
         getState: () => state,
@@ -635,8 +606,11 @@ export async function renderDeckSimulator(context) {
           }));
         }
       });
+      cardActions = createSimulatorCardActions({ getState: () => state, byDeckCardId, render, openCardZoom });
       const openZonePile = (zone) => {
         if (disposed || !['graveyard', 'exile'].includes(zone)) return;
+        libraryController.closeMenu();
+        cardActions.closeMenu();
         const pileState = state;
         trackDialog(zonePileDialog(zone, pileState, byDeckCardId, {
           isCurrent: () => !disposed && state === pileState,
@@ -660,6 +634,7 @@ export async function renderDeckSimulator(context) {
         suppressCardZoomUntil = Date.now() + 400;
         clearTimeout(cardClickTimer);
         libraryController.closeMenu();
+        cardActions.closeMenu();
       }) : () => {};
 
       listen(document.getElementById('simulator-back'), 'click', () => returnFromDeckSimulator(returnToken, deckId));
@@ -674,6 +649,7 @@ export async function renderDeckSimulator(context) {
             if (disposed) return true;
             clearTimeout(cardClickTimer);
             libraryController.closeDialogs();
+            cardActions.closeDialogs();
             for (const dialog of dialogs) if (dialog !== resetDialog) dialog.close();
             state = createInitialState(cards);
             render();
@@ -683,7 +659,26 @@ export async function renderDeckSimulator(context) {
         }));
       });
 
+      const toggleCard = (found) => {
+        if (disposed || found?.zone !== 'battlefield') return;
+        found.instance.tapped = !found.instance.tapped;
+        state.updatedAt = Date.now();
+        render();
+        [...root.querySelectorAll('[data-sim-instance]')]
+          .find((entry) => entry.dataset.simInstance === found.instance.id)?.focus();
+      };
+      const openBattlefieldMenu = (event, card) => {
+        const found = findZone(state, card?.dataset.simInstance);
+        if (disposed || found?.zone !== 'battlefield') return false;
+        event.preventDefault();
+        clearTimeout(cardClickTimer);
+        libraryController.closeMenu();
+        cardActions.openMenu({ instanceId: found.instance.id, opener: card, clientX: event.clientX, clientY: event.clientY });
+        return true;
+      };
       listen(root, 'contextmenu', (event) => {
+        const card = event.target.closest('[data-sim-instance]');
+        if (card && openBattlefieldMenu(event, card)) return;
         const pile = event.target.closest('[data-sim-zone-pile]');
         if (pile) {
           event.preventDefault();
@@ -695,6 +690,7 @@ export async function renderDeckSimulator(context) {
         if (!library) return;
         event.preventDefault();
         clearTimeout(cardClickTimer);
+        cardActions.closeMenu();
         libraryController.openMenu({ opener: library, clientX: event.clientX, clientY: event.clientY });
       });
       listen(root, 'dblclick', (event) => {
@@ -715,8 +711,10 @@ export async function renderDeckSimulator(context) {
           return;
         }
         if (found?.zone !== 'battlefield') return;
-        found.instance.tapped = !found.instance.tapped;
-        render();
+        // Basic lands already acted on the first click. A dblclick event must
+        // not undo that action or open the image popup.
+        if (isSimulatorBasicLand(itemForInstance(found.instance, byDeckCardId)?.card)) return;
+        toggleCard(found);
       });
       listen(root, 'click', (event) => {
         if (Date.now() < suppressCardZoomUntil || event.detail > 1) return;
@@ -732,13 +730,21 @@ export async function renderDeckSimulator(context) {
         if (library) {
           clearTimeout(cardClickTimer);
           cardClickTimer = window.setTimeout(() => {
-            if (!disposed && Date.now() >= suppressCardZoomUntil) libraryController.openMenu({ opener: library });
+            if (!disposed && Date.now() >= suppressCardZoomUntil) {
+              cardActions.closeMenu();
+              libraryController.openMenu({ opener: library });
+            }
           }, 320);
           return;
         }
         const card = event.target.closest('[data-sim-instance]');
         if (!card) return;
         clearTimeout(cardClickTimer);
+        const clicked = findZone(state, card.dataset.simInstance);
+        if (clicked?.zone === 'battlefield' && isSimulatorBasicLand(itemForInstance(clicked.instance, byDeckCardId)?.card)) {
+          toggleCard(clicked);
+          return;
+        }
         cardClickTimer = window.setTimeout(() => {
           if (disposed || Date.now() < suppressCardZoomUntil) return;
           const found = findZone(state, card.dataset.simInstance);
@@ -758,25 +764,30 @@ export async function renderDeckSimulator(context) {
         if (library && (['Enter', ' ', 'ContextMenu'].includes(event.key) || (event.key === 'F10' && event.shiftKey))) {
           event.preventDefault();
           clearTimeout(cardClickTimer);
+          cardActions.closeMenu();
           libraryController.openMenu({ opener: library });
           return;
         }
         const card = event.target.closest('[data-sim-instance]');
+        if (card && (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))) {
+          openBattlefieldMenu(event, card);
+          return;
+        }
         if (!card || !['Enter', ' '].includes(event.key)) return;
         const found = findZone(state, card.dataset.simInstance);
         event.preventDefault();
+        clearTimeout(cardClickTimer);
+        if (found?.zone === 'battlefield' && isSimulatorBasicLand(itemForInstance(found.instance, byDeckCardId)?.card)) {
+          toggleCard(found);
+          return;
+        }
         if (event.key === 'Enter') {
           const item = found ? itemForInstance(found.instance, byDeckCardId) : null;
           if (item) openCardZoom(item);
           return;
         }
         if (found?.zone === 'battlefield') {
-          found.instance.tapped = !found.instance.tapped;
-          render();
-          // Preserve keyboard focus when this copy moves between tapped and
-          // untapped stacks, so Space still acts on the same physical card.
-          [...root.querySelectorAll('[data-sim-instance]')]
-            .find((entry) => entry.dataset.simInstance === found.instance.id)?.focus();
+          toggleCard(found);
         }
       });
       return () => {
@@ -784,6 +795,7 @@ export async function renderDeckSimulator(context) {
         clearTimeout(cardClickTimer);
         cleanupDrag();
         libraryController.dispose();
+        cardActions.dispose();
         for (const dialog of dialogs) dialog.close();
         dialogs.clear();
         for (const cleanup of listeners) cleanup();

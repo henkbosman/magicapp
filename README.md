@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.22.4
+# Magic Collection Manager 2.23.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -53,6 +53,8 @@ Versie **2.22.2** herstelt het normale scrollen van de Goldfishing-pagina en de 
 Versie **2.22.3** geeft Hand en Command zone een vaste hoogte met één horizontale rij kaarten. De verticale scrollbalken in deze twee vakken en de herhaalde tekst **Sleep kaarten naar de tafel.** vervallen.
 
 Versie **2.22.4** maakt het speelveld compacter met kleinere marges en tussenruimtes. **Tafel** heeft een minimumhoogte voor volledige kaarten en groeit mee met extra kaarten en stapels. De speeltafel heeft geen vaste schermhoogte meer.
+
+Versie **2.23.0** verwijdert zonekoppen en aantaltellers uit Goldfishing, tapt basic lands met één klik en voegt een kaartmenu toe voor tokens, counters en creaturekopieën. Stapels hebben geen limiet van vijf meer.
 
 ## Belangrijkste mogelijkheden
 
@@ -345,11 +347,21 @@ Deterministische statistieken worden zonder AI berekend.
 
 Via **Goldfishing** op de deckpagina open je de vrije speeltafel. Kaarten kunnen met drag-and-drop tussen library, hand, tafel, graveyard, exile en command zone worden verplaatst.
 
-De Goldfishing-pagina scrollt normaal, met de oorspronkelijke paginakop en tellers boven de speeltafel. De speeltafel heeft kleine binnenmarges en tussenruimtes van 4 pixels. Hand en Command zone blijven vaste horizontale kaartrijen van 220 pixels hoog (190 op mobiel); extra kaarten zijn horizontaal bereikbaar. Tafel heeft een minimumhoogte op basis van twee volledige kaartrijen met koppen. Meer kaarten, stapels en extra rijen vergroten Tafel vanzelf; er is geen vaste schermhoogte of interne verticale scrollbegrenzing op Tafel. Enchantments en Artifacts houden gelijke hoogtes. De aantalbadges staan binnen de kaartstapels. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts. Kaarten met meerdere typen krijgen één plek: Land heeft voorrang, daarna Creature, Artifact en Enchantment. Overige kaarten blijven zichtbaar in een eigen rij. De indeling gebruikt de voorzijde; subtypes tellen niet als kaarttype.
+Het speelveld bevat geen zichtbare zonekoppen, instructieteksten, aantaltellers of statistiekblokken. Namen en aantallen blijven beschikbaar voor schermlezers en via de kaarttitels. De compacte marges blijven behouden. Hand en Command zone zijn vaste horizontale kaartrijen van 196 pixels hoog (166 op mobiel). Tafel heeft een minimumhoogte voor volledige kaarten en kan meegroeien. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts, met gelijke hoogtes in de rechterkolom. De voorzijde bepaalt de indeling; bij meerdere typen geldt Land, Creature, Artifact, Enchantment.
 
-Gelijke kaarten op tafel, inclusief verschillende printings van dezelfde basic land, staan in overlappende stapels van maximaal vijf exemplaren. De aantalbadge staat op de stapel, net als bij de library. Getapte en ongetapte exemplaren staan apart. Iedere kaart behoudt zijn eigen afbeelding en blijft afzonderlijk te verslepen, vergroten en tappen. Klik op een kaart om te vergroten; dubbelklik om te tappen of untappen. Met het toetsenbord gebruik je Enter voor vergroten en de spatiebalk voor tappen. Er is geen knop **Beurt beëindigen** meer; je tapt en untapt de kaarten zelf. De tellers bovenaan tonen de aantallen in library, hand, tafel, graveyard en exile.
+Gelijke kaarten, tokens en creaturekopieën staan in één stapel zonder limiet van vijf. Verschillende printings van hetzelfde kaartconcept kunnen samen staan; verschillende tokenkenmerken, tapstatus of counters blijven afzonderlijk. Grote stapels worden compact uitgewaaierd, maar iedere instantie blijft aanwezig en via het toetsenbord afzonderlijk bereikbaar. De toetsenbordfocus brengt het gekozen exemplaar naar voren.
 
-Graveyard en Exile tonen ieder één stapel met de bovenste kaart en een aantalbadge. De bovenste kaart blijft rechtstreeks te verslepen. Klik of rechtsklik op de stapel om alle kaarten te bekijken, inclusief de kaarten onderin. Selecteer daar een kaart en kies een bestemming of **Vergroten**. Een dubbelklik op de stapel vergroot de bovenste kaart.
+Een klik op een **basic land op tafel** tapt of untapt meteen, zonder vergrotingspopup. Enter en spatie doen hetzelfde. Andere kaarten behouden klikken voor vergroten en dubbelklikken of spatie voor tappen; Enter vergroot. Er is geen automatische beurtadministratie.
+
+Rechtsklik op een kaart op tafel, of gebruik de contextmenutoets/Shift+F10, voor:
+
+- **Maak token**: verschijnt wanneer de bestaande kaartgegevens beschikbare gekoppelde tokens bevatten. Kies de tokenvariant en het aantal. Ook verschillende zijden van een tokenprinting worden apart aangeboden. Bij een laadfout kun je opnieuw proberen.
+- **Geef counters**: stel voor een creature de totale power- en toughness-counters afzonderlijk in; voor andere kaarttypen één algemeen totaal. Nul wist die counters. Alleen het gekozen exemplaar verandert. Niet-nulwaarden verschijnen compact op de kaartafbeelding.
+- **Dupliceer**: beschikbaar bij creatures. Maak het opgegeven aantal extra exemplaren van de basiskaart, zonder counters en ongetapt. De oorspronkelijke kaart blijft behouden.
+
+Tokens en kopieën krijgen eigen lokale instanties en kunnen tussen zones worden verplaatst. Per aanmaakactie zijn 1–1000 exemplaren mogelijk; herhaalde acties blijven samen stapelen. De tokenfunctie gebruikt bestaande concrete tokenkoppelingen, geen vrije interpretatie van kaartregels. Voor willekeurige creaturekopietokens zonder vaste tokenkoppeling kun je **Dupliceer** op het gewenste creature gebruiken.
+
+Graveyard en Exile tonen ieder één stapel met de bovenste kaart. Die blijft rechtstreeks te verslepen. Klik of rechtsklik om alle kaarten te bekijken, inclusief de kaarten onderin; selecteer een kaart en kies een bestemming of **Vergroten**. Een dubbelklik vergroot de bovenste kaart.
 
 Rechtsklik op de library voor:
 

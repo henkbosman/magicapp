@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.23.0 - 2026-10-25
+
+- Zichtbare zonekoppen, instructies, aantaltellers en statistiekblokken zijn uit Goldfishing verwijderd. Namen en aantallen blijven toegankelijk zonder layoutruimte in te nemen.
+- Eén klik op een basic land op tafel tapt of untapt direct. Enter/spatie werken eveneens; een dubbelklik veroorzaakt geen extra toggle of vergrotingspopup.
+- Kaarten op tafel krijgen een rechtermuisknopmenu: Maak token bij beschikbare tokenkoppelingen, Geef counters voor alle kaarttypen en Dupliceer voor creatures. Popups vragen een tokenvariant/aantal, twee creaturecounterwaarden of één algemeen countertotaal.
+- Tokens en creaturekopieën bestaan alleen in de actieve simulatie. Nieuwe kopieën behouden de basiskaart en printing, zonder counters of tapstatus over te nemen. Tokenafbeeldingen werken ook zonder lokaal kaart-ID.
+- Identieke kaarten en tokens stapelen zonder limiet van vijf; andere tapstatus of counters maken aparte stapels. Grote stapels blijven compact getekend en elk exemplaar blijft via het toetsenbord bereikbaar.
+- Validatie, dubbele-submitbewaking en controles op sessie/broninstantie beschermen lokale acties bij reset, verplaatsen, navigatie en vertraagde tokenantwoorden. Toegevoegd: 12 modeltests en 9 UI-tests; bestaande simulatorcontroles zijn bijgewerkt.
+- Geen databaseschema- of API-wijzigingen. Tokengegevens komen uit het bestaande leesendpoint; collectie- en deckgegevens worden niet aangepast.
+
 ## 2.22.4 - 2026-10-25
 
 - Het Goldfishing-speelveld gebruikt compacte binnenmarges en tussenruimtes van 4 pixels; kopmarges zijn verkleind. Hand en Command zone behouden hun vaste horizontale kaartrij, nu 220 pixels hoog (190 op mobiel).
