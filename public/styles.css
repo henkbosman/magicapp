@@ -1069,34 +1069,15 @@ button[data-write-action].write-disabled,
 .group-order-actions { display: inline-flex; gap: 5px; }
 .group-order-actions .icon-button { width: 32px; height: 32px; border-radius: 8px; font-size: .95rem; }
 
-body:has(#deck-simulator-root) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
-.app-shell:has(#deck-simulator-root),
-.workspace:has(#deck-simulator-root) { height: 100%; min-height: 0; }
-.simulator-metrics { flex: 0 1 auto; min-height: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; overflow: auto; }
-.simulator-metrics .metric-card { min-width: 0; min-height: 0; padding: 6px 10px; flex-direction: row; align-items: center; gap: 8px; }
-.simulator-metrics .metric-card span { font-size: .72rem; }
-.simulator-metrics .metric-card strong { margin: 0; font-size: 1.25rem; }
-.simulator-metrics .metric-card small { display: none; }
-#app:has(#deck-simulator-root) {
-  --simulator-nav-space: 0px;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - var(--topbar));
-  height: calc(100dvh - var(--topbar));
-  min-height: 0;
-  padding-top: 10px;
-  padding-bottom: calc(10px + var(--simulator-nav-space));
-  overflow: hidden;
-}
-#app:has(#deck-simulator-root) > .page-header { flex: 0 1 auto; min-height: 0; max-height: 22vh; max-height: 22dvh; display: flex; align-items: center; gap: 12px; margin-bottom: 10px; overflow: auto; }
-#app:has(#deck-simulator-root) > .page-header > div:first-child { min-width: 0; flex: 1; }
-#app:has(#deck-simulator-root) .page-header h1 { font-size: clamp(1.1rem, 1.7vw, 1.5rem); margin-bottom: 4px; overflow-wrap: anywhere; }
-#app:has(#deck-simulator-root) .page-header .eyebrow { margin-bottom: 3px; font-size: .65rem; }
-#app:has(#deck-simulator-root) .page-header p:not(.eyebrow) { font-size: .78rem; }
-#app:has(#deck-simulator-root) .page-actions { flex: 0 0 auto; margin-top: 0; }
-#deck-simulator-root { flex: 1 1 0; display: flex; min-width: 0; min-height: 0; overflow: hidden; }
+.simulator-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.simulator-metrics .metric-card { min-height: 105px; padding: 15px; }
+#deck-simulator-root { display: flex; min-width: 0; }
 .simulator-layout { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
 .simulator-table {
+  /* Constrain only the play area; the page, header and metrics scroll normally. */
+  --simulator-nav-space: 0px;
+  height: calc(100vh - 48px - var(--simulator-nav-space));
+  height: calc(100dvh - 48px - var(--simulator-nav-space));
   min-width: 0;
   min-height: 0;
   padding: 10px;
@@ -1175,27 +1156,17 @@ body:has(#deck-simulator-root) { height: 100vh; height: 100dvh; min-height: 0; o
 }
 
 @media (max-width: 900px) {
-  #app:has(#deck-simulator-root) { --simulator-nav-space: calc(72px + env(safe-area-inset-bottom)); }
+  .simulator-table { --simulator-nav-space: calc(72px + env(safe-area-inset-bottom)); }
 }
 @media (max-height: 600px) {
-  /* Keep every zone reachable when even the compact page chrome leaves very
-     little room, without growing the page beyond the viewport. */
+  /* Short screens can scroll inside the table as well as the page. */
   .simulator-table {
     grid-template-rows: minmax(100px, 1fr) minmax(220px, 2.4fr) minmax(100px, 1fr);
     overflow: auto;
   }
-  #app:has(#deck-simulator-root) { padding-top: 6px; }
-  #app:has(#deck-simulator-root) .page-header p { display: none; }
-  #app:has(#deck-simulator-root) .page-header h1 { font-size: 1rem; }
-  #app:has(#deck-simulator-root) .page-actions .button { min-height: 32px; padding: 6px 9px; font-size: .75rem; }
 }
 @media (max-width: 640px) {
-  .simulator-metrics { gap: 5px; }
-  .simulator-metrics .metric-card { padding: 4px 2px; flex-direction: column; gap: 2px; }
-  .simulator-metrics .metric-card span { font-size: .65rem; }
-  #app:has(#deck-simulator-root) .page-header p { display: none; }
-  #app:has(#deck-simulator-root) .page-actions { gap: 5px; }
-  #app:has(#deck-simulator-root) .page-actions .button { padding: 7px 9px; min-height: 36px; font-size: .75rem; }
+  .simulator-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .simulator-battlefield-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 10px; }
   .simulator-battlefield-side { padding-left: 9px; }
   .mana-manual-row { grid-template-columns: minmax(0, 1fr) 82px 36px; }

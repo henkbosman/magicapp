@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.22.2 - 2026-10-25
+
+- De begrenzing van de hele Goldfishing-pagina is teruggedraaid. De pagina scrollt weer normaal en de paginakop, knoppen en tellers hebben hun oorspronkelijke formaat.
+- Alleen de speeltafel heeft een hoogte op basis van het scherm, met ruimte voor de vaste mobiele navigatie. Interne kaartgebieden en de fallback voor lage schermen blijven beschikbaar.
+- Enchantments en Artifacts houden ieder de helft van de rechterkolom.
+- Alleen CSS, releasegegevens en documentatie gewijzigd; geen wijzigingen aan speltoestand, databases of API-endpoints.
+
 ## 2.22.1 - 2026-10-25
 
 - Goldfishing heeft een vaste schermbegrenzing in plaats van een minimale schermhoogte plus een battlefieldminimum van 420 pixels. De kop, compacte tellers en mobiele navigatie worden binnen dezelfde hoogte meegenomen.
