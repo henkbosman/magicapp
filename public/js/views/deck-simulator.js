@@ -1,4 +1,5 @@
 import { api, apiPath } from '../api.js';
+import { createSimulatorLibraryController } from '../simulator-library.js';
 import {
   cardImage,
   metric,
@@ -8,13 +9,13 @@ import {
   getDeckSimulatorReturnLabel,
   returnFromDeckSimulator
 } from '../navigation-state.js';
-import { confirmDialog, escapeHtml, openDialog, toast } from '../utils.js';
+import { escapeHtml, openDialog, toast } from '../utils.js';
 
 const SIMULATED_ROLES = new Set(['main']);
 const COMMAND_ROLES = new Set(['commander', 'partner', 'companion']);
 const MAX_STACK_SIZE = 5;
 const ZONE_LABELS = {
-  library: 'Library', hand: 'Hand', battlefield: 'Tafel', graveyard: 'Graveyard', command: 'Command zone'
+  library: 'Library', hand: 'Hand', battlefield: 'Tafel', graveyard: 'Graveyard', exile: 'Exile', command: 'Command zone'
 };
 
 function shuffle(values) {
@@ -50,16 +51,14 @@ function createInitialState(cards) {
   const hand = [];
   for (let index = 0; index < 7 && zones.library.length; index += 1) hand.push(zones.library.pop());
   return {
-    turn: 1,
     zones: {
       library: zones.library,
       hand,
       battlefield: [],
       graveyard: [],
+      exile: [],
       command: zones.command
     },
-    turnActions: { drawn: [], played: [], graveyarded: [] },
-    history: [],
     updatedAt: Date.now()
   };
 }
@@ -82,26 +81,20 @@ function findZone(state, instanceId) {
 
 function moveInstance(state, instanceId, targetZone) {
   const found = findZone(state, instanceId);
-  if (!found || !state.zones[targetZone] || found.zone === targetZone) return false;
+  if (!found || !Array.isArray(state.zones[targetZone]) || found.zone === targetZone) return false;
   const [instance] = state.zones[found.zone].splice(found.index, 1);
   instance.tapped = false;
   state.zones[targetZone].push(instance);
-  if (targetZone === 'hand' && found.zone === 'library') state.turnActions.drawn.push(instance.id);
-  if (targetZone === 'battlefield' && found.zone !== 'battlefield') state.turnActions.played.push(instance.id);
-  if (targetZone === 'graveyard' && found.zone !== 'graveyard') state.turnActions.graveyarded.push(instance.id);
   state.updatedAt = Date.now();
   return true;
 }
 
 function drawTop(state, targetZone = 'hand') {
-  if (targetZone === 'library') return false;
+  if (targetZone === 'library' || !Array.isArray(state.zones[targetZone])) return false;
   const instance = state.zones.library.pop();
-  if (!instance || !state.zones[targetZone]) return false;
+  if (!instance) return false;
   instance.tapped = false;
   state.zones[targetZone].push(instance);
-  if (targetZone === 'hand') state.turnActions.drawn.push(instance.id);
-  if (targetZone === 'battlefield') state.turnActions.played.push(instance.id);
-  if (targetZone === 'graveyard') state.turnActions.graveyarded.push(instance.id);
   state.updatedAt = Date.now();
   return true;
 }
@@ -148,7 +141,7 @@ function battlefieldStacksHtml(instances, byDeckCardId) {
       const label = `${stack.length} × ${item.card.name} · ${tapped ? 'getapt' : 'ongetapt'}`;
       stacks.push(`<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" style="--sim-stack-count: ${stack.length}">
         <div class="simulator-stack-cards">${stack.map((instance, stackIndex) => `<div class="simulator-stack-slot" style="--sim-stack-index: ${stackIndex}">${simulatorCard(instance, 'battlefield', byDeckCardId, { stackIndex, stackSize: stack.length })}</div>`).join('')}</div>
-        ${stack.length > 1 ? `<span class="simulator-stack-count" aria-hidden="true">${stack.length}×</span>` : ''}
+        ${stack.length > 1 ? `<span class="simulator-stack-count" aria-hidden="true">${stack.length}</span>` : ''}
       </div>`);
     }
   }
@@ -168,10 +161,9 @@ function zoneHtml(zone, instances, byDeckCardId, { empty = 'Sleep kaarten hierhe
 
 function libraryPileHtml(state) {
   return `<section class="simulator-zone simulator-library-zone" data-sim-dropzone="library">
-    <div class="sim-library-end-turn"><button class="button primary" type="button" data-sim-end-turn>Beurt beëindigen</button></div>
     <header><h2>Library</h2><span>${state.zones.library.length}</span></header>
     <div class="library-pile-wrap">
-      <div class="library-pile ${state.zones.library.length ? '' : 'empty'}" data-sim-library-source draggable="${state.zones.library.length ? 'true' : 'false'}" tabindex="0" role="button" aria-label="Bovenste kaart van library; sleep naar een zone" title="Sleep de bovenste kaart naar hand, tafel of graveyard">
+      <div class="library-pile ${state.zones.library.length ? '' : 'empty'}" data-sim-library-source draggable="${state.zones.library.length ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="menu" aria-label="Library-acties; klik of gebruik de rechtermuisknop" title="Klik of rechtermuisknop voor library-acties; sleep de bovenste kaart naar een zone">
         <span class="library-card-back" aria-hidden="true"><i></i></span>
         <span class="library-pile-count">${state.zones.library.length}</span>
       </div>
@@ -205,6 +197,7 @@ function tableHtml(state, byDeckCardId) {
       <div class="simulator-top-zones">
         ${libraryPileHtml(state)}
         ${zoneHtml('graveyard', state.zones.graveyard, byDeckCardId)}
+        ${zoneHtml('exile', state.zones.exile, byDeckCardId)}
         ${zoneHtml('command', state.zones.command, byDeckCardId, { empty: 'Geen commander of companion.' })}
       </div>
       ${zoneHtml('battlefield', state.zones.battlefield, byDeckCardId)}
@@ -346,11 +339,12 @@ function installTouchDrag(root, onDrop, onDragComplete) {
     if (drag) onDragComplete();
     cleanup();
   });
+  return cleanup;
 }
 
 function installSimulatorDrag(root, onDrop, onDragComplete = () => {}) {
   installNativeDrag(root, onDrop, onDragComplete);
-  installTouchDrag(root, onDrop, onDragComplete);
+  return installTouchDrag(root, onDrop, onDragComplete);
 }
 
 function librarySearchDialog(state, byDeckCardId, onMove) {
@@ -363,7 +357,7 @@ function librarySearchDialog(state, byDeckCardId, onMove) {
     cancelLabel: 'Sluiten',
     wide: true,
     content: `<div class="field"><label>Kaartnaam</label><input id="sim-library-filter" type="search" autocomplete="off" placeholder="Filter library..."></div>
-      <div class="sim-library-dialog-targets"><div data-library-dialog-target="hand">Hand</div><div data-library-dialog-target="battlefield">Tafel</div><div data-library-dialog-target="graveyard">Graveyard</div></div>
+      <div class="sim-library-dialog-targets"><div data-library-dialog-target="hand">Hand</div><div data-library-dialog-target="battlefield">Tafel</div><div data-library-dialog-target="graveyard">Graveyard</div><div data-library-dialog-target="exile">Exile</div></div>
       <div id="sim-library-results" class="sim-library-image-grid">${rows.map(({ item, instance }) => `<div class="sim-library-image-card" data-library-search-row data-search="${escapeHtml(item.card.name.toLocaleLowerCase('nl'))}" data-library-instance="${escapeHtml(instance.id)}" draggable="true" tabindex="0" title="${escapeHtml(item.card.name)}">
           ${cardImage(item.card, { className: 'sim-library-card-image' })}
         </div>`).join('')}</div>`
@@ -429,6 +423,16 @@ function librarySearchDialog(state, byDeckCardId, onMove) {
   return dialog;
 }
 
+function metricsHtml(state) {
+  return [
+    metric('Library', state.zones.library.length, 'Kaarten over'),
+    metric('Hand', state.zones.hand.length, 'Kaarten in hand'),
+    metric('Tafel', state.zones.battlefield.length, 'Kaarten op tafel'),
+    metric('Graveyard', state.zones.graveyard.length, 'Kaarten in graveyard'),
+    metric('Exile', state.zones.exile.length, 'Kaarten in exile')
+  ].join('');
+}
+
 export async function renderDeckSimulator(context) {
   const deckId = Number(context.params.id);
   const returnToken = context.query.get('return') || '';
@@ -443,87 +447,102 @@ export async function renderDeckSimulator(context) {
     html: `${pageHeader({
       eyebrow: `${deck.format} · Speeltest`,
       title: `${deck.name} - Goldfishing`,
-      description: 'Sleep kaarten vrij tussen library, hand, tafel, command zone en graveyard.',
-      actions: `<button id="simulator-back" class="button secondary" type="button"><- ${escapeHtml(getDeckSimulatorReturnLabel(returnToken))}</button><button id="sim-search-library" class="button secondary" type="button">Library bekijken</button><button id="sim-shuffle-library" class="button secondary" type="button">Schudden</button><button id="sim-end-turn" class="button primary" type="button">Beurt beëindigen</button><button id="sim-reset" class="button secondary" type="button">Reset</button>`
+      description: 'Sleep kaarten vrij tussen library, hand, tafel, command zone, graveyard en exile.',
+      actions: `<button id="simulator-back" class="button secondary" type="button">← ${escapeHtml(getDeckSimulatorReturnLabel(returnToken))}</button><button id="sim-reset" class="button secondary" type="button">Reset</button>`
     })}
-    <section class="simulator-metrics metrics-grid">
-      ${metric('Beurt', state.turn, 'Handmatig doorlopen', 'info')}
-      ${metric('Library', state.zones.library.length, 'Kaarten over')}
-      ${metric('Hand', state.zones.hand.length, 'Kaarten in hand')}
-      ${metric('Tafel', state.zones.battlefield.length, 'Kaarten op tafel')}
-      ${metric('Graveyard', state.zones.graveyard.length, 'Kaarten in graveyard')}
-    </section>
+    <section class="simulator-metrics metrics-grid">${metricsHtml(state)}</section>
     <div id="deck-simulator-root">${tableHtml(state, byDeckCardId)}</div>`,
     mount() {
       const root = document.getElementById('deck-simulator-root');
+      let disposed = false;
       let cardClickTimer = null;
       let suppressCardZoomUntil = 0;
+      let libraryController = null;
+      const listeners = [];
+      const dialogs = new Set();
+      const listen = (element, type, handler) => {
+        if (!element) return;
+        element.addEventListener(type, handler);
+        listeners.push(() => element.removeEventListener(type, handler));
+      };
+      const trackDialog = (dialog) => {
+        if (!dialog) return null;
+        dialogs.add(dialog);
+        dialog.addEventListener('close', () => dialogs.delete(dialog), { once: true });
+        return dialog;
+      };
+      const openCardZoom = (item) => disposed ? null : trackDialog(openSimulatorCardZoom(item));
       const render = () => {
+        if (disposed) return;
+        libraryController?.closeMenu();
         if (root) root.innerHTML = tableHtml(state, byDeckCardId);
         const metrics = document.querySelector('.simulator-metrics');
-        if (metrics) metrics.innerHTML = [
-          metric('Beurt', state.turn, 'Handmatig doorlopen', 'info'),
-          metric('Library', state.zones.library.length, 'Kaarten over'),
-          metric('Hand', state.zones.hand.length, 'Kaarten in hand'),
-          metric('Tafel', state.zones.battlefield.length, 'Kaarten op tafel'),
-          metric('Graveyard', state.zones.graveyard.length, 'Kaarten in graveyard')
-        ].join('');
+        if (metrics) metrics.innerHTML = metricsHtml(state);
       };
-
+      libraryController = createSimulatorLibraryController({
+        getState: () => state,
+        byDeckCardId,
+        render,
+        moveInstance: (instanceId, targetZone) => !disposed && moveInstance(state, instanceId, targetZone),
+        drawTop: (targetZone) => !disposed && drawTop(state, targetZone),
+        openCardZoom,
+        shuffle,
+        openLibrarySearch: () => {
+          if (disposed) return null;
+          if (!state.zones.library.length) return toast('De library is leeg.', 'warning');
+          const searchedState = state;
+          return trackDialog(librarySearchDialog(searchedState, byDeckCardId, (instanceId, targetZone) => {
+            if (disposed || state !== searchedState) return;
+            if (moveInstance(state, instanceId, targetZone)) render();
+          }));
+        }
+      });
       const handleDrop = (payload, targetZone) => {
+        if (disposed) return;
         const changed = payload.type === 'library'
           ? drawTop(state, targetZone)
           : moveInstance(state, payload.id, targetZone);
         if (changed) render();
       };
-      if (root) installSimulatorDrag(root, handleDrop, () => {
+      const cleanupDrag = root ? installSimulatorDrag(root, handleDrop, () => {
         suppressCardZoomUntil = Date.now() + 400;
         clearTimeout(cardClickTimer);
-      });
+        libraryController.closeMenu();
+      }) : () => {};
 
-      const endTurn = () => {
-        state.history.unshift({ turn: state.turn, ...state.turnActions });
-        state.history = state.history.slice(0, 10);
-        state.turn += 1;
-        state.zones.battlefield.forEach((instance) => { instance.tapped = false; });
-        state.turnActions = { drawn: [], played: [], graveyarded: [] };
-        state.updatedAt = Date.now();
-        render();
-        toast(`Beurt ${state.turn} is begonnen.`);
-      };
-
-      document.getElementById('simulator-back')?.addEventListener('click', () => returnFromDeckSimulator(returnToken, deckId));
-      document.getElementById('sim-end-turn')?.addEventListener('click', endTurn);
-      document.getElementById('sim-reset')?.addEventListener('click', async () => {
-        const confirmed = await confirmDialog({
+      listen(document.getElementById('simulator-back'), 'click', () => returnFromDeckSimulator(returnToken, deckId));
+      listen(document.getElementById('sim-reset'), 'click', () => {
+        trackDialog(openDialog({
           title: 'Simulatie resetten',
-          message: 'Alle zones en beurtinformatie worden gewist. Het deck wordt opnieuw geschud en je krijgt zeven kaarten.',
-          confirmLabel: 'Resetten',
-          writeAction: false
-        });
-        if (!confirmed) return;
-        state = createInitialState(cards);
-        render();
-        toast('De speeltest is opnieuw begonnen.');
-      });
-      document.getElementById('sim-shuffle-library')?.addEventListener('click', () => {
-        state.zones.library = shuffle(state.zones.library);
-        state.updatedAt = Date.now();
-        render();
-        toast('Library geschud.');
-      });
-      document.getElementById('sim-search-library')?.addEventListener('click', () => {
-        if (!state.zones.library.length) return toast('De library is leeg.', 'warning');
-        librarySearchDialog(state, byDeckCardId, (instanceId, targetZone) => {
-          moveInstance(state, instanceId, targetZone);
-          render();
-        });
+          content: '<p class="dialog-message">Alle zones worden gewist. Het deck wordt opnieuw geschud en je krijgt zeven kaarten.</p>',
+          submitLabel: 'Resetten',
+          destructive: true,
+          writeAction: false,
+          onSubmit: (_formData, resetDialog) => {
+            if (disposed) return true;
+            clearTimeout(cardClickTimer);
+            libraryController.closeDialogs();
+            for (const dialog of dialogs) if (dialog !== resetDialog) dialog.close();
+            state = createInitialState(cards);
+            render();
+            toast('De speeltest is opnieuw begonnen.');
+            return true;
+          }
+        }));
       });
 
-      root?.addEventListener('dblclick', (event) => {
+      listen(root, 'contextmenu', (event) => {
+        const library = event.target.closest('[data-sim-library-source]');
+        if (!library) return;
+        event.preventDefault();
+        clearTimeout(cardClickTimer);
+        libraryController.openMenu({ opener: library, clientX: event.clientX, clientY: event.clientY });
+      });
+      listen(root, 'dblclick', (event) => {
         clearTimeout(cardClickTimer);
         const library = event.target.closest('[data-sim-library-source]');
         if (library) {
+          libraryController.closeMenu();
           if (!drawTop(state, 'hand')) toast('De library is leeg.', 'warning');
           render();
           return;
@@ -535,41 +554,61 @@ export async function renderDeckSimulator(context) {
         found.instance.tapped = !found.instance.tapped;
         render();
       });
-      root?.addEventListener('click', (event) => {
-        const endTurnButton = event.target.closest('[data-sim-end-turn]');
-        if (endTurnButton) {
-          endTurn();
+      listen(root, 'click', (event) => {
+        if (Date.now() < suppressCardZoomUntil || event.detail > 1) return;
+        const library = event.target.closest('[data-sim-library-source]');
+        if (library) {
+          clearTimeout(cardClickTimer);
+          cardClickTimer = window.setTimeout(() => {
+            if (!disposed && Date.now() >= suppressCardZoomUntil) libraryController.openMenu({ opener: library });
+          }, 320);
           return;
         }
         const card = event.target.closest('[data-sim-instance]');
-        if (!card || Date.now() < suppressCardZoomUntil || event.detail > 1) return;
+        if (!card) return;
         clearTimeout(cardClickTimer);
         cardClickTimer = window.setTimeout(() => {
-          if (Date.now() < suppressCardZoomUntil) return;
+          if (disposed || Date.now() < suppressCardZoomUntil) return;
           const found = findZone(state, card.dataset.simInstance);
           const item = found ? itemForInstance(found.instance, byDeckCardId) : null;
-          if (item) openSimulatorCardZoom(item);
+          if (item) openCardZoom(item);
         }, 320);
       });
-      root?.addEventListener('keydown', (event) => {
+      listen(root, 'keydown', (event) => {
+        const library = event.target.closest('[data-sim-library-source]');
+        if (library && (['Enter', ' ', 'ContextMenu'].includes(event.key) || (event.key === 'F10' && event.shiftKey))) {
+          event.preventDefault();
+          clearTimeout(cardClickTimer);
+          libraryController.openMenu({ opener: library });
+          return;
+        }
         const card = event.target.closest('[data-sim-instance]');
         if (!card || !['Enter', ' '].includes(event.key)) return;
         const found = findZone(state, card.dataset.simInstance);
         event.preventDefault();
         if (event.key === 'Enter') {
           const item = found ? itemForInstance(found.instance, byDeckCardId) : null;
-          if (item) openSimulatorCardZoom(item);
+          if (item) openCardZoom(item);
           return;
         }
         if (found?.zone === 'battlefield') {
           found.instance.tapped = !found.instance.tapped;
           render();
-          // Tapping moves this copy between stacks. Keep keyboard focus on the
-          // same physical card so Space can untap it again after regrouping.
+          // Preserve keyboard focus when this copy moves between tapped and
+          // untapped stacks, so Space still acts on the same physical card.
           [...root.querySelectorAll('[data-sim-instance]')]
             .find((entry) => entry.dataset.simInstance === found.instance.id)?.focus();
         }
       });
+      return () => {
+        disposed = true;
+        clearTimeout(cardClickTimer);
+        cleanupDrag();
+        libraryController.dispose();
+        for (const dialog of dialogs) dialog.close();
+        dialogs.clear();
+        for (const cleanup of listeners) cleanup();
+      };
     }
   };
 }

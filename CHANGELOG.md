@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.21.0 - 2026-10-25
+
+- Aantalbadges staan op de kaartstapels, in dezelfde stijl als de libraryteller.
+- **Exile** is een afzonderlijke zone naast **Graveyard**, met verslepen, vergroten en een eigen teller.
+- Beide knoppen **Beurt beëindigen** en de ongebruikte beurtteller zijn verwijderd. **Schudden** en **Library bekijken** zijn verplaatst van de paginakop naar het library-contextmenu.
+- Het library-menu bevat **Toon bovenste kaart**, **Mill kaart** en **Toon X kaarten**. Millen verplaatst één bovenste kaart naar graveyard.
+- **Toon X kaarten** heeft +/−, kaartacties voor hand/tafel/graveyard/exile, en een derde actieknop met teruglegkeuze: bovenop, onderop of door de hele library schudden. Volgorde, kaartinstanties en printings blijven behouden.
+- Sluiten of Escape laat de resterende bekeken kaarten bovenop in dezelfde volgorde; verplaatste kaarten blijven in hun doelzone. Popups en menu’s worden bij navigatie opgeruimd en oude acties kunnen geen nieuwe speeltest wijzigen.
+- Geen databaseschema- of API-wijzigingen; alle speeltestacties blijven lokaal en beschikbaar in alleen-lezenmodus.
+
 ## 2.20.0 - 2026-10-25
 
 - De knop **Simulator** op de deckpagina en de titel van de speeltafel heten nu **Goldfishing**. Bestaande simulatorlinks blijven werken.

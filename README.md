@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.20.0
+# Magic Collection Manager 2.21.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -43,6 +43,8 @@ Versie **2.18.0** laat **In bezit** correct samenwerken met de commander-kleurid
 Versie **2.19.0** toont bijbehorende tokenafbeeldingen onder de kaartafbeelding en tokeninformatie boven **Beschikbaarheid** op de kaartdetailpagina. De bestaande Scryfall-verwijzingen bepalen welke tokens erbij horen; ook meerdere tokens worden getoond.
 
 Versie **2.20.0** hernoemt de deckknop naar **Goldfishing**, geeft de speeltafel de volledige breedte en stapelt gelijke kaarten op tafel. Iedere kaart blijft afzonderlijk te bedienen; getapte en ongetapte exemplaren staan apart.
+
+Versie **2.21.0** plaatst de aantallen op de kaartstapels, voegt **Exile** toe en verplaatst library-acties naar een rechtermuisknopmenu. **Toon X kaarten** ondersteunt bekijken met +/−, afzonderlijk verplaatsen en de resterende kaarten bovenop, onderop of geschud terugleggen. De knoppen **Beurt beëindigen** zijn verwijderd.
 
 ## Belangrijkste mogelijkheden
 
@@ -333,11 +335,26 @@ Deterministische statistieken worden zonder AI berekend.
 
 ## Goldfishing
 
-Via **Goldfishing** op de deckpagina open je de vrije speeltafel om gevoel te krijgen voor het deck. Kaarten worden als afbeeldingen getoond en kunnen met drag-and-drop tussen library, hand, battlefield, graveyard en command zone worden verplaatst.
+Via **Goldfishing** op de deckpagina open je de vrije speeltafel. Kaarten kunnen met drag-and-drop tussen library, hand, tafel, graveyard, exile en command zone worden verplaatst.
 
-De speeltafel gebruikt de volledige breedte; de informatieblokken naast de tafel zijn verwijderd. Beurt- en kaartenaantallen blijven bovenaan zichtbaar. Gelijke kaarten op tafel, inclusief verschillende printings van dezelfde basic land, worden in overlappende stapels van maximaal vijf exemplaren weergegeven. Getapte en ongetapte kaarten staan in aparte stapels. Iedere kaart behoudt zijn eigen afbeelding en blijft afzonderlijk te verslepen, vergroten en tappen. Klik op een kaart om te vergroten; dubbelklik om te tappen of untappen. Met het toetsenbord gebruik je Enter voor vergroten en de spatiebalk voor tappen. Bij **Beurt beëindigen** worden de kaarten op tafel weer ongetapt. Hand, graveyard en command zone blijven afzonderlijke kaarten tonen.
+Gelijke kaarten op tafel, inclusief verschillende printings van dezelfde basic land, staan in overlappende stapels van maximaal vijf exemplaren. De aantalbadge staat op de stapel, net als bij de library. Getapte en ongetapte exemplaren staan apart. Iedere kaart behoudt zijn eigen afbeelding en blijft afzonderlijk te verslepen, vergroten en tappen. Klik op een kaart om te vergroten; dubbelklik om te tappen of untappen. Met het toetsenbord gebruik je Enter voor vergroten en de spatiebalk voor tappen. Er is geen knop **Beurt beëindigen** meer; je tapt en untapt de kaarten zelf. De tellers bovenaan tonen de aantallen in library, hand, tafel, graveyard en exile.
 
-De simulator valideert bewust geen Magic-regels of betaalbaarheid. De toestand bestaat alleen in het geheugen van de geopende pagina, wordt niet in browseropslag of de database bewaard en begint opnieuw na herladen of opnieuw openen. Alle simulatoracties, inclusief resetten, blijven daardoor beschikbaar in alleen-lezenmodus.
+Rechtsklik op de library voor:
+
+- **Toon bovenste kaart**: bekijk de bovenste kaart zonder de volgorde of aantallen te veranderen.
+- **Mill kaart**: verplaats precies de bovenste kaart naar graveyard.
+- **Toon X kaarten**: open de bovenste kaart en gebruik **+** en **−** om telkens een kaart meer of minder te tonen. De getoonde volgorde begint bij de bovenste kaart. Rechtsklik op een getoonde kaart voor **Naar hand**, **Naar speelveld**, **Naar graveyard** of **Naar exile**.
+- **Schudden** en **Library bekijken**: de bestaande functies zijn via dit menu beschikbaar en staan niet meer bovenaan.
+
+In **Toon X kaarten** kies je naast +/− de teruglegwijze en druk je op de derde actieknop:
+
+- **Bovenaan library**: leg de resterende getoonde kaarten bovenop, in de getoonde volgorde.
+- **Onderop library**: leg ze onderop, waarbij de eerst getoonde kaart als eerste van dat groepje gepakt wordt.
+- **Shuffle in library**: schud de resterende getoonde kaarten door de volledige library.
+
+De actie sluit de popup. Sluiten via **Sluiten**, het kruisje of Escape laat de resterende kaarten in dezelfde volgorde bovenop liggen; eerder verplaatste kaarten blijven in hun gekozen zone. Bekeken kaarten tellen als librarykaarten totdat je ze naar een andere zone verplaatst. Klikken op de library opent het menu ook; Enter, spatie of de contextmenutoets werken eveneens. Klik op een getoonde kaart om deze te vergroten. Het verplaatsmenu is ook bereikbaar met de contextmenutoets of Shift+F10.
+
+De simulator valideert geen Magic-regels of betaalbaarheid. Alle toestand bestaat alleen in het geheugen van de geopende pagina en wordt niet in browseropslag of de database bewaard. Herladen, opnieuw openen of **Reset** begint een nieuwe speeltest. Alle acties werken ook in alleen-lezenmodus.
 
 ## Wanted-list
 

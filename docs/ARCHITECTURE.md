@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.20.0
+# Architectuur - Magic Collection Manager 2.21.0
 
 ## Overzicht
 
@@ -204,6 +204,8 @@ De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regele
 
 Vanaf 2.20.0 heet de ingang **Goldfishing**. De speeltafel gebruikt de volledige breedte en heeft geen informatiekolom meer. Alleen de battlefield-weergave groepeert gelijke kaarten per kaartidentiteit en tapstatus, met maximaal vijf echte kaartinstanties per stapel. Het groeperen verandert geen zonevolgorde, aantallen of kaartgegevens. Iedere instantie houdt zijn oorspronkelijke printing, instance-ID en interacties; de overige zones blijven ongestapeld. Er worden alleen het deck en de kaarten opgehaald; de vervallen informatiekolom vraagt geen decklinks meer op.
 
+
+Vanaf 2.21.0 bevat de toestand een afzonderlijke `exile`-zone en geen beurtadministratie meer. `public/js/simulator-library.js` beheert lokale contextmenu’s en de popup voor het bekijken van de bovenste kaarten. Bekeken kaarten blijven in de library; een popup bewaart alleen de instance-ID’s in pakvolgorde. Een verplaatsing haalt precies die instantie uit de library. Terugleggen onderop/bovenop partitioneert de overgebleven instanties zonder duplicatie; schudden gebruikt de hele library. Sluiten verandert geen volgorde. Controller- en view-opruiming sluiten popups, verwijderen listeners en blokkeren verouderde callbacks. Contextmenu’s binnen de popup worden binnen hetzelfde native dialog-element geplaatst.
 
 ## Statische API-documentatie
 
