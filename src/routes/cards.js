@@ -13,6 +13,7 @@ import { scryfallService } from '../services/scryfall-service.js';
 import { loadGroupedPrintingsByName } from '../services/printing-catalog-service.js';
 import { serveScryfallImage } from '../services/image-cache-service.js';
 import { updateCardUserMetadata } from '../services/card-insight-service.js';
+import { getCardTokens } from '../services/card-token-service.js';
 
 export const cardsReadRouter = express.Router();
 export const cardsWriteRouter = express.Router();
@@ -72,6 +73,11 @@ cardsReadRouter.get('/:id/image', async (req, res) => {
   const extension = size === 'png' || new URL(url).pathname.endsWith('.png') ? 'png' : 'jpg';
   const preferredName = `${card.scryfallId}-${face}-${size}.${extension}`;
   await serveScryfallImage(res, url, { preferredName });
+});
+
+cardsReadRouter.get('/:id/tokens', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ data: await getCardTokens(positiveInteger(req.params.id, 'Kaart-ID')) });
 });
 
 cardsReadRouter.get('/:id', (req, res) => {

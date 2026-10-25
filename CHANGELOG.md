@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.19.0 - 2026-10-25
+
+- De kaartdetailpagina toont bijbehorende tokenafbeeldingen onder de hoofdkaart en het blok **Tokens** boven **Beschikbaarheid**.
+- Tokeninformatie gebruikt de eigen naam, type, kleur, power/toughness en kaarttekst. Meerdere tokens en beide zijden van dubbelzijdige tokens worden ondersteund. Mana-iconen en keywordmarkeringen blijven beschikbaar.
+- Nieuw leesendpoint: `GET /api/read/cards/:id/tokens`. Bestaande `all_parts`-verwijzingen bepalen de tokens; alleen gevalideerde token-ID’s worden opgehaald. Tokens worden niet automatisch toegevoegd aan kaarten, collectie, decks of Wanted.
+- Metadata en afbeeldingen gebruiken de bestaande technische caches. Een mislukte tokenaanvraag blokkeert de gewone kaartpagina niet; gedeeltelijke resultaten en opnieuw proberen worden ondersteund. Late antwoorden na navigatie worden genegeerd.
+- Geen databaseschemamigratie en geen wijziging aan de zelfstandige MTGJSON-catalogus. Bestaande collectie-, afwerkings-, Wanted- en deckgegevens blijven behouden.
+
 ## 2.18.0 - 2026-10-24
 
 - **In bezit** activeert nu ook de gekozen commander-kleuridentiteit en andere aanvullende ontdekfilters. De frontend stuurde deze eerder niet mee zonder tekst- of kaartsoortfilter. Zoekresultaten, reactieve opties en terugkeerlinks gebruiken dezelfde voorwaarde. Alleen een kleur of deck kiezen start nog steeds geen zoekopdracht.

@@ -1,4 +1,4 @@
-MAGIC COLLECTION MANAGER READ API 2.18.0
+MAGIC COLLECTION MANAGER READ API 2.19.0
 
 Base URL: https://<host>
 Alle routes gebruiken GET en hebben geen JSON-body. Querywaarden staan in de URL.
@@ -16,7 +16,7 @@ INPUT JSON
 
 OUTPUT JSON
 
-{"status":"ok","version":"2.18.0"}
+{"status":"ok","version":"2.19.0"}
 
 GET /api/read/card-catalog/status
 
@@ -394,6 +394,43 @@ INPUT JSON
 OUTPUT JSON
 
 Niet van toepassing. Responsebody is een kaartafbeelding.
+
+GET /api/read/cards/:id/tokens
+
+Geeft de tokens die volgens cards.raw_json.all_parts bij deze lokale kaartprinting horen. Alleen component=token wordt gebruikt; combo_piece en andere gerelateerde kaarten worden genegeerd. Dubbele verwijzingen worden op Scryfall-ID ontdubbeld. De opgeslagen externe uri wordt niet gebruikt: alleen een gevalideerde UUID wordt via de vaste Scryfall-ID-route opgehaald. Een antwoord met een verkeerde kaart-ID of zonder herkenbaar tokentype wordt niet getoond.
+
+Lokale tokenmetadata wordt eerst gelezen als die al in cards staat. Anders gebruikt de resolver de bestaande persistente Scryfall-responsecache. Nieuwe tokens worden niet in cards, collection_items, wanted_items of deck_cards ingevoegd. Er kan alleen technische responsecache worden bijgewerkt. Afbeeldingen lopen via het bestaande /cards/image-cache-endpoint. Geen database- of catalogusschemamigratie nodig.
+
+Een kaart zonder tokenverwijzingen geeft data:[]. Een onbekende kaart geeft 404; ongeldige opgeslagen brongegevens geven 502. Een fout voor één token levert een item met available:false en error op; andere tokens blijven beschikbaar. Een ongeldige token-ID wordt als scryfallId:null teruggegeven zonder extern verzoek. cardFaces gebruikt dezelfde snake_case-veldnotatie als Scryfall, met per zijde eigen kleuren, tekst, stats en gevalideerde image_uris. images bevat normal/small/large/png en overeenkomstige backNormal/backSmall/backLarge/backPng, met null bij ontbrekende afbeeldingen. De responscacheheader is no-store, zodat een herhaalde aanvraag opnieuw kan controleren.
+
+INPUT JSON
+
+{}
+
+OUTPUT JSON
+
+{
+  "data": [
+    {
+      "scryfallId": "4e42cb2e-578f-4fec-a9a4-33b95b78229c",
+      "name": "Badger",
+      "typeLine": "Token Creature — Badger",
+      "manaCost": "",
+      "oracleText": "",
+      "colors": ["G"],
+      "keywords": [],
+      "power": "3",
+      "toughness": "3",
+      "images": {"normal":"https://cards.scryfall.io/normal/front/...jpg","backNormal":null},
+      "cardFaces": [],
+      "available": true
+    }
+  ]
+}
+
+Een gedeeltelijk antwoord kan daarnaast bijvoorbeeld bevatten:
+
+{"scryfallId":"uuid","name":"Treasure","typeLine":"Token Artifact — Treasure","available":false,"error":"Scryfall is momenteel niet bereikbaar. Lokale gegevens blijven beschikbaar."}
 
 GET /api/read/cards/:id
 
@@ -842,7 +879,7 @@ OUTPUT JSON
 
 {
   "data": {
-    "applicationVersion": "2.18.0",
+    "applicationVersion": "2.19.0",
     "nodeVersion": "v24.0.0",
     "databaseFile": "magic-collection.sqlite",
     "databaseSizeBytes": 1048576,

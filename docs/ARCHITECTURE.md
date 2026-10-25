@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.18.0
+# Architectuur - Magic Collection Manager 2.19.0
 
 ## Overzicht
 
@@ -297,3 +297,12 @@ De bestaande tabellen `deck_card_groups` en `deck_card_group_members` slaan defi
 `PUT /api/write/decks/:id/cards/:deckCardId/synergies` vervangt transactioneel uitsluitend de synergietoewijzingen van één kaart. Verkeerde deck-, kaart-, combo- of verwijderde synergie-ID’s leiden tot afwijzing vóór enige mutatie. Niet-gewijzigde lidmaatschappen en andere kaarten behouden hun volgorde. Nieuwe leden worden achteraan toegevoegd. De bestaande revisiecontrole neemt alle groepsdefinities en lidmaatschappen al mee, ook lege groepen.
 
 `cardGroup=synergies` groepeert op stabiele groep-ID’s. Kaarten met meerdere synergieën verschijnen in iedere passende groep; de globale teller ontdubbelt originele deckregels. **Geen synergie** staat als laatste. Basic lands worden eerst per oorspronkelijke printing aan groepen toegewezen en pas binnen de groep samengevoegd. Sortering, filters en beide deckweergaven blijven beschikbaar. Lege synergieën zijn beheerbaar maar leveren geen lege groep in het kaartoverzicht op.
+
+
+## Tokenafbeeldingen en -details vanaf 2.19.0
+
+`card-token-service.js` leest de lokale hoofdkaart en haar `raw_json.all_parts`. Alleen verwijzingen met `component: token` worden opgelost, op een gevalideerde en ontdubbelde Scryfall-UUID. Verwijzings-URL’s worden genegeerd. De resolver leest eventueel reeds aanwezige lokale tokenmetadata of gebruikt `scryfallService.getById` met de bestaande responsecache, aanvraagbundeling en wachtrij. Token-ID, objecttype en tokentype worden gecontroleerd voordat gegevens worden teruggegeven. Ongeldige gecachete antwoorden worden alleen voor de exacte cachesleutel en payload verwijderd, zodat een herhaling kan herstellen.
+
+`GET /api/read/cards/:id/tokens` levert een array met tokenmetadata en `available`. Een afzonderlijke upstreamfout resulteert in een beperkt item met naam, type en `error`; de andere tokens blijven zichtbaar. Dubbelzijdige tokens bevatten de eigen kenmerken per face. Afbeeldings-URL’s zijn beperkt tot HTTPS op cards.scryfall.io. De resolver roept nooit `ensureCard` of `upsertScryfallCard` aan en verandert geen businessgegevens; alleen de bestaande technische cache mag worden bijgewerkt. De bestaande afbeeldingsroute verzorgt lokale opslag op schijf. Database- en catalogusschema’s blijven gelijk.
+
+`card-tokens.js` laadt na het renderen van de kaartdetailpagina afzonderlijk de tokengegevens. Afbeeldingen staan onder de bestaande printingviewer en tekst boven Beschikbaarheid. Op tokenpagina’s scrollt de hele afbeeldingskolom mee zodat ook de onderste afbeeldingen bereikbaar zijn. Een leeg antwoord verbergt beide secties. Een fout toont herstelmogelijkheden zonder de kaartpagina te vervangen. Cleanup, AbortController, aanvraagnummer, routecontrole en controle van de actieve DOM-elementen voorkomen dat een laat antwoord bij een andere kaart terechtkomt. De nieuwe weergave werkt ook wanneer de schrijf-API afgeschermd is.

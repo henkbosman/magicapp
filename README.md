@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.18.0
+# Magic Collection Manager 2.19.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -39,6 +39,8 @@ Versie **2.17.0** voegt per deck beheer van functionele tags toe, gebruikt besta
 Versie **2.17.1** herstelt de oorspronkelijke breedte van de Wanted-popups en maakt de kaartzoekpopup hoger, met meer ruimte voor kaartsuggesties. Deze correctie verandert geen database of API.
 
 Versie **2.18.0** laat **In bezit** correct samenwerken met de commander-kleuridentiteit, vereenvoudigt het tagbeheer en voegt beheer, kaarttoewijzing en groepering van synergieën toe. Synergieën kunnen vooraf zonder kaarten worden aangemaakt; hiervoor wordt de bestaande opslag gebruikt.
+
+Versie **2.19.0** toont bijbehorende tokenafbeeldingen onder de kaartafbeelding en tokeninformatie boven **Beschikbaarheid** op de kaartdetailpagina. De bestaande Scryfall-verwijzingen bepalen welke tokens erbij horen; ook meerdere tokens worden getoond.
 
 ## Belangrijkste mogelijkheden
 
@@ -192,6 +194,14 @@ Scryfall is de primaire externe bron. De applicatie slaat kaartmetadata lokaal o
 Externe resultaten worden tijdelijk in SQLite gecachet. Kaartafbeeldingen worden standaard lokaal opgeslagen in `data/images/`. Daardoor zijn herhaalde schermweergaven niet afhankelijk van nieuwe Scryfall-aanroepen.
 
 Via **Instellingen en onderhoud** kan de externe responsecache worden geleegd of lokaal opgeslagen kaartmetadata opnieuw met Scryfall worden gesynchroniseerd. Gebruikersgegevens zoals aantallen, decks, wanted-status, notities en aankoopprijzen worden daarbij niet overschreven.
+
+### Tokens bij een kaart
+
+Op de kaartdetailpagina staan de bijbehorende tokenafbeeldingen onder de afbeelding van de kaart zelf. Het blok **Tokens**, direct boven **Beschikbaarheid**, toont per token de naam, het type, de eigen kleuren, eventuele power/toughness en kaarttekst met mana-iconen. Bij meerdere tokens worden ze allemaal getoond; dubbelzijdige tokens tonen beide zijden. Zonder tokenverwijzingen verschijnen deze onderdelen niet.
+
+De koppelingen komen uit de al opgeslagen Scryfall-gegevens van de gekozen printing (`all_parts`, onderdeel `token`). Zo verwijst Greensleeves naar de groene 3/3 Badger-token. Ontbrekende tokengegevens worden via de unieke Scryfall-ID opgehaald en technisch gecachet; afbeeldingen gebruiken de bestaande lokale afbeeldingscache. Dit voegt geen tokens aan je collectie, decks of Wanted toe en verandert geen afwerking of aantallen. Er is geen databaseschemamigratie en de losse MTGJSON-catalogus wordt niet gebruikt of gewijzigd.
+
+De normale kaartpagina verschijnt meteen terwijl de tokengegevens laden. Bij een tijdelijk probleem blijven beschikbare tokens en de overige kaartgegevens zichtbaar. Met **Opnieuw proberen** kun je het ophalen herhalen. Zonder internet zijn eerder gecachete gegevens en afbeeldingen bruikbaar, voor zover aanwezig; de eerste keer ophalen vereist toegang tot Scryfall. De bestaande knop **Kaartgegevens vernieuwen** kan verouderde tokenverwijzingen van de hoofdkaart opnieuw ophalen.
 
 ## MTGJSON-kaartcatalogus
 

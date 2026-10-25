@@ -4,6 +4,7 @@ import { cardImage, cardInsightSourceLabel, cardTextHtml, colorIdentity, library
 import { openCardInsightsEditor } from '../card-insights.js';
 import { escapeHtml, formatEuro, refreshView, toast } from '../utils.js';
 import { getCardReturnLabel, returnToCardSource } from '../navigation-state.js';
+import { bindCardTokens } from '../card-tokens.js';
 
 function faceText(card) {
   if (card.cardFaces?.length) {
@@ -110,6 +111,7 @@ export async function renderCardDetail(context) {
       <section class="card-detail-grid">
         <div class="card-detail-image-stack">
           ${ownedImageViewer(imageVariants)}
+          <section id="card-token-images" class="card-token-images" aria-label="Tokenafbeeldingen" hidden></section>
           <button id="refresh-card" class="button secondary" data-write-action>Kaartgegevens vernieuwen</button>
         </div>
         <div>
@@ -119,6 +121,7 @@ export async function renderCardDetail(context) {
             <h3>${escapeHtml(card.typeLine)}</h3>
             ${faceText(card)}
           </div></section>
+          <section id="card-token-info" class="panel card-token-panel" hidden></section>
           <section class="panel card-availability-panel"><header class="panel-header"><h2>Beschikbaarheid</h2></header><div class="panel-body">${usageBadges(card.usage)}${card.usage.decks.length ? `<p class="help-text">Verschillende fysieke printings tellen samen op basis van Oracle-identiteit.</p>` : ''}</div></section>
           <section class="grid-2">
             <section class="panel"><header class="panel-header"><h2>Kaartgegevens</h2></header><div class="panel-body"><div class="card-facts">
@@ -171,6 +174,12 @@ export async function renderCardDetail(context) {
         button.disabled = true; button.textContent = 'Vernieuwen…';
         try { await api(`/cards/${card.id}/refresh`, { method: 'POST', body: {} }); toast('Kaartgegevens zijn vernieuwd.'); refreshView(); }
         catch (error) { toast(error.message, 'error'); button.disabled = false; button.textContent = 'Kaartgegevens vernieuwen'; }
+      });
+      return bindCardTokens({
+        cardId,
+        imageContainer: document.getElementById('card-token-images'),
+        infoPanel: document.getElementById('card-token-info'),
+        imageStack: document.querySelector('.card-detail-image-stack')
       });
     }
   };
