@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.22.2
+# Magic Collection Manager 2.22.3
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -49,6 +49,8 @@ Versie **2.21.0** plaatst de aantallen op de kaartstapels, voegt **Exile** toe e
 Versie **2.22.0** maakt Graveyard en Exile compacte stapels, deelt de hogere tafel in per kaarttype en laat de bovenste librarykaart rechtstreeks op de stapel zien of verbergen. **Toon X kaarten** heeft drie aparte teruglegknoppen.
 
 Versie **2.22.2** herstelt het normale scrollen van de Goldfishing-pagina en de oorspronkelijke paginakop en tellers. Alleen de speeltafel heeft een begrensde hoogte; Enchantments en Artifacts houden ieder de helft van de rechterkolom.
+
+Versie **2.22.3** geeft Hand en Command zone een vaste hoogte met één horizontale rij kaarten. De verticale scrollbalken in deze twee vakken en de herhaalde tekst **Sleep kaarten naar de tafel.** vervallen.
 
 ## Belangrijkste mogelijkheden
 
@@ -341,7 +343,7 @@ Deterministische statistieken worden zonder AI berekend.
 
 Via **Goldfishing** op de deckpagina open je de vrije speeltafel. Kaarten kunnen met drag-and-drop tussen library, hand, tafel, graveyard, exile en command zone worden verplaatst.
 
-De Goldfishing-pagina scrollt normaal, met de oorspronkelijke paginakop en tellers boven de speeltafel. Alleen de speeltafel heeft een hoogte op basis van de schermhoogte, met ruimte rondom en voor mobiele navigatie. Kaartgebieden scrollen binnen hun eigen vak. Enchantments en Artifacts krijgen ieder de helft van de rechterkolom. Op zeer lage schermen is ook de speeltafel zelf intern scrollbaar, zodat alle zones bereikbaar blijven. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts. Kaarten met meerdere typen krijgen één plek: Land heeft voorrang, daarna Creature, Artifact en Enchantment. Overige kaarten blijven zichtbaar in een eigen rij. De indeling gebruikt de voorzijde; subtypes tellen niet als kaarttype.
+De Goldfishing-pagina scrollt normaal, met de oorspronkelijke paginakop en tellers boven de speeltafel. Alleen de speeltafel heeft een hoogte op basis van de schermhoogte, met ruimte rondom en voor mobiele navigatie. Hand en Command zone zijn 240 pixels hoog (210 op mobiel) en tonen kaarten in één horizontale rij. Bij veel kaarten kun je horizontaal scrollen; er is geen verticale scrollbalk in deze twee vakken. De kaartgebieden op tafel scrollen binnen hun eigen vak. Enchantments en Artifacts krijgen ieder de helft van de rechterkolom. Wanneer de vaste kaartrijen en de tafel niet samen in de beschikbare hoogte passen, is de speeltafel zelf intern scrollbaar zodat alle zones bereikbaar blijven. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts. Kaarten met meerdere typen krijgen één plek: Land heeft voorrang, daarna Creature, Artifact en Enchantment. Overige kaarten blijven zichtbaar in een eigen rij. De indeling gebruikt de voorzijde; subtypes tellen niet als kaarttype.
 
 Gelijke kaarten op tafel, inclusief verschillende printings van dezelfde basic land, staan in overlappende stapels van maximaal vijf exemplaren. De aantalbadge staat op de stapel, net als bij de library. Getapte en ongetapte exemplaren staan apart. Iedere kaart behoudt zijn eigen afbeelding en blijft afzonderlijk te verslepen, vergroten en tappen. Klik op een kaart om te vergroten; dubbelklik om te tappen of untappen. Met het toetsenbord gebruik je Enter voor vergroten en de spatiebalk voor tappen. Er is geen knop **Beurt beëindigen** meer; je tapt en untapt de kaarten zelf. De tellers bovenaan tonen de aantallen in library, hand, tafel, graveyard en exile.
 

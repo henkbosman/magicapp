@@ -169,7 +169,7 @@ function battlefieldHtml(instances, byDeckCardId) {
   }
   const area = (key, label) => `<section class="simulator-battlefield-area simulator-battlefield-${key}" data-sim-battlefield-area="${key}">
     <h3>${label}</h3>
-    <div class="simulator-zone-cards">${groups[key].length ? battlefieldStacksHtml(groups[key], byDeckCardId) : '<p class="simulator-zone-empty">Sleep kaarten naar de tafel.</p>'}</div>
+    <div class="simulator-zone-cards">${battlefieldStacksHtml(groups[key], byDeckCardId)}</div>
   </section>`;
   return `<section class="simulator-zone simulator-zone-battlefield" data-sim-dropzone="battlefield">
     <header><h2>Tafel</h2><span>${instances.length}</span></header>

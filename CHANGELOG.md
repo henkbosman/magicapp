@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.22.3 - 2026-10-25
+
+- Hand en Command zone hebben een vaste hoogte van 240 pixels (210 op mobiel), met voldoende ruimte voor volledige kaartafbeeldingen. Kaarten blijven in één horizontale rij; extra kaarten zijn horizontaal bereikbaar zonder verticale scrollbalk in deze vakken.
+- De vaste kaartrijen worden ook op lage schermen behouden. Zo nodig scrollt de speeltafel intern; de pagina blijft normaal scrollbaar en Enchantments/Artifacts blijven gelijk verdeeld.
+- De tekst **Sleep kaarten naar de tafel.** is uit alle lege battlefieldgebieden verwijderd. Kaarten kunnen nog steeds naar die gebieden worden gesleept.
+- Geen wijzigingen aan speltoestand, databases of API-endpoints.
+
 ## 2.22.2 - 2026-10-25
 
 - De begrenzing van de hele Goldfishing-pagina is teruggedraaid. De pagina scrollt weer normaal en de paginakop, knoppen en tellers hebben hun oorspronkelijke formaat.
