@@ -1,8 +1,6 @@
 import { api, apiPath } from '../api.js';
 import {
   cardImage,
-  librarySearchHtml,
-  manaProductionHtml,
   metric,
   pageHeader
 } from '../components.js';
@@ -14,6 +12,7 @@ import { confirmDialog, escapeHtml, openDialog, toast } from '../utils.js';
 
 const SIMULATED_ROLES = new Set(['main']);
 const COMMAND_ROLES = new Set(['commander', 'partner', 'companion']);
+const MAX_STACK_SIZE = 5;
 const ZONE_LABELS = {
   library: 'Library', hand: 'Hand', battlefield: 'Tafel', graveyard: 'Graveyard', command: 'Command zone'
 };
@@ -73,10 +72,6 @@ function itemForInstance(instance, byDeckCardId) {
   return byDeckCardId.get(Number(instance?.deckCardId)) || null;
 }
 
-function instanceName(instance, byDeckCardId) {
-  return itemForInstance(instance, byDeckCardId)?.card?.name || 'Onbekende kaart';
-}
-
 function findZone(state, instanceId) {
   for (const [zone, instances] of Object.entries(state.zones)) {
     const index = instances.findIndex((instance) => instance.id === instanceId);
@@ -111,20 +106,62 @@ function drawTop(state, targetZone = 'hand') {
   return true;
 }
 
-function simulatorCard(instance, zone, byDeckCardId) {
+function simulatorCard(instance, zone, byDeckCardId, { stackIndex, stackSize } = {}) {
   const item = itemForInstance(instance, byDeckCardId);
   if (!item) return '';
-  const label = `${item.card.name} in ${ZONE_LABELS[zone]}`;
+  const positionLabel = stackSize > 1 ? `, exemplaar ${stackIndex + 1} van ${stackSize}` : '';
+  const stateLabel = zone === 'battlefield' ? `, ${instance.tapped ? 'getapt' : 'ongetapt'}` : '';
+  const label = `${item.card.name} in ${ZONE_LABELS[zone]}${stateLabel}${positionLabel}`;
   return `<div class="simulator-playing-card ${instance.tapped ? 'tapped' : ''}" data-sim-instance="${escapeHtml(instance.id)}" data-sim-source-zone="${zone}" draggable="true" tabindex="0" role="button" aria-label="${escapeHtml(label)}" title="${escapeHtml(item.card.name)}">
     ${cardImage(item.card, { className: 'sim-playing-card-image' })}
   </div>`;
+}
+
+function battlefieldIdentity(card, instance) {
+  // cardKey normally contains the Oracle ID, but falls back to a printing ID
+  // for older records. Prefer the name over that printing-specific fallback.
+  const oracleId = String(card?.oracleId || (card?.cardKey !== card?.scryfallId ? card?.cardKey : '') || '').trim().toLowerCase();
+  if (oracleId) return `oracle:${oracleId}`;
+  const name = String(card?.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (name) return `name:${name}`;
+  return `instance:${instance.id}`;
+}
+
+function battlefieldStacksHtml(instances, byDeckCardId) {
+  const groups = new Map();
+  for (const instance of instances) {
+    const item = itemForInstance(instance, byDeckCardId);
+    if (!item) continue;
+    const key = JSON.stringify([battlefieldIdentity(item.card, instance), Boolean(instance.tapped)]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(instance);
+  }
+
+  const stacks = [];
+  for (const group of groups.values()) {
+    // Every copy stays individually visible, focusable and draggable. Limiting
+    // each pile prevents large land groups from covering their own controls.
+    for (let offset = 0; offset < group.length; offset += MAX_STACK_SIZE) {
+      const stack = group.slice(offset, offset + MAX_STACK_SIZE);
+      const item = itemForInstance(stack[0], byDeckCardId);
+      const tapped = Boolean(stack[0].tapped);
+      const label = `${stack.length} × ${item.card.name} · ${tapped ? 'getapt' : 'ongetapt'}`;
+      stacks.push(`<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" style="--sim-stack-count: ${stack.length}">
+        <div class="simulator-stack-cards">${stack.map((instance, stackIndex) => `<div class="simulator-stack-slot" style="--sim-stack-index: ${stackIndex}">${simulatorCard(instance, 'battlefield', byDeckCardId, { stackIndex, stackSize: stack.length })}</div>`).join('')}</div>
+        ${stack.length > 1 ? `<span class="simulator-stack-count" aria-hidden="true">${stack.length}×</span>` : ''}
+      </div>`);
+    }
+  }
+  return stacks.join('');
 }
 
 function zoneHtml(zone, instances, byDeckCardId, { empty = 'Sleep kaarten hierheen.' } = {}) {
   return `<section class="simulator-zone simulator-zone-${zone}" data-sim-dropzone="${zone}">
     <header><h2>${escapeHtml(ZONE_LABELS[zone])}</h2><span>${instances.length}</span></header>
     <div class="simulator-zone-cards">${instances.length
-      ? instances.map((instance) => simulatorCard(instance, zone, byDeckCardId)).join('')
+      ? zone === 'battlefield'
+        ? battlefieldStacksHtml(instances, byDeckCardId)
+        : instances.map((instance) => simulatorCard(instance, zone, byDeckCardId)).join('')
       : `<p class="simulator-zone-empty">${escapeHtml(empty)}</p>`}</div>
   </section>`;
 }
@@ -162,111 +199,7 @@ function openSimulatorCardZoom(item) {
   });
 }
 
-function aggregateBattlefieldMana(state, byDeckCardId) {
-  const totals = new Map();
-  for (const instance of state.zones.battlefield) {
-    if (instance.tapped) continue;
-    const item = itemForInstance(instance, byDeckCardId);
-    for (const entry of item?.card?.insights?.manaProduction?.entries || []) {
-      const key = `${entry.mana}|${entry.variable ? 1 : 0}`;
-      const current = totals.get(key) || { mana: entry.mana, amount: 0, variable: entry.variable };
-      current.amount += Number(entry.amount || 1);
-      totals.set(key, current);
-    }
-  }
-  return [...totals.values()];
-}
-
-function availableSearchCards(state, byDeckCardId) {
-  const rows = [];
-  for (const zone of ['battlefield', 'hand']) {
-    for (const instance of state.zones[zone]) {
-      const item = itemForInstance(instance, byDeckCardId);
-      const targets = item?.card?.insights?.librarySearch?.targets || [];
-      if (targets.length) rows.push({ zone, card: item.card, targets });
-    }
-  }
-  return rows;
-}
-
-function groupProgress(groups, state, byDeckCardId) {
-  const battlefieldIds = new Set(state.zones.battlefield.map((instance) => Number(instance.deckCardId)));
-  const availableIds = new Set([
-    ...state.zones.hand,
-    ...state.zones.command,
-    ...state.zones.graveyard
-  ].map((instance) => Number(instance.deckCardId)));
-  return groups.map((group) => {
-    const ordered = [...(group.members || [])].sort((a, b) => Number(a.position) - Number(b.position));
-    const completed = ordered.filter((member) => battlefieldIds.has(Number(member.deckCardId))).length;
-    const next = ordered.find((member) => !battlefieldIds.has(Number(member.deckCardId))) || null;
-    const nextItem = next ? byDeckCardId.get(Number(next.deckCardId)) : null;
-    return {
-      ...group,
-      ordered,
-      completed,
-      complete: completed === ordered.length && ordered.length > 0,
-      next,
-      nextItem,
-      nextAvailable: next ? availableIds.has(Number(next.deckCardId)) : false
-    };
-  });
-}
-
-function actionNames(ids, state, byDeckCardId) {
-  const all = Object.values(state.zones).flat();
-  return ids.map((id) => instanceName(all.find((instance) => instance.id === id) || { id }, byDeckCardId));
-}
-
-function turnInformationHtml(state, groups, byDeckCardId) {
-  const mana = aggregateBattlefieldMana(state, byDeckCardId);
-  const searchCards = availableSearchCards(state, byDeckCardId);
-  const progress = groupProgress(groups, state, byDeckCardId);
-  const drawn = actionNames(state.turnActions.drawn, state, byDeckCardId);
-  const played = actionNames(state.turnActions.played, state, byDeckCardId);
-  const graveyarded = actionNames(state.turnActions.graveyarded, state, byDeckCardId);
-  const recentTurns = (state.history || []).slice(0, 5).map((entry) => ({
-    turn: Number(entry.turn || 0),
-    drawn: actionNames(entry.drawn || [], state, byDeckCardId),
-    played: actionNames(entry.played || [], state, byDeckCardId),
-    graveyarded: actionNames(entry.graveyarded || [], state, byDeckCardId)
-  }));
-
-  return `<aside class="simulator-information">
-    <section class="sim-info-card turn-card">
-      <span>Huidige beurt</span><strong>${state.turn}</strong>
-      <div class="sim-turn-actions"><span>Gepakt: ${drawn.length}</span><span>Naar tafel: ${played.length}</span><span>Naar graveyard: ${graveyarded.length}</span></div>
-    </section>
-    <section class="sim-info-card">
-      <h3>Beschikbare mana op tafel</h3>
-      ${mana.length ? manaProductionHtml(mana) : '<p class="muted">Geen ongetapte mana-producers op tafel.</p>'}
-    </section>
-    <section class="sim-info-card">
-      <h3>Deckzoekfuncties</h3>
-      ${searchCards.length ? `<div class="sim-search-functions">${searchCards.map((entry) => `<div><strong>${escapeHtml(entry.card.name)}</strong><small>${escapeHtml(ZONE_LABELS[entry.zone])}</small>${librarySearchHtml(entry.targets)}</div>`).join('')}</div>` : '<p class="muted">Geen zoekkaart in je hand of op tafel.</p>'}
-    </section>
-    <section class="sim-info-card combo-progress-card">
-      <h3>Combo's en synergieen</h3>
-      ${progress.length ? progress.map((group) => `<div class="sim-combo-progress ${group.complete ? 'complete' : ''}">
-        <div><span class="relation-type-badge ${escapeHtml(group.type)}">${group.type === 'combo' ? 'Combo' : 'Synergie'}</span><strong>${escapeHtml(group.name)}</strong></div>
-        <progress max="${Math.max(group.ordered.length, 1)}" value="${group.completed}"></progress>
-        <small>${!group.ordered.length ? 'Nog geen kaarten toegewezen.' : group.complete ? 'Alle kaarten liggen op tafel.' : `Volgende stap: ${escapeHtml(group.nextItem?.card?.name || group.next?.name || 'onbekend')}${group.nextAvailable ? ' · beschikbaar in hand, command zone of graveyard' : ''}`}</small>
-      </div>`).join('') : '<p class="muted">Geen combo\'s of synergieen vastgelegd.</p>'}
-    </section>
-    <section class="sim-info-card">
-      <h3>Acties deze beurt</h3>
-      <div class="sim-action-log">
-        ${drawn.length ? `<p><strong>Gepakt:</strong> ${drawn.map(escapeHtml).join(', ')}</p>` : ''}
-        ${played.length ? `<p><strong>Gespeeld:</strong> ${played.map(escapeHtml).join(', ')}</p>` : ''}
-        ${graveyarded.length ? `<p><strong>Graveyard:</strong> ${graveyarded.map(escapeHtml).join(', ')}</p>` : ''}
-        ${!drawn.length && !played.length && !graveyarded.length ? '<p class="muted">Nog geen acties in deze beurt.</p>' : ''}
-      </div>
-    </section>
-    ${recentTurns.length ? `<section class="sim-info-card"><h3>Vorige beurten</h3><div class="sim-turn-history">${recentTurns.map((entry) => `<details><summary>Beurt ${entry.turn}<span>${entry.drawn.length} gepakt · ${entry.played.length} gespeeld · ${entry.graveyarded.length} graveyard</span></summary><div>${entry.drawn.length ? `<p><strong>Gepakt:</strong> ${entry.drawn.map(escapeHtml).join(', ')}</p>` : ''}${entry.played.length ? `<p><strong>Gespeeld:</strong> ${entry.played.map(escapeHtml).join(', ')}</p>` : ''}${entry.graveyarded.length ? `<p><strong>Graveyard:</strong> ${entry.graveyarded.map(escapeHtml).join(', ')}</p>` : ''}${!entry.drawn.length && !entry.played.length && !entry.graveyarded.length ? '<p class="muted">Geen geregistreerde acties.</p>' : ''}</div></details>`).join('')}</div></section>` : ''}
-  </aside>`;
-}
-
-function tableHtml(state, groups, byDeckCardId) {
+function tableHtml(state, byDeckCardId) {
   return `<div class="simulator-layout">
     <div class="simulator-table" aria-label="Drag-and-drop speeltafel">
       <div class="simulator-top-zones">
@@ -277,7 +210,6 @@ function tableHtml(state, groups, byDeckCardId) {
       ${zoneHtml('battlefield', state.zones.battlefield, byDeckCardId)}
       ${zoneHtml('hand', state.zones.hand, byDeckCardId)}
     </div>
-    ${turnInformationHtml(state, groups, byDeckCardId)}
   </div>`;
 }
 
@@ -500,10 +432,9 @@ function librarySearchDialog(state, byDeckCardId, onMove) {
 export async function renderDeckSimulator(context) {
   const deckId = Number(context.params.id);
   const returnToken = context.query.get('return') || '';
-  const [deck, cards, groups] = await Promise.all([
+  const [deck, cards] = await Promise.all([
     api(`/decks/${deckId}`),
-    api(`/decks/${deckId}/cards`),
-    api(`/decks/${deckId}/links`)
+    api(`/decks/${deckId}/cards`)
   ]);
   const byDeckCardId = itemMap(cards);
   let state = createInitialState(cards);
@@ -511,7 +442,7 @@ export async function renderDeckSimulator(context) {
   return {
     html: `${pageHeader({
       eyebrow: `${deck.format} · Speeltest`,
-      title: `${deck.name} - simulator`,
+      title: `${deck.name} - Goldfishing`,
       description: 'Sleep kaarten vrij tussen library, hand, tafel, command zone en graveyard.',
       actions: `<button id="simulator-back" class="button secondary" type="button"><- ${escapeHtml(getDeckSimulatorReturnLabel(returnToken))}</button><button id="sim-search-library" class="button secondary" type="button">Library bekijken</button><button id="sim-shuffle-library" class="button secondary" type="button">Schudden</button><button id="sim-end-turn" class="button primary" type="button">Beurt beëindigen</button><button id="sim-reset" class="button secondary" type="button">Reset</button>`
     })}
@@ -522,13 +453,13 @@ export async function renderDeckSimulator(context) {
       ${metric('Tafel', state.zones.battlefield.length, 'Kaarten op tafel')}
       ${metric('Graveyard', state.zones.graveyard.length, 'Kaarten in graveyard')}
     </section>
-    <div id="deck-simulator-root">${tableHtml(state, groups, byDeckCardId)}</div>`,
+    <div id="deck-simulator-root">${tableHtml(state, byDeckCardId)}</div>`,
     mount() {
       const root = document.getElementById('deck-simulator-root');
       let cardClickTimer = null;
       let suppressCardZoomUntil = 0;
       const render = () => {
-        if (root) root.innerHTML = tableHtml(state, groups, byDeckCardId);
+        if (root) root.innerHTML = tableHtml(state, byDeckCardId);
         const metrics = document.querySelector('.simulator-metrics');
         if (metrics) metrics.innerHTML = [
           metric('Beurt', state.turn, 'Handmatig doorlopen', 'info'),
@@ -633,6 +564,10 @@ export async function renderDeckSimulator(context) {
         if (found?.zone === 'battlefield') {
           found.instance.tapped = !found.instance.tapped;
           render();
+          // Tapping moves this copy between stacks. Keep keyboard focus on the
+          // same physical card so Space can untap it again after regrouping.
+          [...root.querySelectorAll('[data-sim-instance]')]
+            .find((entry) => entry.dataset.simInstance === found.instance.id)?.focus();
         }
       });
     }

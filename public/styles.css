@@ -1071,7 +1071,7 @@ button[data-write-action].write-disabled,
 
 .simulator-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .simulator-metrics .metric-card { min-height: 105px; padding: 15px; }
-.simulator-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); align-items: start; gap: 18px; }
+.simulator-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .simulator-table {
   min-width: 0;
   padding: 16px;
@@ -1215,6 +1215,40 @@ button[data-write-action].write-disabled,
   display: block;
   object-fit: cover;
   border-radius: inherit;
+  pointer-events: none;
+}
+/* Each battlefield copy keeps its own image, drag target and tap state. */
+.simulator-card-stack { min-width: 0; display: grid; gap: 7px; }
+.simulator-stack-cards { display: grid; isolation: isolate; }
+.simulator-stack-slot {
+  position: relative;
+  grid-area: 1 / 1;
+  align-self: start;
+  min-width: 0;
+  margin-top: calc(var(--sim-stack-index, 0) * 22px);
+}
+.simulator-card-stack.is-tapped .simulator-stack-slot { aspect-ratio: 680 / 488; }
+.simulator-card-stack.is-tapped .simulator-playing-card {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 71.7647058824%;
+  margin: 0;
+  transform-origin: top left;
+  transform: rotate(90deg);
+}
+.simulator-card-stack.is-tapped .simulator-playing-card:hover { transform: translateY(-3px) rotate(90deg); }
+.simulator-card-stack.is-tapped .simulator-playing-card.sim-dragging { transform: rotate(90deg); }
+.simulator-stack-count {
+  justify-self: center;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.5;
   pointer-events: none;
 }
 .simulator-zone.sim-drop-active,

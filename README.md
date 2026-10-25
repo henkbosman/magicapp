@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.19.0
+# Magic Collection Manager 2.20.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -41,6 +41,8 @@ Versie **2.17.1** herstelt de oorspronkelijke breedte van de Wanted-popups en ma
 Versie **2.18.0** laat **In bezit** correct samenwerken met de commander-kleuridentiteit, vereenvoudigt het tagbeheer en voegt beheer, kaarttoewijzing en groepering van synergieën toe. Synergieën kunnen vooraf zonder kaarten worden aangemaakt; hiervoor wordt de bestaande opslag gebruikt.
 
 Versie **2.19.0** toont bijbehorende tokenafbeeldingen onder de kaartafbeelding en tokeninformatie boven **Beschikbaarheid** op de kaartdetailpagina. De bestaande Scryfall-verwijzingen bepalen welke tokens erbij horen; ook meerdere tokens worden getoond.
+
+Versie **2.20.0** hernoemt de deckknop naar **Goldfishing**, geeft de speeltafel de volledige breedte en stapelt gelijke kaarten op tafel. Iedere kaart blijft afzonderlijk te bedienen; getapte en ongetapte exemplaren staan apart.
 
 ## Belangrijkste mogelijkheden
 
@@ -329,9 +331,11 @@ De aparte statistiekenpagina berekent lokaal onder andere:
 
 Deterministische statistieken worden zonder AI berekend.
 
-## Decksimulator
+## Goldfishing
 
-De simulator is een vrije speeltafel om gevoel te krijgen voor het deck. Kaarten worden als afbeeldingen getoond en kunnen met drag-and-drop tussen library, hand, battlefield, graveyard en command zone worden verplaatst.
+Via **Goldfishing** op de deckpagina open je de vrije speeltafel om gevoel te krijgen voor het deck. Kaarten worden als afbeeldingen getoond en kunnen met drag-and-drop tussen library, hand, battlefield, graveyard en command zone worden verplaatst.
+
+De speeltafel gebruikt de volledige breedte; de informatieblokken naast de tafel zijn verwijderd. Beurt- en kaartenaantallen blijven bovenaan zichtbaar. Gelijke kaarten op tafel, inclusief verschillende printings van dezelfde basic land, worden in overlappende stapels van maximaal vijf exemplaren weergegeven. Getapte en ongetapte kaarten staan in aparte stapels. Iedere kaart behoudt zijn eigen afbeelding en blijft afzonderlijk te verslepen, vergroten en tappen. Klik op een kaart om te vergroten; dubbelklik om te tappen of untappen. Met het toetsenbord gebruik je Enter voor vergroten en de spatiebalk voor tappen. Bij **Beurt beëindigen** worden de kaarten op tafel weer ongetapt. Hand, graveyard en command zone blijven afzonderlijke kaarten tonen.
 
 De simulator valideert bewust geen Magic-regels of betaalbaarheid. De toestand bestaat alleen in het geheugen van de geopende pagina, wordt niet in browseropslag of de database bewaard en begint opnieuw na herladen of opnieuw openen. Alle simulatoracties, inclusief resetten, blijven daardoor beschikbaar in alleen-lezenmodus.
 

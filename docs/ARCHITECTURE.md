@@ -1,4 +1,4 @@
-# Architectuur - Magic Collection Manager 2.19.0
+# Architectuur - Magic Collection Manager 2.20.0
 
 ## Overzicht
 
@@ -201,6 +201,8 @@ Er is geen Monte Carlo- of regelsimulatieanalyse in 2.0.
 ## Simulator
 
 De decksimulator is bewust een vrije client-side speeltafel en geen Magic-regelengine. De toestand bestaat uitsluitend in het geheugen van de actieve view. Herladen of opnieuw openen start een nieuwe simulatie; kaartverplaatsingen veranderen geen browseropslag of databasegegevens. De resetbevestiging is een lokale actie en is niet gekoppeld aan de write-API.
+
+Vanaf 2.20.0 heet de ingang **Goldfishing**. De speeltafel gebruikt de volledige breedte en heeft geen informatiekolom meer. Alleen de battlefield-weergave groepeert gelijke kaarten per kaartidentiteit en tapstatus, met maximaal vijf echte kaartinstanties per stapel. Het groeperen verandert geen zonevolgorde, aantallen of kaartgegevens. Iedere instantie houdt zijn oorspronkelijke printing, instance-ID en interacties; de overige zones blijven ongestapeld. Er worden alleen het deck en de kaarten opgehaald; de vervallen informatiekolom vraagt geen decklinks meer op.
 
 
 ## Statische API-documentatie

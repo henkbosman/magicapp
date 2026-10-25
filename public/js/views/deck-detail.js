@@ -930,7 +930,7 @@ export async function renderDeckDetail(context) {
         eyebrow: deck.format,
         title: deck.name,
         description: deck.description || '',
-        actions: `<a id="deck-simulator-link" class="button secondary" href="#/decks/${deck.id}/simulate">Simulator</a><a id="deck-statistics-link" class="button secondary" href="#/decks/${deck.id}/stats">Statistieken</a><button id="add-deck-card" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</button><button id="more-deck" class="button ghost" type="button" aria-haspopup="dialog">Meer…</button>`
+        actions: `<a id="deck-simulator-link" class="button secondary" href="#/decks/${deck.id}/simulate">Goldfishing</a><a id="deck-statistics-link" class="button secondary" href="#/decks/${deck.id}/stats">Statistieken</a><button id="add-deck-card" class="button primary" data-write-action><span class="icon-plus" aria-hidden="true"></span> Kaart toevoegen</button><button id="more-deck" class="button ghost" type="button" aria-haspopup="dialog">Meer…</button>`
       })}
       ${commanderStrip}
 

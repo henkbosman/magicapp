@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.20.0 - 2026-10-25
+
+- De knop **Simulator** op de deckpagina en de titel van de speeltafel heten nu **Goldfishing**. Bestaande simulatorlinks blijven werken.
+- De zijblokken voor beurtinformatie, mana, deckzoekfuncties, combo’s/synergieën en actiegeschiedenis zijn verwijderd. De speeltafel gebruikt de volledige breedte; de tellers bovenaan en de bestaande bediening blijven beschikbaar.
+- Gelijke kaarten op tafel worden gestapeld, ook over verschillende printings heen. Stapels bevatten maximaal vijf exemplaren, met een aantalbadge bij meerdere kaarten. Getapte en ongetapte exemplaren staan apart.
+- Elke kaart behoudt zijn eigen identiteit, printing en bediening: slepen, vergroten, dubbelklikken of spatie voor tappen. Aan het einde van de beurt voegen ongetapte exemplaren zich weer samen.
+- De simulator blijft uitsluitend in het geheugen werken. Geen wijzigingen aan databaseschema’s, opgeslagen collectie-/deckgegevens of API-endpoints; het ongebruikte verzoek voor combo’s/synergieën vervalt.
+
 ## 2.19.0 - 2026-10-25
 
 - De kaartdetailpagina toont bijbehorende tokenafbeeldingen onder de hoofdkaart en het blok **Tokens** boven **Beschikbaarheid**.
