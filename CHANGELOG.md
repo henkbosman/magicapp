@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.22.4 - 2026-10-25
+
+- Het Goldfishing-speelveld gebruikt compacte binnenmarges en tussenruimtes van 4 pixels; kopmarges zijn verkleind. Hand en Command zone behouden hun vaste horizontale kaartrij, nu 220 pixels hoog (190 op mobiel).
+- Tafel heeft een minimumhoogte voor twee volledige kaartrijen met koppen. De hoogte groeit met stapels en extra kaartrijen; de vaste viewporthoogte en interne verticale scrollbegrenzingen zijn verwijderd. De pagina scrollt normaal.
+- De rechterkolom blijft gelijk verdeeld over Enchantments en Artifacts; landen blijven onderaan. Aantalbadges passen binnen de stapels en focusomlijningen binnen de kleinere marges.
+- Alleen CSS, releasegegevens en documentatie gewijzigd; geen wijzigingen aan speltoestand, databases of API-endpoints.
+
 ## 2.22.3 - 2026-10-25
 
 - Hand en Command zone hebben een vaste hoogte van 240 pixels (210 op mobiel), met voldoende ruimte voor volledige kaartafbeeldingen. Kaarten blijven in één horizontale rij; extra kaarten zijn horizontaal bereikbaar zonder verticale scrollbalk in deze vakken.

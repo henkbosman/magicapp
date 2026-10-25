@@ -1,4 +1,4 @@
-# Deckexport — versie 2.22.3
+# Deckexport — versie 2.22.4
 
 Klik op **Exporteren** op de deckpagina. De popup opent met **Tekst (.txt)**. De tekst is selecteerbaar en kan met **Kopiëren** naar het klembord worden gekopieerd. Als de browser geen klembordtoegang geeft, wordt de tekst geselecteerd en verschijnt een aanwijzing voor handmatig kopiëren. **Downloaden** bewaart exact de getoonde inhoud in een bestand met de passende extensie.
 
@@ -64,4 +64,4 @@ De indeling is gecontroleerd tegen de officiële Forge-code en meegeleverde deck
 
 ## Installeren
 
-Vervang de applicatiecode, behoud `.env` en `data/` en herstart het Node.js-proces of de systemd-service. De aangepaste backend moet opnieuw worden geladen om de nieuwe exportverdeling te gebruiken. `/api/read/health` moet daarna versie `2.22.3` tonen.
+Vervang de applicatiecode, behoud `.env` en `data/` en herstart het Node.js-proces of de systemd-service. De aangepaste backend moet opnieuw worden geladen om de nieuwe exportverdeling te gebruiken. `/api/read/health` moet daarna versie `2.22.4` tonen.
