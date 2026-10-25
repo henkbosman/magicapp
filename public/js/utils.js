@@ -86,8 +86,34 @@ export function openDialog({ title, content, submitLabel = 'Opslaan', cancelLabe
     dialog.close();
   };
   dialog.querySelectorAll('.close-dialog').forEach((button) => button.addEventListener('click', close));
+  let backdropPress = null;
+  const isBackdrop = (event) => {
+    if (event.target !== dialog || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return false;
+    const bounds = dialog.getBoundingClientRect();
+    return event.clientX < bounds.left || event.clientX >= bounds.right
+      || event.clientY < bounds.top || event.clientY >= bounds.bottom;
+  };
+  dialog.addEventListener('pointerdown', (event) => {
+    // A click after dragging a text selection out of the form may be retargeted
+    // to the dialog itself. Remember where this interaction actually began.
+    backdropPress = event.button === 0 && event.isPrimary !== false && isBackdrop(event)
+      ? { pointerId: event.pointerId, released: false } : null;
+  });
+  dialog.addEventListener('pointerup', (event) => {
+    if (!backdropPress || event.pointerId !== backdropPress.pointerId
+      || event.button !== 0 || !isBackdrop(event)) {
+      backdropPress = null;
+      return;
+    }
+    backdropPress.released = true;
+  });
+  dialog.addEventListener('pointercancel', () => { backdropPress = null; });
   dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) close();
+    const press = backdropPress;
+    backdropPress = null;
+    if (press?.released && event.button === 0 && event.detail !== 0
+      && (event.pointerId === undefined || event.pointerId === press.pointerId)
+      && isBackdrop(event)) close();
   });
   dialog.addEventListener('cancel', (event) => {
     if (submitting || dialog.dataset.preventClose === 'true') event.preventDefault();

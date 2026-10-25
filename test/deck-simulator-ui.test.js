@@ -29,11 +29,11 @@ const sampleDeck = () => [
   { ...deckCard(16, 'Sideboard card', 1), role: 'sideboard' }
 ];
 
-async function setup(t, cards = sampleDeck(), { tokens = () => [] } = {}) {
+async function setup(t, cards = sampleDeck(), { tokens = () => [], nativeDialogFocus = false } = {}) {
   const keys = ['document', 'window', 'Element', 'FormData', 'HTMLButtonElement',
     'HTMLInputElement', 'HTMLSelectElement', 'HTMLTextAreaElement'];
   const originals = keys.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
-  const additions = ['focus', 'append', 'remove', 'contains', 'removeEventListener', 'getBoundingClientRect',
+  const additions = ['focus', 'select', 'append', 'remove', 'contains', 'removeEventListener', 'getBoundingClientRect',
     'style', 'className', 'isConnected', 'dispatch', 'matches'];
   const oldMethods = additions.map((name) => [name, Object.getOwnPropertyDescriptor(Element.prototype, name)]);
   const oldMatches = Element.prototype.matches;
@@ -52,7 +52,18 @@ async function setup(t, cards = sampleDeck(), { tokens = () => [] } = {}) {
   });
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 10000 });
   t.mock.method(Math, 'random', () => 0.999999);
-  Element.prototype.focus = function () { this.focused = true; globalThis.document.activeElement = this; };
+  Element.prototype.focus = function () {
+    if (globalThis.document.activeElement === this) return;
+    globalThis.document.activeElement?.dispatch('blur');
+    this.focused = true;
+    globalThis.document.activeElement = this;
+    this.dispatch('focus');
+  };
+  Element.prototype.select = function () {
+    this.selectionStart = 0;
+    this.selectionEnd = this.value.length;
+    this.selectionCalls = (this.selectionCalls || 0) + 1;
+  };
   const append = function (child) { child.parentElement = this; this.children.push(child); };
   const remove = function () {
     if (this.parentElement) this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
@@ -113,7 +124,10 @@ async function setup(t, cards = sampleDeck(), { tokens = () => [] } = {}) {
     const element = new Element(tag);
     element.append = append;
     element.remove = remove;
-    element.showModal = () => { element.open = true; };
+    element.showModal = () => {
+      element.open = true;
+      if (nativeDialogFocus) element.querySelector('input')?.focus();
+    };
     element.close = () => { if (!element.open) return; element.open = false; element.dispatch('close'); };
     return element;
   };
@@ -212,6 +226,15 @@ async function setup(t, cards = sampleDeck(), { tokens = () => [] } = {}) {
 function assertUniqueInstances(ui, expected) {
   const ids = ui.instances().map((card) => card.dataset.simInstance);
   assert.equal(new Set(ids).size, ids.length, 'every visible physical copy occurs only once');
+  for (const zone of ['library', 'graveyard', 'exile']) {
+    assert.equal(Number(ui.zone(zone).querySelector('.library-pile-count').textContent), ui.zoneCount(zone), `${zone} badge follows its current count`);
+  }
+  for (const stack of ui.stacks()) {
+    const count = stack.querySelectorAll('[data-sim-instance]').length;
+    const badge = stack.querySelector('.simulator-stack-count');
+    if (count > 1) assert.equal(Number(badge?.textContent), count, 'stack badge counts every actual instance');
+    else assert.equal(badge, null, 'a single card needs no stack badge');
+  }
   assert.equal(['library', 'hand', 'battlefield', 'graveyard', 'exile', 'command'].reduce((total, zone) => total + ui.zoneCount(zone), 0), expected, 'no copies lost or created across all zones, including cards hidden beneath piles');
 }
 
@@ -226,7 +249,10 @@ test('goldfishing opens without the sidebar, end-turn or header library buttons 
   for (const id of ['sim-end-turn', 'sim-search-library', 'sim-shuffle-library']) assert.equal(ui.document.getElementById(id), null);
   assert.equal(ui.instances('exile').length, 0);
   assert.equal(ui.document.querySelector('.simulator-metrics'), null);
-  assert.equal(ui.root().textContent.trim(), '', 'empty playfield chrome contains no visible labels or counts');
+  assert.equal(ui.root().textContent.replace(/[\d\s]/g, ''), '', 'playfield shows numeric badges without text headings');
+  assert.equal(ui.root().querySelector('header'), null);
+  assert.equal(ui.root().querySelector('h3'), null);
+  for (const zone of ['library', 'graveyard', 'exile']) assert.equal(ui.zone(zone).querySelector('.library-pile-count').textContent, '0');
   assert.ok(ui.zone('exile').getAttribute('aria-label').includes('Exile'));
   assert.equal(ui.instances('hand').length, 7);
   assert.equal(ui.instances('command').length, 1);
@@ -248,7 +274,7 @@ test('same battlefield cards stack across printings while images and every physi
   assert.equal(forest.querySelectorAll('[data-sim-instance]').length, 4);
   assert.equal(ui.instance('12:2').closest('.simulator-card-stack'), forest);
   assert.notEqual(ui.instance('13:1').closest('.simulator-card-stack'), forest);
-  assert.equal(forest.querySelector('.simulator-stack-count'), null);
+  assert.equal(forest.querySelector('.simulator-stack-count').textContent, '4');
   assert.match(forest.getAttribute('aria-label'), /4/);
   assert.match(ui.instance('11:1').querySelector('img').getAttribute('src'), /\/cards\/111\/image/);
   assert.match(ui.instance('12:2').querySelector('img').getAttribute('src'), /\/cards\/112\/image/);
@@ -768,7 +794,7 @@ test('graveyard and exile show one top card but their browser retains every buri
     assert.equal(ui.instances(zone).length, 1);
     const pile = ui.zone(zone).querySelector('[data-sim-zone-pile]');
     assert.equal(pile.dataset.simInstance, topId);
-    assert.equal(pile.querySelector('.library-pile-count'), null);
+    assert.equal(pile.querySelector('.library-pile-count').textContent, '3');
     assert.match(pile.getAttribute('aria-label'), /3 kaarten/);
     assert.equal(pile.getAttribute('draggable'), 'true');
   }
@@ -1150,4 +1176,83 @@ test('stale menus and dialogs cannot duplicate a moved source or affect a reset 
   assert.equal(ui.zoneCount('battlefield'), 0);
   assert.equal(ui.zoneCount('hand'), 1);
   assertUniqueInstances(ui, 1);
+});
+
+
+function typeIntoSelection(input, text) {
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? start;
+  input.value = input.value.slice(0, start) + text + input.value.slice(end);
+  input.selectionStart = input.selectionEnd = start + text.length;
+  input.dispatch('input');
+}
+
+test('counter inputs select existing totals on keyboard and first mouse focus while later caret editing still works', async (t) => {
+  const ui = await setup(t, [deckCard(401, 'Counter creature', 1)]);
+  ui.allToBattlefield();
+  await openCardMenu(ui, '401:1');
+  await submitDialog(cardAction(ui, 'counters'), { power: 12, toughness: 34 });
+  await openCardMenu(ui, '401:1');
+  const dialog = cardAction(ui, 'counters');
+  const power = dialog.querySelector('[name="power"]');
+  const toughness = dialog.querySelector('[name="toughness"]');
+  ui.tick(0);
+  assert.equal(power.type, 'text', 'text inputs provide actual selection support');
+  assert.equal(power.getAttribute('inputmode'), 'numeric');
+  assert.equal(power.value, '12', 'focusing preserves the stored value until typing');
+  assert.deepEqual([power.selectionStart, power.selectionEnd], [0, 2]);
+  typeIntoSelection(power, '5');
+  assert.equal(power.value, '5', 'typing replaces the selected total');
+
+  toughness.dispatch('pointerdown', { button: 0, pointerId: 1 });
+  toughness.focus();
+  // Native mouse focus can collapse the focus-handler selection at mouseup.
+  toughness.selectionStart = toughness.selectionEnd = 1;
+  toughness.dispatch('pointerup', { button: 0, pointerId: 1 });
+  toughness.dispatch('click', { detail: 1 });
+  assert.deepEqual([toughness.selectionStart, toughness.selectionEnd], [0, 2]);
+  typeIntoSelection(toughness, '7');
+  assert.equal(toughness.value, '7');
+
+  toughness.dispatch('pointerdown', { button: 0, pointerId: 1 });
+  toughness.selectionStart = toughness.selectionEnd = 0;
+  toughness.dispatch('click', { detail: 1 });
+  assert.deepEqual([toughness.selectionStart, toughness.selectionEnd], [0, 0], 'later clicks retain a chosen caret');
+  typeIntoSelection(toughness, '1');
+  assert.equal(toughness.value, '17');
+  power.focus();
+  assert.deepEqual([power.selectionStart, power.selectionEnd], [0, 1], 'returning via keyboard selects the whole value again');
+  typeIntoSelection(power, '-2');
+  await submitDialog(dialog);
+  assert.equal(ui.instance('401:1').querySelector('.simulator-card-counters').textContent, '-2/+17');
+  assertUniqueInstances(ui, 1);
+});
+
+test('token and generic-counter fields select even when the browser focused them before popup listeners were attached', async (t) => {
+  const ui = await setup(t, [deckCard(411, 'Token source', 1), deckCard(412, 'Artifact', 1, { typeLine: 'Artifact' })], {
+    tokens: () => [relatedToken()], nativeDialogFocus: true
+  });
+  ui.allToBattlefield();
+  await openCardMenu(ui, '411:1');
+  let dialog = cardAction(ui, 'token');
+  const quantity = dialog.querySelector('[name="quantity"]');
+  assert.equal(quantity.value, '1');
+  assert.deepEqual([quantity.selectionStart, quantity.selectionEnd], [0, 1]);
+  // Clicking the initially auto-focused field still replaces its default.
+  quantity.dispatch('pointerdown', { button: 0, pointerId: 1 });
+  quantity.selectionStart = quantity.selectionEnd = 1;
+  quantity.dispatch('click', { detail: 1 });
+  typeIntoSelection(quantity, '8');
+  await submitDialog(dialog);
+  assert.equal(generatedCards(ui).length, 8);
+  assert.equal(generatedCards(ui)[0].closest('.simulator-card-stack').querySelector('.simulator-stack-count').textContent, '8');
+
+  await openCardMenu(ui, '412:1');
+  dialog = cardAction(ui, 'counters');
+  const generic = dialog.querySelector('[name="generic"]');
+  assert.deepEqual([generic.selectionStart, generic.selectionEnd], [0, 1]);
+  typeIntoSelection(generic, '6');
+  await submitDialog(dialog);
+  assert.equal(ui.instance('412:1').querySelector('.simulator-card-counters').textContent, '6');
+  assertUniqueInstances(ui, 10);
 });

@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.23.0
+# Magic Collection Manager 2.23.1
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -55,6 +55,8 @@ Versie **2.22.3** geeft Hand en Command zone een vaste hoogte met één horizont
 Versie **2.22.4** maakt het speelveld compacter met kleinere marges en tussenruimtes. **Tafel** heeft een minimumhoogte voor volledige kaarten en groeit mee met extra kaarten en stapels. De speeltafel heeft geen vaste schermhoogte meer.
 
 Versie **2.23.0** verwijdert zonekoppen en aantaltellers uit Goldfishing, tapt basic lands met één klik en voegt een kaartmenu toe voor tokens, counters en creaturekopieën. Stapels hebben geen limiet van vijf meer.
+
+Versie **2.23.1** herstelt de aantallen op de kaartstapels en library. De getalvelden bij tokens en counters selecteren hun huidige waarde om die meteen te kunnen overschrijven. Popups in de hele applicatie blijven open wanneer tekstselectie vanuit de popup buiten het venster eindigt.
 
 ## Belangrijkste mogelijkheden
 
@@ -347,7 +349,7 @@ Deterministische statistieken worden zonder AI berekend.
 
 Via **Goldfishing** op de deckpagina open je de vrije speeltafel. Kaarten kunnen met drag-and-drop tussen library, hand, tafel, graveyard, exile en command zone worden verplaatst.
 
-Het speelveld bevat geen zichtbare zonekoppen, instructieteksten, aantaltellers of statistiekblokken. Namen en aantallen blijven beschikbaar voor schermlezers en via de kaarttitels. De compacte marges blijven behouden. Hand en Command zone zijn vaste horizontale kaartrijen van 196 pixels hoog (166 op mobiel). Tafel heeft een minimumhoogte voor volledige kaarten en kan meegroeien. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts, met gelijke hoogtes in de rechterkolom. De voorzijde bepaalt de indeling; bij meerdere typen geldt Land, Creature, Artifact, Enchantment.
+Het speelveld bevat geen zichtbare zonekoppen, instructieteksten of statistiekblokken. Aantalbadges staan wel op de library, graveyard, exile en kaartstapels met meerdere exemplaren. De stapelbadge staat bovenaan zodat deze niet overlapt met toegekende counters. Namen en aantallen blijven ook beschikbaar voor schermlezers en via de kaarttitels. De compacte marges blijven behouden. Hand en Command zone zijn vaste horizontale kaartrijen van 196 pixels hoog (166 op mobiel). Tafel heeft een minimumhoogte voor volledige kaarten en kan meegroeien. Landen staan onderaan, creatures erboven en enchantments/artifacts rechts, met gelijke hoogtes in de rechterkolom. De voorzijde bepaalt de indeling; bij meerdere typen geldt Land, Creature, Artifact, Enchantment.
 
 Gelijke kaarten, tokens en creaturekopieën staan in één stapel zonder limiet van vijf. Verschillende printings van hetzelfde kaartconcept kunnen samen staan; verschillende tokenkenmerken, tapstatus of counters blijven afzonderlijk. Grote stapels worden compact uitgewaaierd, maar iedere instantie blijft aanwezig en via het toetsenbord afzonderlijk bereikbaar. De toetsenbordfocus brengt het gekozen exemplaar naar voren.
 
@@ -359,9 +361,11 @@ Rechtsklik op een kaart op tafel, of gebruik de contextmenutoets/Shift+F10, voor
 - **Geef counters**: stel voor een creature de totale power- en toughness-counters afzonderlijk in; voor andere kaarttypen één algemeen totaal. Nul wist die counters. Alleen het gekozen exemplaar verandert. Niet-nulwaarden verschijnen compact op de kaartafbeelding.
 - **Dupliceer**: beschikbaar bij creatures. Maak het opgegeven aantal extra exemplaren van de basiskaart, zonder counters en ongetapt. De oorspronkelijke kaart blijft behouden.
 
+Bij focus op een getalveld in de token-, counter- of duplicatiepopup wordt de huidige waarde geselecteerd. Je kunt die direct overschrijven; daarna kun je gewoon verder typen of een deel bewerken.
+
 Tokens en kopieën krijgen eigen lokale instanties en kunnen tussen zones worden verplaatst. Per aanmaakactie zijn 1–1000 exemplaren mogelijk; herhaalde acties blijven samen stapelen. De tokenfunctie gebruikt bestaande concrete tokenkoppelingen, geen vrije interpretatie van kaartregels. Voor willekeurige creaturekopietokens zonder vaste tokenkoppeling kun je **Dupliceer** op het gewenste creature gebruiken.
 
-Graveyard en Exile tonen ieder één stapel met de bovenste kaart. Die blijft rechtstreeks te verslepen. Klik of rechtsklik om alle kaarten te bekijken, inclusief de kaarten onderin; selecteer een kaart en kies een bestemming of **Vergroten**. Een dubbelklik vergroot de bovenste kaart.
+Graveyard en Exile tonen ieder één stapel met de bovenste kaart en het aantal exemplaren. Die blijft rechtstreeks te verslepen. Klik of rechtsklik om alle kaarten te bekijken, inclusief de kaarten onderin; selecteer een kaart en kies een bestemming of **Vergroten**. Een dubbelklik vergroot de bovenste kaart.
 
 Rechtsklik op de library voor:
 
@@ -377,6 +381,8 @@ In **Toon X kaarten** staan naast +/− drie afzonderlijke teruglegknoppen:
 - **Shuffle in library**: schud de resterende getoonde kaarten door de volledige library.
 
 De actie sluit de popup. Sluiten via **Sluiten**, het kruisje of Escape laat de resterende kaarten in dezelfde volgorde bovenop liggen; eerder verplaatste kaarten blijven in hun gekozen zone. Bekeken kaarten tellen als librarykaarten totdat je ze naar een andere zone verplaatst. Klikken op de library opent het menu ook; Enter, spatie of de contextmenutoets werken eveneens. Klik op een getoonde kaart om deze te vergroten. Het verplaatsmenu is ook bereikbaar met de contextmenutoets of Shift+F10.
+
+Popups blijven open als je tekst selecteert en de muis buiten het venster loslaat. Een gewone klik die op de achtergrond begint en eindigt, sluit de popup wel, naast de sluitknoppen en Escape. Dit geldt voor de hele applicatie.
 
 De simulator valideert geen Magic-regels of betaalbaarheid. Alle toestand bestaat alleen in het geheugen van de geopende pagina en wordt niet in browseropslag of de database bewaard. Herladen, opnieuw openen of **Reset** begint een nieuwe speeltest. Alle acties werken ook in alleen-lezenmodus.
 

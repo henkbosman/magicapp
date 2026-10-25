@@ -1376,6 +1376,7 @@ body.simulator-touch-dragging { overflow: hidden; user-select: none; }
 }
 .simulator-table .library-pile-count,
 .simulator-table .simulator-stack-count { right: 0; bottom: 0; }
+.simulator-table .simulator-stack-count { top: 0; bottom: auto; }
 .sim-library-image-grid {
   max-height: min(54vh, 550px);
   padding: 4px;

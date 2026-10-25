@@ -134,6 +134,7 @@ function battlefieldStacksHtml(instances, byDeckCardId) {
     const step = Math.min(22, 88 / Math.max(1, stack.length - 1));
     return `<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" data-sim-stack-count="${stack.length}" style="--sim-stack-count: ${stack.length}; --sim-stack-step: ${step}px">
       <div class="simulator-stack-cards">${stack.map((instance, stackIndex) => `<div class="simulator-stack-slot" style="--sim-stack-index: ${stackIndex}">${simulatorCard(instance, 'battlefield', byDeckCardId, { stackIndex, stackSize: stack.length })}</div>`).join('')}</div>
+      ${stack.length > 1 ? `<span class="simulator-stack-count" aria-hidden="true">${stack.length}</span>` : ''}
     </div>`;
   }).join('');
 }
@@ -187,6 +188,7 @@ function libraryPileHtml(state, byDeckCardId) {
     <div class="library-pile-wrap">
       <div class="library-pile ${state.zones.library.length ? '' : 'empty'}${visible ? ' is-face-up' : ''}" data-sim-library-source draggable="${state.zones.library.length ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="menu" aria-label="Library-acties; klik of gebruik de rechtermuisknop" title="Klik of rechtermuisknop voor library-acties; sleep de bovenste kaart naar een zone">
         ${visible ? cardImage(item.card, { className: 'sim-library-top-image' }) : '<span class="library-card-back" aria-hidden="true"><i></i></span>'}
+        <span class="library-pile-count" aria-hidden="true">${state.zones.library.length}</span>
       </div>
     </div>
   </section>`;
@@ -200,6 +202,7 @@ function zonePileHtml(zone, instances, byDeckCardId) {
     <div class="library-pile-wrap">
       <div class="library-pile simulator-zone-pile${top ? '' : ' empty'}" data-sim-zone-pile="${zone}" ${top ? `data-sim-instance="${escapeHtml(top.id)}" data-sim-source-zone="${zone}"` : ''} draggable="${top ? 'true' : 'false'}" tabindex="0" role="button" aria-haspopup="dialog" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
         ${item ? cardImage(item.card, { className: 'sim-zone-pile-image' }) : `<span class="sim-zone-pile-placeholder" aria-hidden="true"></span>`}
+        <span class="library-pile-count" aria-hidden="true">${instances.length}</span>
       </div>
     </div>
   </section>`;

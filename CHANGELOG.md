@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.23.1 - 2026-10-25
+
+- Aantalbadges zijn hersteld op de library, graveyard, exile en kaartstapels met meerdere exemplaren. Zonekoppen en statistiekblokken blijven verborgen. De stapelbadge overlapt niet met toegekende counters.
+- Getalvelden in token-, counter- en duplicatiepopups selecteren hun huidige waarde zodat typen de waarde direct vervangt. Daarna blijft gewone tekstbewerking mogelijk; bestaande gehele-getal- en grensvalidatie blijft actief.
+- De gedeelde popupbediening sluit alleen bij een echte achtergrondklik. Tekstselectie die in de popup begint en erbuiten eindigt, sluit het venster niet meer. Deze correctie geldt voor alle popups in de applicatie.
+- Geen wijzigingen aan databaseschema, API-endpoints of opgeslagen kaart-/deckgegevens.
+
 ## 2.23.0 - 2026-10-25
 
 - Zichtbare zonekoppen, instructies, aantaltellers en statistiekblokken zijn uit Goldfishing verwijderd. Namen en aantallen blijven toegankelijk zonder layoutruimte in te nemen.

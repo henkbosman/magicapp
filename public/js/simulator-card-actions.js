@@ -19,7 +19,43 @@ function integerField(formData, name, min, max, label) {
   return value;
 }
 
-const quantityField = '<label class="field"><span>Aantal</span><input name="quantity" type="number" min="1" max="1000" step="1" value="1" required></label>';
+// Text inputs support a reliable selection range; native number inputs do not
+// in every browser. integerField still validates integer syntax and all bounds.
+const quantityField = '<label class="field"><span>Aantal</span><input name="quantity" type="text" inputmode="numeric" data-sim-select-value value="1" required></label>';
+
+function selectValuesOnFocus(dialog) {
+  dialog.querySelectorAll('[data-sim-select-value]').forEach((input) => {
+    let freshFocus = false;
+    let selectAfterClick = false;
+    const select = () => {
+      if (dialog.open && document.activeElement === input) input.select();
+    };
+    input.addEventListener('focus', () => {
+      freshFocus = true;
+      select();
+    });
+    input.addEventListener('pointerdown', (event) => {
+      selectAfterClick = event.button === 0 && (document.activeElement !== input || freshFocus);
+    });
+    input.addEventListener('click', () => {
+      // The first mouse click can collapse the selection made by focus. Restore
+      // it after that click, but allow later clicks to place a caret normally.
+      if (selectAfterClick) {
+        select();
+        freshFocus = false;
+      }
+      selectAfterClick = false;
+    });
+    input.addEventListener('pointercancel', () => { selectAfterClick = false; });
+    input.addEventListener('input', () => { freshFocus = false; selectAfterClick = false; });
+    input.addEventListener('blur', () => { freshFocus = false; selectAfterClick = false; });
+    // showModal may already have focused this input before listeners were bound.
+    if (document.activeElement === input) {
+      freshFocus = true;
+      select();
+    }
+  });
+}
 
 function tokenLabel(card) {
   const stats = card.power !== null && card.power !== undefined && card.toughness !== null && card.toughness !== undefined
@@ -44,6 +80,7 @@ export function createSimulatorCardActions({ getState, byDeckCardId, render }) {
 
   function trackDialog(dialog, kind) {
     dialog.setAttribute('data-sim-card-dialog', kind);
+    selectValuesOnFocus(dialog);
     dialogs.add(dialog);
     dialog.addEventListener('close', () => dialogs.delete(dialog), { once: true });
     return dialog;
@@ -54,7 +91,7 @@ export function createSimulatorCardActions({ getState, byDeckCardId, render }) {
     const card = context.item.card;
     const creature = isSimulatorCreature(card);
     const counters = context.instance.counters || {};
-    const field = (name, label, min) => `<label class="field"><span>${label}</span><input name="${name}" type="number" min="${min}" max="9999" step="1" value="${escapeHtml(counters[name] ?? 0)}" required></label>`;
+    const field = (name, label) => `<label class="field"><span>${label}</span><input name="${name}" type="text" inputmode="numeric" data-sim-select-value value="${escapeHtml(counters[name] ?? 0)}" required></label>`;
     let applied = false;
     trackDialog(openDialog({
       title: `Geef counters · ${card.name}`,
@@ -63,8 +100,8 @@ export function createSimulatorCardActions({ getState, byDeckCardId, render }) {
       initialFocus: creature ? '[name="power"]' : '[name="generic"]',
       content: `<p class="muted">Stel het totale aantal counters op deze kaart in. Nul verwijdert de counters.</p>
         <div class="form-grid">${creature
-    ? field('power', 'Power-counters', -9999) + field('toughness', 'Toughness-counters', -9999)
-    : field('generic', 'Counters', 0)}</div>`,
+    ? field('power', 'Power-counters') + field('toughness', 'Toughness-counters')
+    : field('generic', 'Counters')}</div>`,
       onSubmit: (formData, dialog) => {
         if (applied || !dialog.open || !currentSource(context)) return true;
         const values = creature ? {
