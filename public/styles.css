@@ -542,7 +542,7 @@ progress::-moz-progress-bar { background: #39734c; border-radius: 999px; }
     position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
     height: calc(72px + env(safe-area-inset-bottom));
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px;
     background: rgba(255,255,255,.97); border-top: 1px solid var(--line);
     box-shadow: 0 -7px 24px rgba(23,35,28,.08); backdrop-filter: blur(14px);
   }
@@ -1259,17 +1259,12 @@ button[data-write-action].write-disabled,
   border-radius: inherit;
   pointer-events: none;
 }
-/* Each battlefield copy keeps its own image, drag target and tap state. */
+/* One visible representative per battlefield stack; all copies stay in state. */
 .simulator-card-stack { position: relative; min-width: 0; }
-.simulator-stack-cards { display: grid; isolation: isolate; }
 .simulator-stack-slot {
   position: relative;
-  grid-area: 1 / 1;
-  align-self: start;
   min-width: 0;
-  margin-top: calc(var(--sim-stack-index, 0) * var(--sim-stack-step, 22px));
 }
-.simulator-stack-slot:has(.simulator-playing-card:focus-visible) { z-index: 1; }
 .simulator-card-stack.is-tapped .simulator-stack-slot { aspect-ratio: 680 / 488; }
 .simulator-card-stack.is-tapped .simulator-playing-card {
   position: absolute;
@@ -2627,4 +2622,35 @@ html.write-unavailable [data-write-only] { display: none !important; }
   .discovery-pagination { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .discovery-pagination > span { grid-column: 1 / -1; grid-row: 1; text-align: center; }
   .discovery-pagination .button { width: 100%; }
+}
+
+/* Local draw-odds tools; no shared page or simulator sizing overrides. */
+.tools-explanation { max-width: 100ch; margin: 0 0 20px; color: var(--ink-soft); line-height: 1.6; }
+.tools-calculators { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; }
+.tools-calculators > .panel { min-width: 0; margin: 0; }
+.draw-odds-calculator .panel-header h2 { overflow-wrap: anywhere; }
+.draw-odds-description { margin: 0 0 18px; color: var(--ink-soft); line-height: 1.55; }
+.draw-odds-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.draw-odds-fields .field { align-content: end; min-width: 0; }
+.draw-odds-fields input { min-width: 0; width: 100%; font-variant-numeric: tabular-nums; }
+.draw-odds-fields input[aria-invalid="true"] { border-color: var(--danger); }
+.draw-odds-feedback { margin-top: 20px; }
+.draw-odds-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.draw-odds-result { min-width: 0; padding: 12px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 10px; }
+.draw-odds-result dt { color: var(--ink-soft); font-size: .8rem; line-height: 1.5; }
+.draw-odds-result dt span { white-space: nowrap; }
+.draw-odds-result dd { margin: 5px 0 0; font-size: 1.35rem; font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.draw-odds-result-emphasis { background: var(--primary-soft); border-color: #bfd6c4; }
+.draw-odds-result-emphasis dd { color: var(--primary-dark); }
+.draw-odds-results-single { grid-template-columns: minmax(0, 1fr); }
+.draw-odds-results-single dd { font-size: 2rem; }
+.draw-odds-note { margin: 12px 0 0; color: var(--ink-soft); font-size: .82rem; line-height: 1.55; }
+.draw-odds-error { margin: 0; padding: 12px; border: 1px solid var(--danger); border-radius: 10px; color: var(--danger); background: var(--surface-soft); }
+.tools-reference { margin-top: 18px; color: var(--ink-faint); font-size: .8rem; }
+.tools-reference a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 1100px) {
+  .tools-calculators { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .draw-odds-fields { grid-template-columns: minmax(0, 1fr); }
 }

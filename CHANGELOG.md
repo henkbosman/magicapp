@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.24.0 - 2026-10-27
+
+- Iedere kaartstapel op de goldfishing-tafel toont één afbeelding met een aantalbadge. Grote tokenstapels renderen geen overlappende afbeeldingen meer. Alle exemplaren blijven bewaard; tappen, counters en verplaatsen werken op één exemplaar.
+- Nieuwe pagina **Tools**, bereikbaar via de hoofd- en mobiele navigatie, met een **Hypergeometric Calculator** en **Multivariate Intersect**.
+- De hypergeometrische calculator toont vijf trekkansen en het verwachte aantal; Multivariate Intersect berekent de kans op minstens één kaart uit elk van twee afzonderlijke groepen. Resultaten reageren op invoer en ongeldige aantallen worden afgewezen.
+- Beide calculators rekenen lokaal zonder terugleggen en zonder mulligans. Kaarten buiten de library, zoals een commander in de command zone, tellen niet mee in de ingevoerde deckgrootte.
+- Geen database- of API-wijzigingen; de tools zijn ook beschikbaar in alleen-lezenmodus.
+
 ## 2.23.1 - 2026-10-25
 
 - Aantalbadges zijn hersteld op de library, graveyard, exile en kaartstapels met meerdere exemplaren. Zonekoppen en statistiekblokken blijven verborgen. De stapelbadge overlapt niet met toegekende counters.

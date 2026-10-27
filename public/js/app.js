@@ -13,6 +13,7 @@ import { renderDeckStatistics } from './views/deck-statistics.js';
 import { renderDeckSimulator } from './views/deck-simulator.js';
 import { renderDecks } from './views/decks.js';
 import { renderSettings } from './views/settings.js';
+import { renderTools } from './views/tools.js';
 import { renderWanted } from './views/wanted.js';
 
 const root = document.getElementById('app');
@@ -36,6 +37,7 @@ const routes = [
   { pattern: /^\/decks\/(?<id>\d+)\/stats$/, name: 'decks', render: renderDeckStatistics },
   { pattern: /^\/decks\/(?<id>\d+)\/simulate$/, name: 'decks', render: renderDeckSimulator },
   { pattern: /^\/wanted$/, name: 'wanted', render: renderWanted },
+  { pattern: /^\/tools$/, name: 'tools', render: renderTools },
   { pattern: /^\/cards\/(?<id>\d+)$/, name: '', render: renderCardDetail },
   { pattern: /^\/settings$/, name: 'settings', render: renderSettings }
 ];

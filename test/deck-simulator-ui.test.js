@@ -230,11 +230,14 @@ function assertUniqueInstances(ui, expected) {
     assert.equal(Number(ui.zone(zone).querySelector('.library-pile-count').textContent), ui.zoneCount(zone), `${zone} badge follows its current count`);
   }
   for (const stack of ui.stacks()) {
-    const count = stack.querySelectorAll('[data-sim-instance]').length;
+    const count = Number(stack.dataset.simStackCount);
+    assert.equal(stack.querySelectorAll('[data-sim-instance]').length, 1, 'one action target represents every stack');
+    assert.equal(stack.querySelectorAll('img').length, 1, 'one image per stack, independent of quantity');
     const badge = stack.querySelector('.simulator-stack-count');
     if (count > 1) assert.equal(Number(badge?.textContent), count, 'stack badge counts every actual instance');
     else assert.equal(badge, null, 'a single card needs no stack badge');
   }
+  assert.equal(ui.stacks().reduce((total, stack) => total + Number(stack.dataset.simStackCount), 0), ui.zoneCount('battlefield'), 'stack counts represent all battlefield copies');
   assert.equal(['library', 'hand', 'battlefield', 'graveyard', 'exile', 'command'].reduce((total, zone) => total + ui.zoneCount(zone), 0), expected, 'no copies lost or created across all zones, including cards hidden beneath piles');
 }
 
@@ -263,45 +266,52 @@ test('goldfishing opens without the sidebar, end-turn or header library buttons 
   ]);
 });
 
-test('same battlefield cards stack across printings while images and every physical copy remain distinct', async (t) => {
+const stackSize = (card) => Number(card.closest('.simulator-card-stack').dataset.simStackCount);
+const stackSizes = (ui) => ui.stacks().map((stack) => Number(stack.dataset.simStackCount)).sort((a, b) => a - b);
+
+test('same battlefield cards use one image per stack across printings while every physical copy remains in state', async (t) => {
   const cards = sampleDeck();
   const original = structuredClone(cards);
   const ui = await setup(t, cards);
   assert.equal(ui.zone('hand').querySelector('.simulator-card-stack'), null);
   ui.allToBattlefield();
   assert.equal(ui.stacks().length, 3, 'Forest, Snow-Covered Forest and Llanowar Elves have separate groups');
-  const forest = ui.instance('11:1').closest('.simulator-card-stack');
-  assert.equal(forest.querySelectorAll('[data-sim-instance]').length, 4);
-  assert.equal(ui.instance('12:2').closest('.simulator-card-stack'), forest);
+  const forest = ui.instance('12:2').closest('.simulator-card-stack');
+  assert.equal(forest.querySelectorAll('[data-sim-instance]').length, 1);
+  assert.equal(ui.instance('11:1'), null, 'buried copies have no image or action target');
   assert.notEqual(ui.instance('13:1').closest('.simulator-card-stack'), forest);
   assert.equal(forest.querySelector('.simulator-stack-count').textContent, '4');
   assert.match(forest.getAttribute('aria-label'), /4/);
-  assert.match(ui.instance('11:1').querySelector('img').getAttribute('src'), /\/cards\/111\/image/);
   assert.match(ui.instance('12:2').querySelector('img').getAttribute('src'), /\/cards\/112\/image/);
   assert.ok(ui.instances('battlefield').every((card) => card.getAttribute('draggable') === 'true' && card.getAttribute('tabindex') === '0'));
   assert.equal(ui.zone('command').querySelector('.simulator-card-stack'), null);
   assertUniqueInstances(ui, 8);
+  while (ui.zoneCount('battlefield')) ui.drag(ui.instances('battlefield')[0], 'hand');
+  assert.equal(ui.instances('hand').length, 7, 'every physical copy is recoverable');
+  assert.match(ui.instance('11:1').querySelector('img').getAttribute('src'), /\/cards\/111\/image/);
   assert.deepEqual(cards, original, 'rendering and moving cannot change fetched deck/card records');
 });
 
-test('tapping and untapping individual stacked copies preserves focus and reunites only those copies', async (t) => {
+test('tapping stack representatives splits one copy and restores focus when it rejoins a stack', async (t) => {
   const ui = await setup(t);
   ui.allToBattlefield();
   ui.tick(450);
   ui.instance('12:2').click();
   assert.ok(ui.instance('12:2').classList.contains('tapped'));
-  assert.ok(!ui.instance('11:1').classList.contains('tapped'));
-  assert.equal(ui.instance('12:2').closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 1);
-  assert.equal(ui.instance('11:1').closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 3);
-  ui.instance('11:1').dispatch('keydown', { key: ' ' });
-  assert.equal(ui.instance('11:1').focused, true, 'focus follows the same copy after regrouping');
-  assert.equal(ui.instance('12:2').closest('.simulator-card-stack'), ui.instance('11:1').closest('.simulator-card-stack'));
+  assert.ok(!ui.instance('12:1').classList.contains('tapped'));
+  assert.equal(stackSize(ui.instance('12:2')), 1);
+  assert.equal(stackSize(ui.instance('12:1')), 3);
+  ui.instance('12:1').dispatch('keydown', { key: ' ' });
+  assert.equal(ui.instance('12:2').focused, true, 'focus follows the merged stack representative');
+  assert.equal(ui.instance('12:1'), null, 'two tapped copies share one image');
+  assert.equal(stackSize(ui.instance('12:2')), 2);
   ui.instance('12:2').dispatch('keydown', { key: ' ' });
   assert.ok(!ui.instance('12:2').classList.contains('tapped'));
-  assert.ok(ui.instance('11:1').classList.contains('tapped'));
-  ui.instance('11:1').dispatch('keydown', { key: ' ' });
+  assert.ok(ui.instance('12:1').classList.contains('tapped'));
+  ui.instance('12:1').dispatch('keydown', { key: ' ' });
   assert.ok(ui.instances('battlefield').every((card) => !card.classList.contains('tapped')));
-  assert.equal(ui.instance('11:1').closest('.simulator-card-stack'), ui.instance('12:2').closest('.simulator-card-stack'));
+  assert.equal(stackSize(ui.instance('12:2')), 4);
+  assert.equal(ui.instance('12:2').focused, true);
   assertUniqueInstances(ui, 8);
 });
 
@@ -316,52 +326,57 @@ test('stack identity handles older printing IDs and missing IDs without mixing d
   ]);
   ui.allToBattlefield();
   assert.equal(ui.stacks().length, 3);
-  assert.equal(ui.instance('41:1').closest('.simulator-card-stack'), ui.instance('42:1').closest('.simulator-card-stack'));
-  assert.equal(ui.instance('41:1').closest('.simulator-card-stack'), ui.instance('43:1').closest('.simulator-card-stack'));
-  assert.equal(ui.instance('44:1').closest('.simulator-card-stack'), ui.instance('45:1').closest('.simulator-card-stack'));
-  assert.notEqual(ui.instance('44:1').closest('.simulator-card-stack'), ui.instance('46:1').closest('.simulator-card-stack'));
+  assert.equal(stackSize(ui.instance('43:1')), 3);
+  assert.equal(stackSize(ui.instance('45:1')), 2);
+  assert.equal(stackSize(ui.instance('46:1')), 1);
   assertUniqueInstances(ui, 6);
 });
 
-test('dragging a stacked copy changes exactly one zone entry and returning it preserves its printing', async (t) => {
+test('dragging a stack moves exactly one copy and preserves its printing through every zone', async (t) => {
   const ui = await setup(t);
   ui.allToBattlefield();
+  ui.drag(ui.instance('12:2'), 'hand');
+  ui.drag(ui.instance('12:1'), 'hand');
+  const id = '11:2';
   ui.tick(450);
-  ui.instance('12:2').click();
-  ui.drag(ui.instance('12:2'), 'graveyard');
-  assert.equal(ui.instances('battlefield').length, 6);
+  ui.instance(id).click();
+  ui.drag(ui.instance(id), 'graveyard');
+  assert.equal(ui.zoneCount('battlefield'), 4);
   assert.equal(ui.instances('graveyard').length, 1);
-  assert.equal(ui.instance('12:2').dataset.simSourceZone, 'graveyard');
+  assert.equal(ui.instance(id).dataset.simSourceZone, 'graveyard');
   assert.equal(ui.zone('graveyard').querySelector('.simulator-card-stack'), null);
-  assert.ok(!ui.instance('12:2').classList.contains('tapped'));
-  ui.drag(ui.instance('12:2'), 'library');
+  assert.ok(!ui.instance(id).classList.contains('tapped'));
+  ui.drag(ui.instance(id), 'library');
   assert.equal(ui.libraryCount(), 1);
-  assert.equal(ui.instance('12:2'), null);
+  assert.equal(ui.instance(id), null);
   ui.root().querySelector('[data-sim-library-source]').dispatch('dblclick');
-  assert.equal(ui.instance('12:2').dataset.simSourceZone, 'hand');
-  ui.drag(ui.instance('12:2'), 'battlefield');
-  assert.match(ui.instance('12:2').querySelector('img').getAttribute('src'), /\/cards\/112\/image/);
-  assert.equal(ui.instance('12:2').closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 4);
+  assert.equal(ui.instance(id).dataset.simSourceZone, 'hand');
+  assert.match(ui.instance(id).querySelector('img').getAttribute('src'), /\/cards\/111\/image/);
+  ui.drag(ui.instance(id), 'battlefield');
+  assert.equal(stackSize(ui.instance('11:1')), 2);
   assertUniqueInstances(ui, 8);
 });
 
-test('large land groups remain one unlimited stack without dropping copies when tapping or moving them', async (t) => {
+test('large land groups render one image and do not lose copies when tapping or moving representatives', async (t) => {
   const ui = await setup(t, [deckCard(21, 'Forest', 13)]);
   ui.allToBattlefield();
-  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length), [13]);
+  assert.deepEqual(stackSizes(ui), [13]);
+  assert.equal(ui.instances('battlefield').length, 1);
+  const firstId = ui.instances('battlefield')[0].dataset.simInstance;
   ui.tick(450);
-  ui.instance('21:6').click();
-  ui.drag(ui.instance('21:9'), 'graveyard');
-  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length).sort((a, b) => a - b), [1, 11]);
-  assert.ok(ui.instance('21:6').classList.contains('tapped'));
+  ui.instance(firstId).click();
+  const secondId = ui.instances('battlefield').find((card) => card.dataset.simInstance !== firstId).dataset.simInstance;
+  ui.drag(ui.instance(secondId), 'graveyard');
+  assert.deepEqual(stackSizes(ui), [1, 11]);
+  assert.ok(ui.instance(firstId).classList.contains('tapped'));
   ui.tick(450);
-  ui.instance('21:6').click();
-  ui.drag(ui.instance('21:9'), 'battlefield');
+  ui.instance(firstId).click();
+  ui.drag(ui.instance(secondId), 'battlefield');
   assertUniqueInstances(ui, 13);
-  assert.deepEqual(ui.stacks().map((stack) => stack.querySelectorAll('[data-sim-instance]').length), [13]);
+  assert.deepEqual(stackSizes(ui), [13]);
 });
 
-test('zoom on a stacked copy uses its actual printing and drag does not open an accidental zoom', async (t) => {
+test('zoom uses the visible representative printing and drag does not open an accidental zoom', async (t) => {
   const ui = await setup(t, [deckCard(11, 'Llanowar Elves', 2), deckCard(12, 'Llanowar Elves', 2)]);
   ui.allToBattlefield();
   ui.instance('12:2').click();
@@ -374,13 +389,15 @@ test('zoom on a stacked copy uses its actual printing and drag does not open an 
   assert.ok(dialog);
   assert.match(dialog.querySelector('img').getAttribute('src'), /\/cards\/112\/image\?face=front&size=large/);
   dialog.close();
-  ui.instance('11:1').dispatch('keydown', { key: 'Enter' });
+  ui.drag(ui.instance('12:2'), 'hand');
+  ui.drag(ui.instance('12:1'), 'hand');
+  ui.instance('11:2').dispatch('keydown', { key: 'Enter' });
   dialog = ui.document.querySelector('dialog');
   assert.match(dialog.querySelector('img').getAttribute('src'), /\/cards\/111\/image\?face=front&size=large/);
   assertUniqueInstances(ui, 4);
 });
 
-test('touch dragging a stacked copy moves only the selected instance', async (t) => {
+test('touch dragging a stack moves only its representative instance', async (t) => {
   const ui = await setup(t);
   ui.allToBattlefield();
   const source = ui.cloneForTouch(ui.instance('12:2'));
@@ -391,6 +408,7 @@ test('touch dragging a stacked copy moves only the selected instance', async (t)
   ui.root().dispatch('pointerup', { pointerType: 'touch', pointerId: 7, clientX: 100, clientY: 100 });
   assert.equal(ui.instance('12:2').dataset.simSourceZone, 'graveyard');
   assert.equal(ui.instance('12:1').dataset.simSourceZone, 'battlefield');
+  assert.equal(stackSize(ui.instance('12:1')), 3);
   assert.equal(ui.instances('graveyard').length, 1);
   assert.equal(ui.document.body.classList.contains('simulator-touch-dragging'), false);
   assertUniqueInstances(ui, 8);
@@ -421,7 +439,7 @@ test('goldfishing remains temporary and fully usable in read-only mode, includin
   const ui = await setup(t, [deckCard(31, 'Forest', 10)]);
   ui.allToBattlefield();
   ui.tick(450);
-  ui.instance('31:1').click();
+  ui.instances('battlefield')[0].click();
   ui.document.getElementById('sim-reset').click();
   const dialog = ui.document.querySelector('dialog');
   assert.equal(dialog.querySelector('[data-write-action]'), null);
@@ -937,16 +955,16 @@ test('basic land click and keyboard actions tap one copy without zoom or a secon
   ]);
   ui.allToBattlefield();
   ui.tick(450);
-  ui.instance('301:1').dispatch('click', { detail: 1 });
-  assert.ok(ui.instance('301:1').classList.contains('tapped'), 'single click taps immediately');
-  assert.ok(!ui.instance('301:2').classList.contains('tapped'));
-  ui.instance('301:1').dispatch('click', { detail: 2 });
-  ui.instance('301:1').dispatch('dblclick');
-  ui.tick(400);
-  assert.ok(ui.instance('301:1').classList.contains('tapped'), 'double-click sequence does not toggle again');
-  assert.equal(ui.document.querySelector('dialog'), null);
-  ui.instance('301:1').dispatch('keydown', { key: 'Enter' });
+  ui.instance('301:2').dispatch('click', { detail: 1 });
+  assert.ok(ui.instance('301:2').classList.contains('tapped'), 'single click taps immediately');
   assert.ok(!ui.instance('301:1').classList.contains('tapped'));
+  ui.instance('301:2').dispatch('click', { detail: 2 });
+  ui.instance('301:2').dispatch('dblclick');
+  ui.tick(400);
+  assert.ok(ui.instance('301:2').classList.contains('tapped'), 'double-click sequence does not toggle again');
+  assert.equal(ui.document.querySelector('dialog'), null);
+  ui.instance('301:2').dispatch('keydown', { key: 'Enter' });
+  assert.ok(!ui.instance('301:2').classList.contains('tapped'));
   ui.instance('302:1').dispatch('keydown', { key: ' ' });
   assert.ok(ui.instance('302:1').classList.contains('tapped'));
   assert.equal(ui.document.querySelector('dialog'), null);
@@ -987,19 +1005,19 @@ test('counter totals belong to a single instance, split its stack and can be res
   const original = structuredClone(cards);
   const ui = await setup(t, cards);
   ui.allToBattlefield();
-  await openCardMenu(ui, '321:1');
+  await openCardMenu(ui, '321:2');
   let dialog = cardAction(ui, 'counters');
   assert.equal(dialog.querySelector('[name="generic"]'), null);
   await submitDialog(dialog, { power: 2, toughness: 3 });
-  assert.equal(ui.instance('321:1').querySelector('.simulator-card-counters').textContent.trim(), '+2/+3');
-  assert.equal(ui.instance('321:2').querySelector('.simulator-card-counters'), null);
+  assert.equal(ui.instance('321:2').querySelector('.simulator-card-counters').textContent.trim(), '+2/+3');
+  assert.equal(ui.instance('321:1').querySelector('.simulator-card-counters'), null);
   assert.equal(ui.stacks().length, 2, 'different counters cannot hide in the same stack');
-  await openCardMenu(ui, '321:1');
+  await openCardMenu(ui, '321:2');
   dialog = cardAction(ui, 'counters');
   assert.equal(dialog.querySelector('[name="power"]').value, '2');
   assert.equal(dialog.querySelector('[name="toughness"]').value, '3');
   await submitDialog(dialog, { power: 0, toughness: 0 });
-  assert.equal(ui.instance('321:1').querySelector('.simulator-card-counters'), null);
+  assert.equal(ui.instance('321:2').querySelector('.simulator-card-counters'), null);
   assert.equal(ui.stacks().length, 1);
   assert.deepEqual(cards, original);
   assertUniqueInstances(ui, 2);
@@ -1029,10 +1047,11 @@ test('duplicate validates quantity, applies once and creates independent uncount
   await flush();
   assert.equal(ui.zoneCount('battlefield'), 9, 'double submission still creates exactly eight copies');
   const generated = generatedCards(ui);
-  assert.equal(generated.length, 8);
+  assert.equal(generated.length, 1);
+  assert.equal(stackSize(generated[0]), 8);
   assert.ok(generated.every((card) => !card.classList.contains('tapped')));
   assert.ok(generated.every((card) => card.querySelector('.simulator-card-counters') === null));
-  assert.equal(generated[0].closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 8);
+  assert.equal(generated[0].closest('.simulator-card-stack').querySelectorAll('img').length, 1);
   assert.equal(ui.instance('331:1').querySelector('.simulator-card-counters').textContent.trim(), '+1/+2');
   assert.match(generated[0].querySelector('img').getAttribute('src'), /\/cards\/431\/image/);
   assertUniqueInstances(ui, 9);
@@ -1054,7 +1073,8 @@ test('token selection creates the chosen kind and keeps generated cards usable i
   const choices = dialog.querySelector('[name="tokenIndex"]');
   assert.equal(choices.options.length, 2);
   await submitDialog(dialog, { tokenIndex: 1, quantity: 3 });
-  assert.equal(generatedCards(ui).length, 3);
+  assert.equal(generatedCards(ui).length, 1);
+  assert.equal(stackSize(generatedCards(ui)[0]), 3);
   assert.ok(generatedCards(ui).every((card) => card.closest('[data-sim-battlefield-area]').dataset.simBattlefieldArea === 'artifacts'));
   const id = generatedCards(ui)[0].dataset.simInstance;
   const image = ui.instance(id).querySelector('img').getAttribute('src');
@@ -1094,8 +1114,9 @@ test('identical tokens from different makers form one stack and individual count
     await submitDialog(cardAction(ui, 'token'), { quantity: 4 });
   }
   const generated = generatedCards(ui);
-  assert.equal(generated.length, 8);
-  assert.equal(generated[0].closest('.simulator-card-stack').querySelectorAll('[data-sim-instance]').length, 8);
+  assert.equal(generated.length, 1);
+  assert.equal(stackSize(generated[0]), 8);
+  assert.equal(generated[0].closest('.simulator-card-stack').querySelectorAll('img').length, 1);
   const id = generated[0].dataset.simInstance;
   await openCardMenu(ui, id);
   await submitDialog(cardAction(ui, 'counters'), { power: 5, toughness: 5 });
@@ -1103,6 +1124,44 @@ test('identical tokens from different makers form one stack and individual count
   assert.ok(generatedCards(ui).filter((card) => card.dataset.simInstance !== id)
     .every((card) => card.querySelector('.simulator-card-counters') === null));
   assertUniqueInstances(ui, 10);
+});
+
+test('thousands of tokens keep one image per stack while menus, tapping and moving affect only one copy', async (t) => {
+  const ui = await setup(t, [deckCard(353, 'Large token maker', 1)], { tokens: () => [relatedToken()] });
+  ui.allToBattlefield();
+  for (let batch = 0; batch < 2; batch++) {
+    await openCardMenu(ui, '353:1');
+    await submitDialog(cardAction(ui, 'token'), { quantity: 1000 });
+  }
+  assert.equal(ui.zoneCount('battlefield'), 2001);
+  assert.equal(generatedCards(ui).length, 1, 'no per-token DOM or layered images');
+  let representative = generatedCards(ui)[0];
+  assert.equal(stackSize(representative), 2000);
+  assert.equal(representative.closest('.simulator-card-stack').querySelectorAll('img').length, 1);
+  const counterId = representative.dataset.simInstance;
+  await openCardMenu(ui, counterId);
+  await submitDialog(cardAction(ui, 'counters'), { power: 2, toughness: 3 });
+  assert.equal(ui.instance(counterId).querySelector('.simulator-card-counters').textContent, '+2/+3');
+  assert.equal(stackSize(ui.instance(counterId)), 1);
+  representative = generatedCards(ui).find((card) => card.dataset.simInstance !== counterId);
+  assert.equal(stackSize(representative), 1999);
+  const tappedId = representative.dataset.simInstance;
+  representative.dispatch('keydown', { key: ' ' });
+  assert.ok(ui.instance(tappedId).classList.contains('tapped'));
+  assert.equal(stackSize(ui.instance(tappedId)), 1);
+  assert.ok(generatedCards(ui).some((card) => stackSize(card) === 1998));
+  ui.drag(ui.instance(tappedId), 'hand');
+  assert.equal(ui.instance(tappedId).dataset.simSourceZone, 'hand');
+  assert.equal(ui.zoneCount('battlefield'), 2000);
+  assert.ok(!ui.instance(tappedId).classList.contains('tapped'));
+  ui.drag(ui.instance(tappedId), 'battlefield');
+  assert.ok(generatedCards(ui).some((card) => stackSize(card) === 1999));
+  await openCardMenu(ui, counterId);
+  await submitDialog(cardAction(ui, 'counters'), { power: 0, toughness: 0 });
+  assert.equal(generatedCards(ui).length, 1);
+  assert.equal(stackSize(generatedCards(ui)[0]), 2000);
+  assertUniqueInstances(ui, 2001);
+  assert.ok(ui.requests.every((request) => request.method === 'GET'));
 });
 
 test('token lookup errors offer retry and do not claim missing token capability', async (t) => {
@@ -1244,7 +1303,8 @@ test('token and generic-counter fields select even when the browser focused them
   quantity.dispatch('click', { detail: 1 });
   typeIntoSelection(quantity, '8');
   await submitDialog(dialog);
-  assert.equal(generatedCards(ui).length, 8);
+  assert.equal(generatedCards(ui).length, 1);
+  assert.equal(stackSize(generatedCards(ui)[0]), 8);
   assert.equal(generatedCards(ui)[0].closest('.simulator-card-stack').querySelector('.simulator-stack-count').textContent, '8');
 
   await openCardMenu(ui, '412:1');

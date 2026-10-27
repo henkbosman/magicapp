@@ -1,4 +1,4 @@
-# Magic Collection Manager 2.23.1
+# Magic Collection Manager 2.24.0
 
 Magic Collection Manager is een lokale, responsive webapp voor het beheren van een persoonlijke Magic: The Gathering-collectie, wanted-list en decks. De applicatie gebruikt Node.js, Express.js, SQLite en Scryfall en is bedoeld voor één gebruiker zonder ingebouwde authenticatie.
 
@@ -57,6 +57,8 @@ Versie **2.22.4** maakt het speelveld compacter met kleinere marges en tussenrui
 Versie **2.23.0** verwijdert zonekoppen en aantaltellers uit Goldfishing, tapt basic lands met één klik en voegt een kaartmenu toe voor tokens, counters en creaturekopieën. Stapels hebben geen limiet van vijf meer.
 
 Versie **2.23.1** herstelt de aantallen op de kaartstapels en library. De getalvelden bij tokens en counters selecteren hun huidige waarde om die meteen te kunnen overschrijven. Popups in de hele applicatie blijven open wanneer tekstselectie vanuit de popup buiten het venster eindigt.
+
+Versie **2.24.0** toont elke stapel op de goldfishing-tafel als één kaartafbeelding met een aantalbadge. Tappen, counters en verplaatsen werken op één exemplaar; alle overige kaarten blijven behouden. Het menu bevat de nieuwe pagina **Tools**, met een **Hypergeometric Calculator** en **Multivariate Intersect**. Berekeningen reageren op je invoer en werken volledig lokaal, ook in alleen-lezenmodus.
 
 ## Belangrijkste mogelijkheden
 

@@ -102,10 +102,10 @@ function drawTop(state, targetZone = 'hand') {
   return true;
 }
 
-function simulatorCard(instance, zone, byDeckCardId, { stackIndex, stackSize } = {}) {
+function simulatorCard(instance, zone, byDeckCardId, { stackSize } = {}) {
   const item = itemForInstance(instance, byDeckCardId);
   if (!item) return '';
-  const positionLabel = stackSize > 1 ? `, exemplaar ${stackIndex + 1} van ${stackSize}` : '';
+  const positionLabel = stackSize > 1 ? `, stapel van ${stackSize} exemplaren; acties gelden voor één exemplaar` : '';
   const stateLabel = zone === 'battlefield' ? `, ${instance.tapped ? 'getapt' : 'ongetapt'}` : '';
   const counters = simulatorCounterLabel(instance, item.card);
   const label = `${item.card.name} in ${ZONE_LABELS[zone]}${stateLabel}${positionLabel}${counters ? `, counters ${counters}` : ''}`;
@@ -129,11 +129,11 @@ function battlefieldStacksHtml(instances, byDeckCardId) {
     const item = itemForInstance(stack[0], byDeckCardId);
     const tapped = Boolean(stack[0].tapped);
     const label = `${stack.length} × ${item.card.name} · ${tapped ? 'getapt' : 'ongetapt'}`;
-    // Keep every instance in a single pile. Large piles use a compact fan;
-    // keyboard focus still reaches every copy, with its own menu and tap state.
-    const step = Math.min(22, 88 / Math.max(1, stack.length - 1));
-    return `<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" data-sim-stack-count="${stack.length}" style="--sim-stack-count: ${stack.length}; --sim-stack-step: ${step}px">
-      <div class="simulator-stack-cards">${stack.map((instance, stackIndex) => `<div class="simulator-stack-slot" style="--sim-stack-index: ${stackIndex}">${simulatorCard(instance, 'battlefield', byDeckCardId, { stackIndex, stackSize: stack.length })}</div>`).join('')}</div>
+    // A stack has one image and one action target, regardless of its size.
+    // Every physical copy remains in state; moving or changing this copy
+    // reveals the next representative or splits it into its own stack.
+    return `<div class="simulator-card-stack${tapped ? ' is-tapped' : ''}" role="group" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" data-sim-stack-count="${stack.length}">
+      <div class="simulator-stack-slot">${simulatorCard(stack[0], 'battlefield', byDeckCardId, { stackSize: stack.length })}</div>
       ${stack.length > 1 ? `<span class="simulator-stack-count" aria-hidden="true">${stack.length}</span>` : ''}
     </div>`;
   }).join('');
@@ -667,8 +667,14 @@ export async function renderDeckSimulator(context) {
         found.instance.tapped = !found.instance.tapped;
         state.updatedAt = Date.now();
         render();
-        [...root.querySelectorAll('[data-sim-instance]')]
-          .find((entry) => entry.dataset.simInstance === found.instance.id)?.focus();
+        const key = simulatorStackKey(found.instance, itemForInstance(found.instance, byDeckCardId).card);
+        // Untapping may merge this copy into a stack whose visible card is
+        // another instance. Keep keyboard focus on that resulting stack.
+        [...root.querySelectorAll('[data-sim-instance]')].find((entry) => {
+          const candidate = findZone(state, entry.dataset.simInstance);
+          return candidate?.zone === 'battlefield'
+            && simulatorStackKey(candidate.instance, itemForInstance(candidate.instance, byDeckCardId).card) === key;
+        })?.focus();
       };
       const openBattlefieldMenu = (event, card) => {
         const found = findZone(state, card?.dataset.simInstance);
